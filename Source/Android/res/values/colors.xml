@@ -1,29 +1,10 @@
 <resources>
-    <!-- Semantic tokens, light theme. values-night/colors.xml holds the dark set. -->
-    <color name="navy">#0F1B2E</color>
-    <color name="muted">#56647A</color>
-    <color name="surface">#F4F6FB</color>
-    <color name="card_surface">#FFFFFF</color>
-    <color name="surface_alt">#EEF2F8</color>
-    <color name="border">#DFE5EF</color>
-    <color name="blue">#2563EB</color>
-    <color name="button_blue">#2563EB</color>
-    <color name="white">#FFFFFF</color>
-    <color name="primary_container">#E1EAFE</color>
-    <color name="on_primary_container">#1D3F9E</color>
-    <color name="success">#15803D</color>
-    <color name="success_container">#DCF5E4</color>
-    <color name="danger">#C62828</color>
-    <color name="danger_container">#FCE4E4</color>
-    <color name="amber">#F5A524</color>
-    <color name="amber_container">#FDF1D8</color>
-    <color name="on_amber_container">#8A5300</color>
-    <color name="tile_image">#E3EDFF</color>
-    <color name="tile_video">#EFE6FE</color>
-    <color name="tile_audio">#FFEEDD</color>
-    <color name="tile_document">#DFF4EE</color>
-    <color name="tile_archive">#FDF0D5</color>
-    <color name="tile_other">#EAEFF6</color>
-    <color name="launcher_background">#F1F5FB</color>
-    <color name="camera_scrim">#AA0F1B2E</color>
+    <!-- The screens take their colours from the Compose themes (src/com/hop/drop/ui/Theme.kt). These few are for
+         what Android draws itself: the window before the first frame, the app icon tile, notifications, the scanner. -->
+    <color name="window_background">#F7F8FB</color>
+    <color name="launcher_background">#F1F4F8</color>
+    <!-- HopDrop orange: notification accent and the scanner's buttons. -->
+    <color name="brand">#E8590C</color>
+    <color name="brand_light">#FFB693</color>
+    <color name="camera_scrim">#AA0D121B</color>
 </resources>

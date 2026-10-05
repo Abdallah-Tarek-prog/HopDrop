@@ -11,6 +11,11 @@ TestResults/
 Source/Android/out/
 Source/Android/.scratch/
 Source/Android/.keys/
+Source/Android/build/
+Source/Android/.gradle/
+Source/Android/.kotlin/
+Source/Android/local.properties
+Source/Android/screenshots/
 # Built apps go to GitHub Releases, not git.
 *.apk
 *.apk.idsig

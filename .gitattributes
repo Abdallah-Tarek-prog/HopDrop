@@ -1,0 +1,9 @@
+# Shell scripts must keep Unix line endings to run on Linux and macOS; Windows scripts keep CRLF.
+gradlew text eol=lf
+*.sh text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.jar binary
+*.ttf binary
+*.png binary
+*.ico binary

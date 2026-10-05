@@ -60,7 +60,9 @@ public final class TransferService extends Service {
                         break;
                     }
                 }
-                app.peer().send(d, items(uris, trees));
+                List<Peer.FileItem> items = items(uris, trees);
+                app.sendingFrom(d.label(), sources);
+                app.peer().send(d, items);
             } catch (Exception e) {
                 String reason = d == null ? "This device is no longer paired. Pair it again in Devices."
                         : cancelRequested ? "You cancelled it." : ErrorText.forDevice(e, label);
@@ -81,13 +83,19 @@ public final class TransferService extends Service {
     }
 
     /** Folders first (each file with its place inside the folder, listed now so it's current), then loose files. */
+    /** The first 50 files of the transfer being prepared, as [name, uri] pairs for Activity. */
+    private List<Object> sources = new ArrayList<>();
+
     private List<Peer.FileItem> items(List<Uri> uris, List<Uri> trees) {
         List<Peer.FileItem> items = new ArrayList<>();
+        sources = new ArrayList<>();
         if (trees != null) {
             for (Uri tree : trees) {
                 for (FolderScan.Item file : FolderScan.files(getContentResolver(), tree)) {
                     items.add(new Peer.FileItem(file.name, file.size, () -> getContentResolver().openInputStream(file.uri),
                             file.folder));
+                    if (sources.size() < 50) sources.add(java.util.Arrays.asList(file.folder == null ? file.name
+                            : file.folder + "/" + file.name, file.uri.toString()));
                 }
             }
         }
@@ -105,6 +113,7 @@ public final class TransferService extends Service {
             }
             if (name == null) name = "file";
             items.add(new Peer.FileItem(name, size, () -> getContentResolver().openInputStream(uri)));
+            if (sources.size() < 50) sources.add(java.util.Arrays.asList(name, uri.toString()));
         }
         return items;
     }

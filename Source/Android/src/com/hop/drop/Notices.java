@@ -108,7 +108,7 @@ final class Notices {
             String reason = cancelled ? cancelReason(r) : ErrorText.forDevice(r.error, r.peer);
             String kept = r.files.isEmpty() ? "No files were " + (r.incoming ? "saved." : "delivered.")
                     : r.files.size() + " of " + r.offered + " files " + (r.incoming ? "were saved" : "arrived")
-                    + " (" + Format.names(r.files) + "). " + where + ".";
+                    + ": " + Format.names(r.files) + ". " + where + ".";
             line = reason;
             details = reason + "\n" + kept;
         }

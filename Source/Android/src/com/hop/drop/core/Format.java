@@ -43,16 +43,28 @@ public final class Format {
         return String.format(Locale.ROOT, "%,d", count) + (count == 1 ? " folder" : " folders");
     }
 
-    /** "a.jpg, b.pdf +3" — at most two names. Files that came inside a sent folder count once, as "Photos folder". */
+    /** "a.jpg", "a.jpg and b.pdf", "a.jpg + 3 more". Files inside a sent folder count once, as "Photos folder". */
     public static String names(List<String> names) {
-        return list(names, 2);
+        List<String> shown = top(names);
+        if (shown.isEmpty()) return "No files";
+        if (shown.size() == 1) return shown.get(0);
+        if (shown.size() == 2) return shown.get(0) + " and " + shown.get(1);
+        return shown.get(0) + " + " + (shown.size() - 1) + " more";
     }
 
     /**
-     * At most {@code max} entries, then "+N". Paths inside a sent folder ("Photos/2024/a.jpg") are shown as their
-     * top folder ("Photos folder"), once.
+     * One name per line, at most {@code max}, then "+ N more". Paths inside a sent folder ("Photos/2024/a.jpg") are
+     * shown as their top folder ("Photos folder"), once.
      */
     public static String list(List<String> names, int max) {
+        List<String> shown = top(names);
+        if (shown.isEmpty()) return "No files";
+        if (shown.size() <= max) return String.join("\n", shown);
+        return String.join("\n", shown.subList(0, max)) + "\n+ " + (shown.size() - max) + " more";
+    }
+
+    /** Loose files, plus each sent folder once ("Photos folder"). */
+    private static List<String> top(List<String> names) {
         List<String> shown = new ArrayList<>();
         Set<String> folders = new HashSet<>();
         for (String name : names) {
@@ -60,9 +72,7 @@ public final class Format {
             if (slash <= 0) shown.add(name);
             else if (folders.add(name.substring(0, slash))) shown.add(name.substring(0, slash) + " folder");
         }
-        if (shown.isEmpty()) return "No files";
-        if (shown.size() <= max) return String.join(", ", shown);
-        return String.join(", ", shown.subList(0, max)) + " +" + (shown.size() - max);
+        return shown;
     }
 
     /** "412.0 MB of 1.60 GB" or just "412.0 MB" when the total is unknown. */

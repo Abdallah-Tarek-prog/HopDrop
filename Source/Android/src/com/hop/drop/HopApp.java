@@ -65,6 +65,8 @@ public final class HopApp extends Application {
     private boolean uiRefreshQueued;
     private final Map<String, Peer.Offer> offers = new ConcurrentHashMap<>();
     private volatile boolean pairingVisible;
+    /** What is being sent to each device right now: [name, uri] pairs, so Activity can open the files later. */
+    private final Map<String, List<Object>> sources = new ConcurrentHashMap<>();
 
     public Peer peer() {
         return peer;
@@ -110,6 +112,11 @@ public final class HopApp extends Application {
     boolean hidden() {
         return "paired".equals(getSharedPreferences("settings_v2", MODE_PRIVATE).getString("visibility", "everyone"))
                 && !pairingVisible;
+    }
+
+    /** TransferService calls this right before it sends to {@code peer} (it sends one transfer at a time). */
+    void sendingFrom(String peer, List<Object> files) {
+        sources.put(peer, files);
     }
 
     void answerOffer(String id, boolean accept) {
@@ -241,7 +248,7 @@ public final class HopApp extends Application {
         PendingIntent open = PendingIntent.getActivity(this, 0, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification.Builder b = new Notification.Builder(this, channel).setSmallIcon(R.drawable.ic_notification)
-                .setColor(getColor(R.color.button_blue)).setContentTitle(title).setContentText(detail)
+                .setColor(getColor(R.color.brand)).setContentTitle(title).setContentText(detail)
                 .setContentIntent(open).setOnlyAlertOnce(ongoing).setOngoing(ongoing);
         if (percent >= 0) b.setProgress(100, percent, false);
         else if (ongoing && channel.equals("transfers") && !title.startsWith("Ready")) b.setProgress(0, 0, true);
@@ -311,12 +318,35 @@ public final class HopApp extends Application {
                 Uri uri = receivedUri(names.get(i));
                 uris.add(uri == null ? null : uri.toString());
             }
-            list.add(0, Json.obj("at", System.currentTimeMillis(), "incoming", r.incoming, "peer", r.peer,
+            Map<String, Object> entry = Json.obj("at", System.currentTimeMillis(), "incoming", r.incoming, "peer", r.peer,
                     "files", names, "count", r.files.size(), "uris", uris, "folder", r.folder, "error", r.error,
-                    "bytes", r.bytes, "offered", r.offered, "millis", r.millis));
+                    "bytes", r.bytes, "offered", r.offered, "millis", r.millis);
+            List<Object> sent = r.incoming ? null : sources.remove(r.peer);
+            if (sent != null) entry.put("sources", sent);
+            list.add(0, entry);
             while (list.size() > 100) list.remove(list.size() - 1);
             p.edit().putString("data", Json.string(Json.obj("items", list))).apply();
         } catch (Exception ignored) {
         }
+    }
+
+    /** Removes one transfer from Activity (the files themselves stay). */
+    @SuppressWarnings("unchecked")
+    public synchronized void removeHistory(long at, boolean incoming, String peer) {
+        SharedPreferences p = getSharedPreferences("history_v2", MODE_PRIVATE);
+        try {
+            List<Object> list = (List<Object>) Json.parseObject(p.getString("data", "{\"items\":[]}")).get("items");
+            list.removeIf(item -> {
+                Map<String, Object> e = (Map<String, Object>) item;
+                return e.get("at") instanceof Number && ((Number) e.get("at")).longValue() == at
+                        && Boolean.valueOf(incoming).equals(e.get("incoming")) && peer.equals(String.valueOf(e.get("peer")));
+            });
+            p.edit().putString("data", Json.string(Json.obj("items", list))).apply();
+        } catch (Exception ignored) {
+        }
+    }
+
+    public synchronized void clearHistory() {
+        getSharedPreferences("history_v2", MODE_PRIVATE).edit().remove("data").apply();
     }
 }

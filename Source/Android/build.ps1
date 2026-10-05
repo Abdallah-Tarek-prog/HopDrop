@@ -1,96 +1,81 @@
 param([switch]$Debug,[switch]$Release,[switch]$Test,[switch]$Install,[switch]$Interop)
-$ErrorActionPreference='Stop'
+# HopDrop for Android.
+#   -Test     the phone's transfer engine, checked on the desktop JVM (no Android SDK needed)
+#   -Interop  the phone's engine against the Windows engine (needs the .NET SDK)
+#   -Debug    debug app "HopDrop Dev" (com.hop.drop.dev, installs next to the real app)
+#   -Release  the release app, signed with the key in "Private signing key/", copied to HopDrop.apk at the repo root
+#   -Install  also install it on the phone connected over adb
+# Needs JDK 17+ (JAVA_HOME, or an installed Temurin/Microsoft/Oracle JDK) and, for -Debug/-Release, the Android SDK
+# (ANDROID_HOME, or Android Studio's default %LOCALAPPDATA%\Android\Sdk). Gradle downloads everything else.
+# Native tools (javac, Gradle) write notes and progress to stderr. With 'Stop', Windows PowerShell 5 would treat that
+# as a failure, so every native call is checked through its exit code instead.
+$ErrorActionPreference='Continue'
 $root=Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $android=Join-Path $root 'Source/Android'
-$sdk='G:\Programs\Android\AndroidSdk'
-$jdk='C:\Users\LOQ\AppData\Local\Programs\Eclipse Adoptium\jdk-21.0.8.9-hotspot'
-$env:JAVA_HOME=$jdk
-$env:PATH=(Join-Path $jdk 'bin')+';'+$env:PATH
-$aapt=Join-Path $sdk 'build-tools/36.0.0/aapt2.exe'
-$d8=Join-Path $sdk 'build-tools/36.0.0/d8.bat'
-$align=Join-Path $sdk 'build-tools/36.0.0/zipalign.exe'
-$sign=Join-Path $sdk 'build-tools/36.0.0/apksigner.bat'
-$platform=Join-Path $sdk 'platforms/android-36/android.jar'
-$javac=Join-Path $jdk 'bin/javac.exe'
-$java=Join-Path $jdk 'bin/java.exe'
-$jar=Join-Path $jdk 'bin/jar.exe'
-$zxing=Join-Path $android 'libs/core-3.5.4.jar'
+
+function Find-Jdk {
+    if($env:JAVA_HOME -and (Test-Path (Join-Path $env:JAVA_HOME 'bin/javac.exe'))){return $env:JAVA_HOME}
+    $places=@("$env:LOCALAPPDATA\Programs\Eclipse Adoptium","$env:ProgramFiles\Eclipse Adoptium","$env:ProgramFiles\Microsoft","$env:ProgramFiles\Java")
+    $found=foreach($place in $places){if(Test-Path $place){Get-ChildItem $place -Directory | Where-Object { Test-Path (Join-Path $_.FullName 'bin/javac.exe') }}}
+    $best=$found | Where-Object { $_.Name -match '(\d+)' -and [int]$Matches[1] -ge 17 } | Sort-Object { [int]([regex]::Match($_.Name,'\d+').Value) } -Descending | Select-Object -First 1
+    if(-not $best){throw 'JDK 17 or newer is needed: install one (for example Eclipse Temurin 21) or set JAVA_HOME.'}
+    return $best.FullName
+}
+$env:JAVA_HOME=Find-Jdk
+$env:PATH=(Join-Path $env:JAVA_HOME 'bin')+';'+$env:PATH
+$javac=Join-Path $env:JAVA_HOME 'bin/javac.exe'
+$java=Join-Path $env:JAVA_HOME 'bin/java.exe'
 $out=Join-Path $android 'out'
 New-Item -ItemType Directory -Force $out | Out-Null
-Push-Location $root
+
 if($Test -or $Interop){
-    $classes=Join-Path $out ('jvm-classes-'+[guid]::NewGuid().ToString('N'));New-Item -ItemType Directory -Force $classes | Out-Null
-    $classesRel='Source/Android/out/'+(Split-Path $classes -Leaf)
-    $core=Get-ChildItem (Join-Path $android 'src/com/hop/drop/core') -Filter '*.java' | ForEach-Object FullName
-    $tests=Get-ChildItem (Join-Path $android 'tests') -Filter '*.java' | ForEach-Object FullName
-    $argsFile=Join-Path $out 'jvm-javac-args.txt'
-    @($core+$tests | ForEach-Object { '"'+$_.Replace('\','/')+'"' }) | Set-Content $argsFile -Encoding Ascii
-    & $javac -encoding UTF-8 -d $classesRel '@Source/Android/out/jvm-javac-args.txt'
-    if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
-    if($Test){
-        & $java -cp $classes com.hop.drop.tests.CoreTests;if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
-        $testRun=Join-Path $out ("jvm/run-"+[guid]::NewGuid().ToString('N'))
-        foreach($n in @('a','b')){
-            $dir=Join-Path $testRun $n;New-Item -ItemType Directory -Force $dir | Out-Null
-            $identity=Join-Path $dir 'identity.p12'
-            if(-not (Test-Path $identity)){& (Join-Path $jdk 'bin/keytool.exe') -genkeypair -alias identity -keyalg EC -groupname secp256r1 -validity 10000 -dname "CN=HopDrop $n" -storetype PKCS12 -keystore $identity -storepass android -keypass android -noprompt;if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}}
+    Push-Location $root
+    try{
+        $classes=Join-Path $out ('jvm-classes-'+[guid]::NewGuid().ToString('N'));New-Item -ItemType Directory -Force $classes | Out-Null
+        $classesRel='Source/Android/out/'+(Split-Path $classes -Leaf)
+        $core=Get-ChildItem (Join-Path $android 'src/com/hop/drop/core') -Filter '*.java' | ForEach-Object FullName
+        $tests=Get-ChildItem (Join-Path $android 'tests') -Filter '*.java' | ForEach-Object FullName
+        $argsFile=Join-Path $out 'jvm-javac-args.txt'
+        @($core+$tests | ForEach-Object { '"'+$_.Replace('\','/')+'"' }) | Set-Content $argsFile -Encoding Ascii
+        & $javac -encoding UTF-8 -d $classesRel '@Source/Android/out/jvm-javac-args.txt' 2>&1 | ForEach-Object { "$_" }
+        if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
+        if($Test){
+            & $java -cp $classes com.hop.drop.tests.CoreTests;if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
+            $testRun=Join-Path $out ("jvm/run-"+[guid]::NewGuid().ToString('N'))
+            foreach($n in @('a','b')){
+                $dir=Join-Path $testRun $n;New-Item -ItemType Directory -Force $dir | Out-Null
+                $identity=Join-Path $dir 'identity.p12'
+                & (Join-Path $env:JAVA_HOME 'bin/keytool.exe') -genkeypair -alias identity -keyalg EC -groupname secp256r1 -validity 10000 -dname "CN=HopDrop $n" -storetype PKCS12 -keystore $identity -storepass android -keypass android -noprompt
+                if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
+            }
+            & $java -cp $classes com.hop.drop.tests.PeerTests $testRun;exit $LASTEXITCODE
         }
-        & $java -cp $classes com.hop.drop.tests.PeerTests $testRun;exit $LASTEXITCODE
-    }
-    if($Interop){& (Join-Path $android 'interop.ps1') -Java $java -Classes $classes -Root $root;exit $LASTEXITCODE}
+        & (Join-Path $android 'interop.ps1') -Java $java -Classes $classes -Root $root;exit $LASTEXITCODE
+    }finally{Pop-Location}
 }
-if(-not $Debug -and -not $Release){throw 'Choose -Debug, -Release, -Test, or -Interop'}
-if($Debug -and $Release){throw 'Choose one build mode'}
-$mode=if($Debug){'debug'}else{'release'}
-$scratch=Join-Path $out ($mode+'-'+[guid]::NewGuid().ToString('N'))
-$scratchRel='Source/Android/out/'+(Split-Path $scratch -Leaf)
-New-Item -ItemType Directory -Force (Join-Path $scratch 'res'),(Join-Path $scratch 'flat'),(Join-Path $scratch 'gen'),(Join-Path $scratch 'classes'),(Join-Path $scratch 'dex') | Out-Null
-Copy-Item (Join-Path $android 'res/*') (Join-Path $scratch 'res') -Recurse -Force
-$manifest=Join-Path $scratch 'AndroidManifest.xml';Copy-Item (Join-Path $android 'AndroidManifest.xml') $manifest -Force
-if($Debug){
-    (Get-Content $manifest -Raw).Replace('com.hop.drop.sharedtext','com.hop.drop.dev.sharedtext') | Set-Content $manifest -Encoding UTF8
-    '<resources><string name="app_name">HopDrop Dev</string></resources>' | Set-Content (Join-Path $scratch 'res/values/strings.xml') -Encoding UTF8
+
+if(-not $Debug -and -not $Release){throw 'Choose -Debug, -Release, -Test or -Interop'}
+if($Debug -and $Release){throw 'Choose one of -Debug and -Release'}
+
+# Where the Android SDK is: local.properties (not in git), else ANDROID_HOME, else Android Studio's default folder.
+$properties=Join-Path $android 'local.properties'
+if(-not (Test-Path $properties)){
+    $sdk=if($env:ANDROID_HOME){$env:ANDROID_HOME}elseif($env:ANDROID_SDK_ROOT){$env:ANDROID_SDK_ROOT}else{Join-Path $env:LOCALAPPDATA 'Android\Sdk'}
+    if(-not (Test-Path $sdk)){throw "No Android SDK found. Install Android Studio, or set ANDROID_HOME."}
+    [IO.File]::WriteAllText($properties,'sdk.dir='+($sdk -replace '\\','/' -replace ':','\:')+"`n")
 }
-$buildConfig=Join-Path $scratch 'gen/BuildConfig.java'
-@("package com.hop.drop;","public final class BuildConfig { public static final boolean DEBUG = $($Debug.ToString().ToLowerInvariant()); }") | Set-Content $buildConfig -Encoding Ascii
-& $aapt compile --dir (Join-Path $scratch 'res') -o (Join-Path $scratch 'flat')
-if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
-$flat=Get-ChildItem (Join-Path $scratch 'flat') -Filter '*.flat' | Sort-Object { if($_.Name -like 'values-night*'){2}elseif($_.Name -like 'values_*'){0}else{1} },Name | ForEach-Object FullName
-$base=Join-Path $scratch 'base.apk'
-$args=@('link','--auto-add-overlay','--manifest',$manifest,'-I',$platform,'-o',$base,'--java',(Join-Path $scratch 'gen'),'--custom-package','com.hop.drop')
-if($Debug){$args+=@('--rename-manifest-package','com.hop.drop.dev')}
-foreach($f in $flat){$args+=@('-R',$f)}
-& $aapt @args
-if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
-$sources=Get-ChildItem (Join-Path $android 'src') -Filter '*.java' -Recurse | ForEach-Object FullName
-$rjava=Get-ChildItem (Join-Path $scratch 'gen') -Filter 'R.java' -Recurse | ForEach-Object FullName
-$androidArgs=Join-Path $scratch 'javac-args.txt'
-@($sources+$rjava+@($buildConfig) | ForEach-Object { '"'+$_.Replace('\','/')+'"' }) | Set-Content $androidArgs -Encoding Ascii
-& $javac -encoding UTF-8 -source 8 -target 8 -classpath "$platform;Source/Android/libs/core-3.5.4.jar" -d "$scratchRel/classes" "@$scratchRel/javac-args.txt"
-if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
-$classesJar=Join-Path $scratch 'classes.jar'
-& $jar cf $classesJar -C (Join-Path $scratch 'classes') .
-if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
-& $d8 --min-api 26 --lib $platform --output (Join-Path $scratch 'dex') $classesJar $zxing
-if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
-Copy-Item $base (Join-Path $scratch 'unsigned.apk') -Force
-& $jar uf (Join-Path $scratch 'unsigned.apk') -C (Join-Path $scratch 'dex') classes.dex
-if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
-$aligned=Join-Path $scratch 'aligned.apk';& $align -f 4 (Join-Path $scratch 'unsigned.apk') $aligned
+$sdk=((Get-Content $properties | Where-Object { $_ -like 'sdk.dir=*' }) -replace '^sdk.dir=','' -replace '\\:',':')
+
+$task=if($Debug){'assembleDebug'}else{'assembleRelease'}
+& (Join-Path $android 'gradlew.bat') -p $android $task --console=plain 2>&1 | ForEach-Object { "$_" }
 if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
 if($Debug){
-    $keys=Join-Path $android '.keys';New-Item -ItemType Directory -Force $keys | Out-Null
-    $keystore=Join-Path $keys 'debug.p12';if(-not (Test-Path $keystore)){
-        & (Join-Path $jdk 'bin/keytool.exe') -genkeypair -alias hopdropdebug -keyalg EC -groupname secp256r1 -validity 10000 -dname 'CN=HopDrop Debug' -storetype PKCS12 -keystore $keystore -storepass android -keypass android -noprompt
-        if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}}
-    $apk=Join-Path $out 'HopDrop-debug.apk';& $sign sign --v4-signing-enabled false --ks $keystore --ks-pass pass:android --out $apk $aligned
+    $apk=Join-Path $android 'build/outputs/apk/debug/HopDrop-debug.apk'
 }else{
-    $keystore=Join-Path $root 'Private signing key/hopdrop-release.p12'
-    $password=Join-Path $root 'Private signing key/signing-password.txt'
-    $apk=Join-Path $root 'HopDrop.apk';& $sign sign --v4-signing-enabled false --ks $keystore --ks-pass "file:$password" --out $apk $aligned
+    $apk=Join-Path $root 'HopDrop.apk'
+    Copy-Item (Join-Path $android 'build/outputs/apk/release/HopDrop-release.apk') $apk -Force
 }
-if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
-& $sign verify --verbose $apk;if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
-if($Release){& $aapt dump badging $apk}
-if($Install){& (Join-Path $sdk 'platform-tools/adb.exe') install -r $apk;if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}}
-Write-Host "Built $apk"
+$adb=Join-Path $sdk 'platform-tools/adb.exe'
+if(-not (Test-Path $adb)){$adb='adb'}
+if($Install){& $adb install -r $apk;if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}}
+Write-Host "Built $apk ($([math]::Round((Get-Item $apk).Length/1MB,1)) MB)"

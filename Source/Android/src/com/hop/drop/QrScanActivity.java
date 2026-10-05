@@ -137,7 +137,7 @@ public final class QrScanActivity extends Activity implements TextureView.Surfac
         close.setBackground(pill(0x66000000));
         close.setOnClickListener(view -> finish());
         top.addView(close, new LinearLayout.LayoutParams(dp(48), dp(48)));
-        TextView title = text("Scan the pairing code", 19, true);
+        TextView title = text("Scan the QR code", 19, true);
         title.setPadding(dp(14), 0, 0, 0);
         top.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
         root.addView(top, new FrameLayout.LayoutParams(-1, -2, Gravity.TOP));
@@ -159,10 +159,10 @@ public final class QrScanActivity extends Activity implements TextureView.Surfac
         LinearLayout.LayoutParams messageParams = new LinearLayout.LayoutParams(-1, -2);
         messageParams.topMargin = dp(16);
         bottom.addView(message, messageParams);
-        showHint();
-        TextView fallback = text("Can't scan? Pair by comparing numbers", 15, true);
-        fallback.setTextColor(0xFFA8C7FF);
-        fallback.setPadding(dp(16), dp(12), dp(16), dp(12));
+        TextView fallback = text("Pair with numbers instead", 15, true);
+        fallback.setTextColor(getColor(R.color.brand_light));
+        fallback.setPadding(dp(18), dp(11), dp(18), dp(11));
+        fallback.setBackground(pill(0x66000000));
         fallback.setOnClickListener(view -> {
             setResult(RESULT_OK, new Intent().putExtra("fallback", true));
             finish();
@@ -659,7 +659,7 @@ public final class QrScanActivity extends Activity implements TextureView.Surfac
             long now = SystemClock.elapsedRealtime();
             if (now - lastWrongCode > 3000) {
                 lastWrongCode = now;
-                main.post(() -> say("That's a different QR code. On the laptop, open HopDrop → Devices → Pair a phone.", true));
+                main.post(() -> say("That's not a HopDrop pairing code.", true));
             }
             return;
         }
@@ -669,7 +669,7 @@ public final class QrScanActivity extends Activity implements TextureView.Surfac
             long now = SystemClock.elapsedRealtime();
             if (now - lastWrongCode > 3000) {
                 lastWrongCode = now;
-                main.post(() -> say("This pairing code is from a different HopDrop version. Update HopDrop on both devices.", true));
+                main.post(() -> say("This code is from another HopDrop version. Update both devices.", true));
             }
             return;
         }
@@ -693,13 +693,18 @@ public final class QrScanActivity extends Activity implements TextureView.Surfac
         main.postDelayed(() -> {
             setResult(RESULT_OK, new Intent().putExtra("uri", uri));
             finish();
-        }, Ui.animationsEnabled() ? 400 : 0);
+        }, animationsEnabled() ? 400 : 0);
     }
 
     // ---- Text and small views ----
 
+    /** Clears a problem message after a few seconds. There's no standing hint: the square explains itself. */
     private void showHint() {
-        say("On the laptop: HopDrop → Devices → Pair a phone.\nFit the code inside the square. Too close to focus? Zoom in.", false);
+        message.setText("");
+    }
+
+    static boolean animationsEnabled() {
+        return android.animation.ValueAnimator.areAnimatorsEnabled();
     }
 
     private void say(String text, boolean problem) {
@@ -714,7 +719,7 @@ public final class QrScanActivity extends Activity implements TextureView.Surfac
         panel.setOrientation(LinearLayout.VERTICAL);
         panel.setPadding(dp(24), dp(22), dp(24), dp(18));
         GradientDrawable background = new GradientDrawable();
-        background.setColor(0xF2172238);
+        background.setColor(0xF2141A25);
         background.setCornerRadius(dp(24));
         panel.setBackground(background);
         panel.addView(text("Allow the camera", 20, true));
@@ -724,7 +729,7 @@ public final class QrScanActivity extends Activity implements TextureView.Surfac
         TextView allow = text("Allow camera", 16, true);
         allow.setGravity(Gravity.CENTER);
         allow.setPadding(dp(20), dp(13), dp(20), dp(13));
-        allow.setBackground(pill(getColor(R.color.button_blue)));
+        allow.setBackground(pill(getColor(R.color.brand)));
         allow.setOnClickListener(view -> {
             if (!asked || shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)) {
                 asked = true;
@@ -735,7 +740,7 @@ public final class QrScanActivity extends Activity implements TextureView.Surfac
                     startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                             Uri.parse("package:" + getPackageName())));
                 } catch (RuntimeException error) {
-                    say("Open Settings → Apps → HopDrop → Permissions and allow the camera.", true);
+                    say("Allow the camera for HopDrop in the phone's settings.", true);
                 }
             }
         });
@@ -753,7 +758,7 @@ public final class QrScanActivity extends Activity implements TextureView.Surfac
         view.setText(value);
         view.setTextColor(Color.WHITE);
         view.setTextSize(sizeSp);
-        if (bold) view.setTypeface(Typeface.DEFAULT_BOLD);
+        view.setTypeface(getResources().getFont(bold ? R.font.jakarta_bold : R.font.jakarta_medium));
         view.setShadowLayer(dp(4), 0, dp(1), 0x99000000);
         return view;
     }
@@ -789,7 +794,7 @@ public final class QrScanActivity extends Activity implements TextureView.Surfac
             corners.setStrokeWidth(dp(4));
             corners.setStrokeCap(Paint.Cap.ROUND);
             corners.setColor(Color.WHITE);
-            sweep.setColor(0xFF7FB0FF);
+            sweep.setColor(0xFFFFB693);
             ring.setStyle(Paint.Style.STROKE);
             ring.setStrokeWidth(dp(2));
             ring.setColor(Color.WHITE);
@@ -842,7 +847,7 @@ public final class QrScanActivity extends Activity implements TextureView.Surfac
         }
 
         void startSweep() {
-            if (sweeping != null || !Ui.animationsEnabled()) return;
+            if (sweeping != null || !animationsEnabled()) return;
             sweeping = ValueAnimator.ofFloat(0f, 1f);
             sweeping.setDuration(2200);
             sweeping.setRepeatCount(ValueAnimator.INFINITE);
@@ -865,7 +870,7 @@ public final class QrScanActivity extends Activity implements TextureView.Surfac
             ringX = x;
             ringY = y;
             if (ringing != null) ringing.cancel();
-            if (!Ui.animationsEnabled()) return;
+            if (!animationsEnabled()) return;
             ringing = ValueAnimator.ofFloat(0f, 1f);
             ringing.setDuration(700);
             ringing.addUpdateListener(animation -> {
