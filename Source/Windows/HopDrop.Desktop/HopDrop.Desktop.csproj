@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationIcon>Assets/HopDrop.ico</ApplicationIcon>
+    <!-- The file stays HopDrop.exe (sign-in entry, firewall rule and installs point at it); Windows shows the product name. -->
+    <AssemblyName>HopDrop</AssemblyName>
+    <Product>HopDrop</Product>
+    <AssemblyTitle>HopDrop</AssemblyTitle>
+    <StartupObject>HopDrop.Desktop.Program</StartupObject>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Velopack" Version="1.2.161" />
+    <Resource Include="Assets/HopDrop.ico" />
+    <ProjectReference Include="../HopDrop.Core/HopDrop.Core.csproj" />
+    <PackageReference Include="WPF-UI" Version="4.3.0" />
+    <PackageReference Include="QRCoder" Version="1.8.0" />
+    <PackageReference Include="Microsoft.Toolkit.Uwp.Notifications" Version="7.1.3" />
+  </ItemGroup>
+</Project>

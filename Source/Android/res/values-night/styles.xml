@@ -1,0 +1,19 @@
+<resources>
+    <style name="HopDropTheme" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">@color/blue</item>
+        <item name="android:colorPrimary">@color/blue</item>
+        <item name="android:colorControlActivated">@color/blue</item>
+        <item name="android:statusBarColor">@color/surface</item>
+        <item name="android:navigationBarColor">@color/card_surface</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowBackground">@color/surface</item>
+        <item name="android:alertDialogTheme">@style/HopDropDialog</item>
+    </style>
+    <style name="HopDropDialog" parent="android:style/Theme.Material.Dialog.Alert">
+        <item name="android:colorAccent">@color/blue</item>
+        <item name="android:windowBackground">@drawable/dialog_background</item>
+        <item name="android:textColorPrimary">@color/navy</item>
+    </style>
+</resources>

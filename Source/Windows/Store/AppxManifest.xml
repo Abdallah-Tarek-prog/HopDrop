@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  HopDrop for the Microsoft Store (MSIX). build.ps1 -Store fills in the {…} values: Name, Publisher and
+  PublisherDisplayName from identity.json (Partner Center gives them when the name is reserved), the version from
+  HopDrop.Desktop.csproj, and the processor architecture. What Windows does for the app because of this file:
+  - Share menu: File Explorer → right-click files → Share → HopDrop (windows.shareTarget).
+  - Sign-in start: a startup task the app turns on for "Start with Windows" / "Receive in the background".
+  - "hopdrop.exe" command for AI agents and scripts (packaged executables can't be started by their path).
+  - Notifications: clicking one starts the app if it isn't running (toast activator).
+  - Firewall: TCP and UDP 7410 open for HopDrop.exe at install, closed again at uninstall (no admin prompt).
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  xmlns:desktop2="http://schemas.microsoft.com/appx/manifest/desktop/windows10/2"
+  xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap uap5 desktop desktop2 com rescap">
+
+  <Identity Name="{Name}" Publisher="{Publisher}" Version="{Version}" ProcessorArchitecture="{Arch}" />
+
+  <Properties>
+    <DisplayName>HopDrop</DisplayName>
+    <PublisherDisplayName>{PublisherDisplayName}</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <Description>Private file transfer between your phones and PCs, over your own network.</Description>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Applications>
+    <Application Id="HopDrop" Executable="HopDrop.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements DisplayName="HopDrop" Description="Private file transfer between your phones and PCs"
+        BackgroundColor="transparent" Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png" />
+      <Extensions>
+        <uap:Extension Category="windows.shareTarget">
+          <uap:ShareTarget Description="Send with HopDrop">
+            <uap:SupportedFileTypes>
+              <uap:SupportsAnyFileType />
+            </uap:SupportedFileTypes>
+            <uap:DataFormat>StorageItems</uap:DataFormat>
+          </uap:ShareTarget>
+        </uap:Extension>
+        <desktop:Extension Category="windows.startupTask" Executable="HopDrop.exe" EntryPoint="Windows.FullTrustApplication">
+          <desktop:StartupTask TaskId="HopDropStartup" Enabled="false" DisplayName="HopDrop" />
+        </desktop:Extension>
+        <uap5:Extension Category="windows.appExecutionAlias" Executable="HopDrop.exe" EntryPoint="Windows.FullTrustApplication">
+          <uap5:AppExecutionAlias>
+            <uap5:ExecutionAlias Alias="hopdrop.exe" />
+          </uap5:AppExecutionAlias>
+        </uap5:Extension>
+        <desktop:Extension Category="windows.toastNotificationActivation">
+          <desktop:ToastNotificationActivation ToastActivatorCLSID="956ccd3f-1f30-4d3c-b8f3-7dd522fa1bdd" />
+        </desktop:Extension>
+        <com:Extension Category="windows.comServer">
+          <com:ComServer>
+            <com:ExeServer Executable="HopDrop.exe" Arguments="-ToastActivated" DisplayName="HopDrop notifications">
+              <com:Class Id="956ccd3f-1f30-4d3c-b8f3-7dd522fa1bdd" DisplayName="HopDrop notifications" />
+            </com:ExeServer>
+          </com:ComServer>
+        </com:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Extensions>
+    <desktop2:Extension Category="windows.firewallRules">
+      <desktop2:FirewallRules Executable="HopDrop.exe">
+        <desktop2:Rule Direction="in" IPProtocol="TCP" Profile="all" LocalPortMin="7410" LocalPortMax="7410" />
+        <desktop2:Rule Direction="in" IPProtocol="UDP" Profile="all" LocalPortMin="7410" LocalPortMax="7410" />
+      </desktop2:FirewallRules>
+    </desktop2:Extension>
+  </Extensions>
+
+  <Capabilities>
+    <Capability Name="internetClient" />
+    <Capability Name="internetClientServer" />
+    <Capability Name="privateNetworkClientServer" />
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>

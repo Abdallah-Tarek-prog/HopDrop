@@ -1,0 +1,19 @@
+{
+  "attribution": {
+    "commit": "",
+    "pr": "",
+    "sessionUrl": false
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ \"$CLAUDE_CODE_REMOTE\" = \"true\" ] || exit 0; git -C \"$CLAUDE_PROJECT_DIR\" config author.name \"Abdallah Tarek\" && git -C \"$CLAUDE_PROJECT_DIR\" config author.email \"abdallah.t.sayed.prog@gmail.com\""
+          }
+        ]
+      }
+    ]
+  }
+}

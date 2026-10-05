@@ -1,0 +1,24 @@
+**/bin/
+**/obj/
+.vs/
+.scratch/
+Source/Windows/.e2e/
+Source/Windows/out/
+Windows App/
+Source/Windows/.test-scratch/
+TestResults/
+**/NuGet/Migrations/
+Source/Android/out/
+Source/Android/.scratch/
+Source/Android/.keys/
+# Built apps go to GitHub Releases, not git.
+*.apk
+*.apk.idsig
+
+# Never commit signing keys or their passwords (the release key lives in "Private signing key/", kept offline).
+Private signing key/
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.pem

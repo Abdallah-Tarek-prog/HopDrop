@@ -1,0 +1,5 @@
+<!-- Notification icon: the logo as a white silhouette. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#FFFFFFFF" android:pathData="M1,17.34 A2.04,2.04 0 1,0 5.07,17.34 A2.04,2.04 0 1,0 1,17.34 Z M4.73,14.09 C7.14,8.3 12.23,4.9 16.75,4.62 C19.3,4.62 21.56,5.75 22.26,8.01 A1.98,1.98 0 0,1 19.44,10.28 C18.31,9 16.89,8.3 15.05,8.3 C11.1,8.3 7.14,11.12 4.73,14.09 Z M19.27,14.09 A1.87,1.87 0 1,0 23,14.09 A1.87,1.87 0 1,0 19.27,14.09 Z" />
+</vector>

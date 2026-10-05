@@ -1,0 +1,5 @@
+<!-- App icon for Android 13+ themed icons (one colour, tinted by the system). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FF000000" android:pathData="M27,67.12 A5,5 0 1,0 36.99,67.12 A5,5 0 1,0 27,67.12 Z M36.16,59.14 C42.06,44.91 54.56,36.58 65.66,35.88 C71.91,35.88 77.46,38.66 79.2,44.21 A4.86,4.86 0 0,1 72.25,49.77 C69.48,46.64 66.01,44.91 61.5,44.91 C51.78,44.91 42.06,51.85 36.16,59.14 Z M71.84,59.14 A4.58,4.58 0 1,0 81,59.14 A4.58,4.58 0 1,0 71.84,59.14 Z" />
+</vector>

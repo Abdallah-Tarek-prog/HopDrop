@@ -1,0 +1,6 @@
+{
+  "_comment": "Replace with Partner Center's values (Product identity page) before building for the Store. These are for test installs on this PC only.",
+  "Name": "HopDrop.LocalTest",
+  "Publisher": "CN=HopDrop Local Test",
+  "PublisherDisplayName": "Abdallah Tarek"
+}
