@@ -14,30 +14,31 @@ using Color = System.Windows.Media.Color;
 
 namespace HopDrop.Desktop;
 
-/// <summary>HopDrop's semantic colors for the current theme (same tokens as the Android app).</summary>
+/// <summary>HopDrop's semantic colors for the current theme (the Android app's "HopDrop" colour theme).</summary>
 internal static class Palette
 {
     public static bool Dark => ApplicationThemeManager.GetAppTheme() == ApplicationTheme.Dark;
-    public static Color Blue => Color.FromRgb(37, 99, 235);
+    /// <summary>HopDrop orange: buttons, links and the selected page. White text on it passes the 4.5:1 contrast rule.</summary>
+    public static Color Brand => Color.FromRgb(0xC2, 0x41, 0x0C);
     private static SolidColorBrush Brush(uint light, uint dark)
     {
         uint v = Dark ? dark : light;
         var brush = new SolidColorBrush(Color.FromRgb((byte)(v >> 16), (byte)(v >> 8), (byte)v)); brush.Freeze(); return brush;
     }
-    public static SolidColorBrush Primary => Brush(0x2563EB, 0x7AA2FF);
-    public static SolidColorBrush PrimaryBg => Brush(0xE1EAFE, 0x1D2F57);
-    public static SolidColorBrush OnPrimaryBg => Brush(0x1D3F9E, 0xC9D8FF);
+    public static SolidColorBrush Primary => Brush(0xC2410C, 0xFFB693);
+    public static SolidColorBrush PrimaryBg => Brush(0xFFE4D6, 0x3E2216);
+    public static SolidColorBrush OnPrimaryBg => Brush(0x8A3208, 0xFFB693);
     public static SolidColorBrush Success => Brush(0x15803D, 0x4ADE80);
     public static SolidColorBrush SuccessBg => Brush(0xDCF5E4, 0x123222);
     public static SolidColorBrush Danger => Brush(0xC62828, 0xF87171);
     public static SolidColorBrush DangerBg => Brush(0xFCE4E4, 0x3A1A1E);
     public static SolidColorBrush Amber => Brush(0x8A5300, 0xFCD68A);
     public static SolidColorBrush AmberBg => Brush(0xFDF1D8, 0x3A2C11);
-    public static SolidColorBrush Muted => Brush(0x56647A, 0x9CA9BE);
-    public static SolidColorBrush Border => Brush(0xDFE5EF, 0x2E3A52);
-    public static SolidColorBrush Surface => Brush(0xF4F6FB, 0x0F1626);
-    public static SolidColorBrush CardBg => Brush(0xFFFFFF, 0x172033);
-    public static SolidColorBrush SurfaceAlt => Brush(0xEEF2F8, 0x1D2940);
+    public static SolidColorBrush Muted => Brush(0x485266, 0xA3ADBE);
+    public static SolidColorBrush Border => Brush(0xDFE3EB, 0x2D3542);
+    public static SolidColorBrush Surface => Brush(0xF7F8FB, 0x0D121B);
+    public static SolidColorBrush CardBg => Brush(0xFFFFFF, 0x161C27);
+    public static SolidColorBrush SurfaceAlt => Brush(0xEBEEF4, 0x1A202B);
 }
 
 /// <summary>Short, one-shot motion. Clocks belong to their element and are removed on completion or hiding.</summary>
@@ -324,7 +325,7 @@ internal static class Ui
         if (action is FrameworkElement a) { a.HorizontalAlignment = HorizontalAlignment.Center; a.Margin = new Thickness(0, 12, 0, 0); stack.Children.Add(a); }
         return new Border { Child = stack };
     }
-    public static ProgressBar Bar() => new() { Height = 6, Minimum = 0, Maximum = 100, Margin = new Thickness(0, 8, 0, 4), Foreground = new SolidColorBrush(Palette.Blue) };
+    public static ProgressBar Bar() => new() { Height = 6, Minimum = 0, Maximum = 100, Margin = new Thickness(0, 8, 0, 4), Foreground = new SolidColorBrush(Palette.Brand) };
 
     public static SymbolRegular FileIcon(string name) => Path.GetExtension(name).ToLowerInvariant() switch
     {
@@ -374,7 +375,10 @@ internal static class Fmt
             if (slash <= 0) shown.Add(relative);
             else if (folders.Add(relative[..slash])) shown.Add(relative[..slash] + " folder");
         }
-        return shown.Count == 0 ? "No files" : shown.Count <= max ? string.Join(", ", shown) : $"{string.Join(", ", shown.Take(max))} +{shown.Count - max}";
+        if (shown.Count == 0) return "No files";
+        // One line ("a.jpg + 2 more") for rows and notifications, one name per line for longer lists. Never comma lists.
+        if (max <= 2) return shown.Count == 1 ? shown[0] : shown.Count == 2 ? $"{shown[0]} and {shown[1]}" : $"{shown[0]} + {shown.Count - 1} more";
+        return shown.Count <= max ? string.Join("\n", shown) : string.Join("\n", shown.Take(max)) + $"\n+ {shown.Count - max} more";
     }
     public static string Amount(long done, long total) => total < 0 ? Size(done) : $"{Size(done)} of {Size(total)}";
     public static string Ago(DateTimeOffset time)

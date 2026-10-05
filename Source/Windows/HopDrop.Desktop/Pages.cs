@@ -399,9 +399,9 @@ public sealed partial class MainWindow
         row.Children.Add(frame);
         var info = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         info.Children.Add(Ui.Label("Scan with HopDrop on your phone", 18, true));
-        info.Children.Add(Ui.Subtle("On the phone: Devices → Scan QR. Pairing is saved on both devices; you only do this once. Hard to scan? Click the code to make it bigger."));
+        info.Children.Add(Ui.Subtle("On the phone: Devices → Pair device → Scan a QR code. Click the code to make it bigger."));
         var timer = Ui.Label("", 14, true); timer.Margin = new Thickness(0, 14, 0, 4); info.Children.Add(timer);
-        info.Children.Add(Ui.Subtle("The code works once and expires after 5 minutes; a new one appears automatically."));
+        info.Children.Add(Ui.Subtle("Each code works once. A new one appears every 5 minutes."));
         Grid.SetColumn(info, 1); row.Children.Add(info); _qrHost.Children.Add(row);
         void Tick()
         {

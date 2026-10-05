@@ -164,11 +164,11 @@ public sealed partial class MainWindow : FluentWindow
     }
     private static void ApplyBrandAccent()
     {
-        Color blue = Palette.Blue;
-        ApplicationAccentColorManager.Apply(blue, blue, blue, blue);
+        Color brand = Palette.Brand;
+        ApplicationAccentColorManager.Apply(brand, brand, brand, brand);
         var resources = System.Windows.Application.Current.Resources;
         resources["TextOnAccentFillColorPrimary"] = Colors.White;
-        resources["NavigationViewSelectionIndicatorForeground"] = new SolidColorBrush(Palette.Dark ? Color.FromRgb(122, 162, 255) : blue);
+        resources["NavigationViewSelectionIndicatorForeground"] = new SolidColorBrush(Palette.Dark ? Color.FromRgb(0xFF, 0xB6, 0x93) : brand);
     }
 
     /// <summary>Lets the window close for good: drops every timer and hook that would keep it alive.</summary>

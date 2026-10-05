@@ -59,7 +59,7 @@ public sealed class QrZoomWindow : FluentWindow
         var body = new StackPanel { Margin = new Thickness(24, 12, 24, 24), HorizontalAlignment = HorizontalAlignment.Center };
         code.Width = 460; code.Height = 460;
         body.Children.Add(new Border { Child = code, Background = Brushes.White, CornerRadius = new CornerRadius(16), Padding = new Thickness(6) });
-        body.Children.Add(new TextBlock { Text = "On the phone: HopDrop → Devices → Scan QR", FontSize = 17, FontWeight = FontWeights.SemiBold, TextAlignment = TextAlignment.Center, Margin = new Thickness(0, 18, 0, 4) });
+        body.Children.Add(new TextBlock { Text = "On the phone: Devices → Pair device → Scan a QR code", FontSize = 17, FontWeight = FontWeights.SemiBold, TextAlignment = TextAlignment.Center, Margin = new Thickness(0, 18, 0, 4) });
         body.Children.Add(new TextBlock { Text = "Click anywhere or press Esc to close.", FontSize = 13, Opacity = 0.7, TextAlignment = TextAlignment.Center });
         Content = body;
         MouseLeftButtonUp += (_, _) => Close();
