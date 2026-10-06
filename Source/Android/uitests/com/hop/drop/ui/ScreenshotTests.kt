@@ -55,6 +55,8 @@ class ScreenshotTests {
 
     @Test fun settingsLight() { show(Sample.state(settings = true)); shot("settings-light") }
     @Test fun settingsDark() { show(Sample.state(settings = true), ThemeMode.Dark); shot("settings-dark") }
+    @Test fun updateOffer() { show(Sample.state().apply { update = UpdateUi("1.0.1", 1_900_000) }); shot("send-update-light") }
+    @Test fun updateDownloading() { show(Sample.state().apply { update = UpdateUi("1.0.1", 1_900_000, downloading = true, fraction = 0.4f) }, ThemeMode.Dark); shot("send-update-dark") }
 
     @Test fun pairCode() { show(Sample.state().apply { prompt = PromptUi("LOQ Laptop", "482913") }); screen("dialog-pair-code-light") }
     @Test fun offer() {
@@ -155,5 +157,10 @@ private object NoActions : HopActions {
     override fun openAppSettings() {}
     override fun copy(label: String, text: String) {}
     override fun openLink(url: String) {}
+    override fun addText(text: String) {}
+    override fun setUpdateChecks(on: Boolean) {}
+    override fun checkForUpdates() {}
+    override fun startUpdate() {}
+    override fun dismissUpdate() {}
 }
 

@@ -5,7 +5,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '../HopDrop.Desktop/Assets/VectorImage.ps1')
 $logo = Join-Path $PSScriptRoot '../../Android/res/drawable/ic_logo.xml'
 New-Item -ItemType Directory -Force $Out | Out-Null
-function Save-Logo([int]$size, [string]$name) { [System.IO.File]::WriteAllBytes((Join-Path $Out $name), (ConvertTo-VectorPng -Path $logo -Size $size)) }
+function Save-Logo([int]$size, [string]$name) { [System.IO.File]::WriteAllBytes((Join-Path $Out $name), (ConvertTo-VectorPng -Path $logo -Size $size -Tile '#FFFFFF')) }
 
 # Scale variants (100% … 400% display scaling) for the Store logo, Start tile and app list icon.
 foreach ($scale in 100, 125, 150, 200, 400) {

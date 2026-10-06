@@ -24,6 +24,17 @@ public final class FileNames {
         if (ext.length() >= 180) return prefix(name,180);
         return prefix(name.substring(0,name.length()-ext.length()),180-ext.length()) + ext;
     }
+    /** File name for typed or shared text: its first line, cut at a word to about 40 characters, or "Link" / "Text". Same rule as the Windows app. */
+    public static String forText(String text) {
+        String line = "";
+        for (String l : (text == null ? "" : text).split("\\r?\\n")) { if (!l.trim().isEmpty()) { line = l.trim().replaceAll("\\s+", " "); break; } }
+        String lower = line.toLowerCase(Locale.ROOT);
+        if (lower.startsWith("http://") || lower.startsWith("https://")) return "Link.txt";
+        if (line.length() > 40) { int space = line.lastIndexOf(' ', 40); line = space >= 20 ? line.substring(0, space) : prefix(line, 40); }
+        line = line.replaceAll("[\\p{Punct}\\s]+$", "");
+        String name = sanitize(line.replace('/', '_').replace('\\', '_'));
+        return (line.isEmpty() || name.equals("file") ? "Text" : name) + ".txt";
+    }
     public static String unique(String input, Predicate<String> exists) {
         String name = sanitize(input); if (!exists.test(name)) return name;
         int dot = name.lastIndexOf('.'); String ext = dot > 0 ? name.substring(dot) : "";

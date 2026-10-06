@@ -1,9 +1,9 @@
-# Builds HopDrop.ico (16–256 px) from the app logo in Source/Android/res/drawable/ic_logo.xml.
+# Builds HopDrop.ico (16–256 px): the app logo (Source/Android/res/drawable/ic_logo.xml) on a white tile.
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'VectorImage.ps1')
 $logo = Join-Path $PSScriptRoot '../../../Android/res/drawable/ic_logo.xml'
 $sizes = @(16, 20, 24, 32, 40, 48, 64, 128, 256)
-$pngs = @($sizes | ForEach-Object { , (ConvertTo-VectorPng -Path $logo -Size $_) })
+$pngs = @($sizes | ForEach-Object { , (ConvertTo-VectorPng -Path $logo -Size $_ -Tile '#FFFFFF') })
 $target = Join-Path $PSScriptRoot 'HopDrop.ico'
 $file = [System.IO.File]::Create($target)
 $writer = [System.IO.BinaryWriter]::new($file)

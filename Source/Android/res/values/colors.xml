@@ -2,7 +2,7 @@
     <!-- The screens take their colours from the Compose themes (src/com/hop/drop/ui/Theme.kt). These few are for
          what Android draws itself: the window before the first frame, the app icon tile, notifications, the scanner. -->
     <color name="window_background">#F7F8FB</color>
-    <color name="launcher_background">#F1F4F8</color>
+    <color name="launcher_background">#121212</color>
     <!-- HopDrop orange: notification accent and the scanner's buttons. -->
     <color name="brand">#E8590C</color>
     <color name="brand_light">#FFB693</color>

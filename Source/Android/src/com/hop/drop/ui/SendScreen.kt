@@ -9,6 +9,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -32,6 +34,8 @@ import androidx.compose.material.icons.rounded.Devices
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.PhotoLibrary
+import androidx.compose.material.icons.automirrored.rounded.TextSnippet
+import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -61,6 +65,7 @@ fun SendScreen(state: HopUiState, actions: HopActions, padding: PaddingValues) {
     val now = rememberNow()
     var showAll by rememberSaveable { mutableStateOf(false) }
     var bluetoothAsk by remember { mutableStateOf(false) }
+    var writing by remember { mutableStateOf(false) }
     val incoming = state.live.filter { it.incoming }
     LazyColumn(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = padding.calculateTopPadding() + 8.dp,
@@ -68,8 +73,10 @@ fun SendScreen(state: HopUiState, actions: HopActions, padding: PaddingValues) {
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         items(incoming, key = { "live:" + it.key }) { LiveCard(it, actions::cancel, Modifier.animateItem()) }
+        state.update?.let { update -> item(key = "update") { UpdateCard(update, actions, Modifier.animateItem()) } }
         item(key = "selection") {
-            if (state.nothingSelected) ChooseCard(actions) else SelectedCard(state, actions, showAll) { showAll = !showAll }
+            if (state.nothingSelected) ChooseCard(actions) { writing = true }
+            else SelectedCard(state, actions, showAll, onText = { writing = true }) { showAll = !showAll }
         }
         item(key = "send-to") { SectionHeader("Send to") }
         if (state.devices.isEmpty()) {
@@ -96,6 +103,7 @@ fun SendScreen(state: HopUiState, actions: HopActions, padding: PaddingValues) {
             }
         }
     }
+    if (writing) TextNoteDialog(onDismiss = { writing = false }, onAdd = { writing = false; actions.addText(it) })
     if (bluetoothAsk) {
         AlertDialog(
             onDismissRequest = { bluetoothAsk = false },
@@ -108,9 +116,39 @@ fun SendScreen(state: HopUiState, actions: HopActions, padding: PaddingValues) {
     }
 }
 
-/** Nothing picked yet: three big ways to pick. */
+/** A newer HopDrop is out: download it and open Android's installer, or put it off. */
 @Composable
-private fun ChooseCard(actions: HopActions) {
+private fun UpdateCard(update: UpdateUi, actions: HopActions, modifier: Modifier) {
+    HopCard(modifier, color = MaterialTheme.colorScheme.primaryContainer) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Rounded.SystemUpdate, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text("HopDrop ${update.version} is available", style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer)
+                Text(
+                    when {
+                        update.downloading -> "Downloading" + (update.fraction?.let { "  ·  ${(it * 100).toInt()}%" } ?: "…")
+                        update.error != null -> update.error
+                        else -> Format.size(update.size) + "  ·  Android asks you to confirm"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (update.error != null && !update.downloading) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
+        }
+        if (update.downloading) ProgressBar(update.fraction, Modifier.padding(top = 12.dp))
+        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.End) {
+            TextButton(onClick = actions::dismissUpdate) { Text(if (update.downloading) "Cancel" else "Later") }
+            Spacer(Modifier.width(8.dp))
+            Button(onClick = actions::startUpdate, enabled = !update.downloading) { Text(if (update.error != null) "Try again" else "Update") }
+        }
+    }
+}
+
+/** Nothing picked yet: four big ways to pick. */
+@Composable
+private fun ChooseCard(actions: HopActions, onText: () -> Unit) {
     HopCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
@@ -128,6 +166,7 @@ private fun ChooseCard(actions: HopActions) {
             ChoiceTile(Icons.AutoMirrored.Rounded.InsertDriveFile, "Files", actions::pickFiles, Modifier.weight(1f))
             ChoiceTile(Icons.Rounded.PhotoLibrary, "Photos", actions::pickPhotos, Modifier.weight(1f))
             ChoiceTile(Icons.Rounded.Folder, "Folder", actions::pickFolder, Modifier.weight(1f))
+            ChoiceTile(Icons.AutoMirrored.Rounded.TextSnippet, "Text", onText, Modifier.weight(1f))
         }
     }
 }
@@ -155,8 +194,9 @@ private fun selectionSummary(state: HopUiState): String {
     return "$what  ·  $size"
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SelectedCard(state: HopUiState, actions: HopActions, showAll: Boolean, onToggle: () -> Unit) {
+private fun SelectedCard(state: HopUiState, actions: HopActions, showAll: Boolean, onText: () -> Unit, onToggle: () -> Unit) {
     HopCard(padding = PaddingValues(start = 16.dp, top = 10.dp, end = 6.dp, bottom = 14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -191,10 +231,11 @@ private fun SelectedCard(state: HopUiState, actions: HopActions, showAll: Boolea
         if (total > 5) {
             TextButton(onClick = onToggle) { Text(if (showAll) "Show less" else "Show all $total") }
         }
-        Row(Modifier.padding(top = 6.dp, end = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(Modifier.padding(top = 6.dp, end = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             AddChip("Files", actions::pickFiles)
             AddChip("Photos", actions::pickPhotos)
             AddChip("Folder", actions::pickFolder)
+            AddChip("Text", onText)
         }
     }
 }

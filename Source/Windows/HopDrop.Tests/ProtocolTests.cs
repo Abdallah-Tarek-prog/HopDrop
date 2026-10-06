@@ -53,6 +53,15 @@ public class ProtocolTests
     [InlineData("تقرير 📁.pdf", "تقرير 📁.pdf")]
     [InlineData("\u0001a.txt", "_a.txt")]
     public void FileNameTable(string input, string expected) => Assert.Equal(expected, FileNames.Sanitize(input));
+
+    [Theory]
+    [InlineData("Meeting at 5 pm.\nBring the slides", "Meeting at 5 pm.txt")]
+    [InlineData("  \r\n https://example.com/a", "Link.txt")]
+    [InlineData("   ", "Text.txt")]
+    [InlineData("???", "Text.txt")]
+    [InlineData("The quick brown fox jumps over the lazy dog again and again", "The quick brown fox jumps over the lazy.txt")]
+    [InlineData("a/b: c", "a_b_ c.txt")]
+    public void TextFileNames(string text, string expected) => Assert.Equal(expected, FileNames.ForText(text));
     [Fact]
     public void LongNamesAndUniqueNames()
     {

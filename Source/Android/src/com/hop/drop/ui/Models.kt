@@ -81,7 +81,12 @@ data class SettingsUi(
     val customFolder: Boolean = false,
     val batteryRestricted: Boolean = false,
     val autoStartHint: Boolean = false,
+    val updateChecks: Boolean = true,
+    val updatesSupported: Boolean = true,
 )
+
+/** A newer HopDrop on GitHub: offered, downloading ([fraction] null while the size is unknown), or failed. */
+data class UpdateUi(val version: String, val size: Long, val downloading: Boolean = false, val fraction: Float? = null, val error: String? = null)
 
 data class UiMessage(val text: String, val id: Long = System.nanoTime())
 
@@ -104,6 +109,8 @@ class HopUiState {
     var pairSheet by mutableStateOf(false)
     var askBackground by mutableStateOf(false)
     var message by mutableStateOf<UiMessage?>(null)
+    var update by mutableStateOf<UpdateUi?>(null)
+    var checkingUpdates by mutableStateOf(false)
 
     val nothingSelected: Boolean get() = files.isEmpty() && folders.isEmpty()
 
@@ -116,6 +123,8 @@ interface HopActions {
     fun pickFiles()
     fun pickPhotos()
     fun pickFolder()
+    /** Typed or pasted text, sent as a .txt file. */
+    fun addText(text: String)
     fun removeFile(file: PickedFile)
     fun removeFolder(folder: PickedFolder)
     fun clearSelection()
@@ -154,4 +163,9 @@ interface HopActions {
     fun openAppSettings()
     fun copy(label: String, text: String)
     fun openLink(url: String)
+
+    fun setUpdateChecks(on: Boolean)
+    fun checkForUpdates()
+    fun startUpdate()
+    fun dismissUpdate()
 }

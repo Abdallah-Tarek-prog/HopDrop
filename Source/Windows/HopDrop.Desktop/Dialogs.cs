@@ -67,3 +67,29 @@ public sealed class QrZoomWindow : FluentWindow
         Motion.AttachWindow(this); Motion.ScaleIn(body);
     }
 }
+
+/// <summary>Type or paste text to send; it arrives as a .txt file named after its first line.</summary>
+public sealed class TextNoteDialog : FluentWindow
+{
+    private readonly TextBox _value;
+    public string Text => _value.Text;
+    public TextNoteDialog()
+    {
+        Title = "Send text"; Width = 520; Height = 400; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        var body = new DockPanel { Margin = new Thickness(24) };
+        var help = new TextBlock { Text = "Type or paste text. It arrives as a .txt file.", FontSize = 15, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) };
+        DockPanel.SetDock(help, Dock.Top); body.Children.Add(help);
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 16, 0, 0) };
+        var add = new Button { Content = "Add", Appearance = ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), Padding = new Thickness(18, 8, 18, 8), IsEnabled = false };
+        add.Click += (_, _) => DialogResult = true;
+        var cancel = new Button { Content = "Cancel", Padding = new Thickness(18, 8, 18, 8) }; cancel.Click += (_, _) => DialogResult = false;
+        buttons.Children.Add(add); buttons.Children.Add(cancel);
+        DockPanel.SetDock(buttons, Dock.Bottom); body.Children.Add(buttons);
+        _value = new TextBox { AcceptsReturn = true, AcceptsTab = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            VerticalContentAlignment = VerticalAlignment.Top, PlaceholderText = "Type or paste text" };
+        _value.TextChanged += (_, _) => add.IsEnabled = _value.Text.Trim().Length > 0;
+        body.Children.Add(_value);
+        Content = body;
+        Loaded += (_, _) => _value.Focus();
+    }
+}

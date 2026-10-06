@@ -20,6 +20,17 @@ public static class FileNames
         int limit = Math.Max(0, 180 - extension.Length);
         return SafePrefix(stem, limit) + extension;
     }
+    /// <summary>File name for typed text: its first line, cut at a word to about 40 characters, or "Link" / "Text". Same rule as the Android app.</summary>
+    public static string ForText(string? text)
+    {
+        string line = (text ?? "").Split('\n').Select(l => l.Trim()).FirstOrDefault(l => l.Length > 0) ?? "";
+        line = System.Text.RegularExpressions.Regex.Replace(line, @"\s+", " ");
+        if (line.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || line.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) return "Link.txt";
+        if (line.Length > 40) { int space = line.LastIndexOf(' ', 40); line = space >= 20 ? line[..space] : SafePrefix(line, 40); }
+        line = System.Text.RegularExpressions.Regex.Replace(line, @"[\p{P}\p{S}\s]+$", "");
+        string name = Sanitize(line.Replace('/', '_').Replace('\\', '_'));
+        return (line.Length == 0 || name == "file" ? "Text" : name) + ".txt";
+    }
     public static string Unique(string input, Func<string, bool> exists)
     {
         string name = Sanitize(input);

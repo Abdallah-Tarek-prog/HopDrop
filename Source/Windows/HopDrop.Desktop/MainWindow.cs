@@ -447,6 +447,12 @@ public sealed partial class MainWindow : FluentWindow
             var sample = new NumberMatchDialog(new PairingRequest("Realme 6 Pro", "428962")) { Owner = this, Left = -32000, Top = -32000, ShowInTaskbar = false };
             sample.Show(); await Task.Delay(300);
             SaveVisual(sample, Path.Combine(folder, $"number-match-{theme}.png")); sample.Close();
+            var note = new TextNoteDialog { Owner = this, Left = -32000, Top = -32000, ShowInTaskbar = false };
+            note.Show(); await Task.Delay(300);
+            SaveVisual(note, Path.Combine(folder, $"text-dialog-{theme}.png")); note.Close();
+            var menu = new TrayMenu("Ready to receive", App.Instance.TrayMenuItems()) { Left = -32000, Top = -32000, ShowActivated = false };
+            menu.Show(); await Task.Delay(300);
+            SaveVisual(menu, Path.Combine(folder, $"tray-menu-{theme}.png")); menu.Close();
         }
         Close();
     }
@@ -485,7 +491,8 @@ public abstract class HopPage : Page
         Loaded += (_, _) =>
         {
             var window = App.WindowInstance!; window.CurrentPage = this;
-            var content = window.Build(key); Content = content; Motion.SlideUp(content);
+            // No fade or slide: switching pages should feel instant, not flash.
+            Content = window.Build(key);
         };
     }
 }

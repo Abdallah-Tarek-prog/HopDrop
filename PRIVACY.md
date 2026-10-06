@@ -1,6 +1,6 @@
 # HopDrop privacy policy
 
-Last updated: 5 October 2026. Applies to the HopDrop apps for Windows (installer, portable and Microsoft Store versions) and Android.
+Last updated: 6 October 2026. Applies to the HopDrop apps for Windows (installer, portable and Microsoft Store versions) and Android.
 
 **Short version:** HopDrop collects nothing. There are no accounts, no analytics, no ads and no cloud. Your files go only to devices you paired yourself, directly over your own local network.
 
@@ -17,7 +17,7 @@ Last updated: 5 October 2026. Applies to the HopDrop apps for Windows (installer
 ## Internet use
 
 - Transfers never use the internet or mobile data.
-- The Windows installer version checks GitHub Releases once a day for updates (this sends only a normal web request, like opening a web page). The Microsoft Store version is updated by the Store. The portable Windows app and the Android app don't check for updates.
+- The Windows installer version and the Android app check GitHub Releases once a day for updates (this sends only a normal web request, like opening a web page, and nothing about you or your files). On Android you can turn it off in Settings → Check for updates; a new version is downloaded only when you tap Update. The Microsoft Store version is updated by the Store. The portable Windows app doesn't check for updates.
 
 ## AI agents (Windows, off by default)
 

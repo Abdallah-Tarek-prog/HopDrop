@@ -9,7 +9,7 @@ Send files and whole folders between your phones and PCs over your own Wi-Fi. No
 ## Download
 
 From the [Releases page](https://github.com/Abdallah-Tarek-prog/HopDrop/releases):
-- `HopDrop.apk` — the Android app.
+- `HopDrop.apk` — the Android app. It checks this page once a day and offers new versions (Android asks you to confirm the install).
 - `HopDrop-win-Setup.exe` — Windows installer (no admin needed; updates itself). `HopDrop-win-arm64-Setup.exe` for ARM laptops.
 - `HopDrop.exe` — the same Windows app without installing (it doesn't update itself).
 - A Microsoft Store version is on its way. It puts HopDrop in Windows' **Share** window (right-click files → **Share**), next to apps like Phone Link.

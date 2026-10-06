@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Windows.Threading;
 using HopDrop.Core;
+using Wpf.Ui.Controls;
 
 namespace HopDrop.Desktop;
 
@@ -104,27 +105,32 @@ public partial class App
     private void ShowTray()
     {
         if (_tray is not null || SnapshotMode) return;
-        var menu = new System.Windows.Forms.ContextMenuStrip();
-        menu.Items.Add("Open HopDrop", null, (_, _) => Dispatcher.Invoke(() => _ = OpenAsync([])));
-        menu.Items.Add("Send files...", null, (_, _) => Dispatcher.Invoke(() => _ = OpenAsync(["--page", "send", "--browse"])));
-        menu.Items.Add("Pair a phone", null, (_, _) => Dispatcher.Invoke(() => _ = OpenAsync(["--page", "devices"])));
-        menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
-        menu.Items.Add("Receive via Bluetooth", null, (_, _) => Dispatcher.Invoke(ReceiveBluetooth));
-        menu.Items.Add("Send via Bluetooth", null, (_, _) => BluetoothWizard.Send());
-        menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
-        var close = menu.Items.Add("Close HopDrop (keep receiving)", null, (_, _) => Dispatcher.Invoke(() => Quit(true)));
-        var quit = menu.Items.Add("Quit HopDrop", null, (_, _) => Dispatcher.Invoke(() => Quit(false)));
-        menu.Opening += (_, _) =>
+        _tray = new System.Windows.Forms.NotifyIcon { Icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!), Visible = true };
+        _tray.MouseClick += (_, e) => Dispatcher.Invoke(() =>
         {
-            close.Visible = Preferences.BackgroundReceive;
-            quit.Text = Preferences.BackgroundReceive ? "Quit and stop receiving" : "Quit HopDrop";
-        };
-        _tray = new System.Windows.Forms.NotifyIcon
-        {
-            Icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!), Visible = true, ContextMenuStrip = menu
-        };
-        _tray.MouseClick += (_, e) => { if (e.Button == System.Windows.Forms.MouseButtons.Left) Dispatcher.Invoke(() => _ = OpenAsync([])); };
+            if (e.Button == System.Windows.Forms.MouseButtons.Left) _ = OpenAsync([]);
+            else if (e.Button == System.Windows.Forms.MouseButtons.Right) ShowTrayMenu();
+        });
         UpdateTrayText();
+    }
+    /// <summary>The right-click menu (TrayMenu): HopDrop's status on top, then what can be done from the tray.</summary>
+    private void ShowTrayMenu() => new TrayMenu(TrayStatus(), TrayMenuItems()).ShowAt(System.Windows.Forms.Cursor.Position);
+    internal List<TrayMenu.Item> TrayMenuItems()
+    {
+        bool keepsReceiving = Preferences.BackgroundReceive;
+        var items = new List<TrayMenu.Item>
+        {
+            new("Open HopDrop", SymbolRegular.Open24, () => _ = OpenAsync([])),
+            new("Send files…", SymbolRegular.Send24, () => _ = OpenAsync(["--page", "send", "--browse"])),
+            new("Pair a phone", SymbolRegular.QrCode24, () => _ = OpenAsync(["--page", "devices"])),
+            new("", default, () => { }, Separator: true),
+            new("Receive via Bluetooth", SymbolRegular.Bluetooth24, ReceiveBluetooth),
+            new("Send via Bluetooth", SymbolRegular.BluetoothConnected24, BluetoothWizard.Send),
+            new("", default, () => { }, Separator: true),
+        };
+        if (keepsReceiving) items.Add(new("Close HopDrop (keep receiving)", SymbolRegular.Dismiss24, () => Quit(true)));
+        items.Add(new(keepsReceiving ? "Quit and stop receiving" : "Quit HopDrop", SymbolRegular.Power24, () => Quit(false)));
+        return items;
     }
     private void HideTray()
     {
@@ -134,10 +140,14 @@ public partial class App
     private void UpdateTrayText()
     {
         if (_tray is null) return;
-        var moving = _active.Values.Where(p => !p.WaitingForApproval).ToList();
-        string text = moving.Count == 0 ? "HopDrop · ready to receive"
-            : string.Join(" · ", moving.Select(p => $"{(p.Incoming ? "Receiving" : "Sending")} {(p.Percent < 0 ? "" : p.Percent + "% ")}{(p.Incoming ? "from" : "to")} {p.PeerName}"));
+        string text = "HopDrop · " + TrayStatus();
         _tray.Text = text.Length > 63 ? text[..63] : text;
+    }
+    private string TrayStatus()
+    {
+        var moving = _active.Values.Where(p => !p.WaitingForApproval).ToList();
+        return moving.Count == 0 ? "Ready to receive"
+            : string.Join(" · ", moving.Select(p => $"{(p.Incoming ? "Receiving" : "Sending")} {(p.Percent < 0 ? "" : p.Percent + "% ")}{(p.Incoming ? "from" : "to")} {p.PeerName}"));
     }
 
     // ---- Window ----

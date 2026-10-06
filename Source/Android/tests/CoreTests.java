@@ -11,7 +11,10 @@ public final class CoreTests {
     private static void names(){String[][] rows={{"report.pdf","report.pdf"},{"../evil.txt","evil.txt"},{"C:\\Windows\\x.dll","x.dll"},{"con.txt","_con.txt"},{"COM1","_COM1"},{"what?.txt","what_.txt"},{"name. ","name"},{"","file"},{"..","file"},{"تقرير 📁.pdf","تقرير 📁.pdf"},{"\u0001a.txt","_a.txt"},{"a".repeat(250)+".txt","a".repeat(176)+".txt"}};
         for(String[] row:rows)check(FileNames.sanitize(row[0]).equals(row[1]),"filename "+row[0]);
         check(FileNames.unique("README",n->n.equals("README")).equals("README (1)"),"duplicate README");
-        check(FileNames.unique(".hidden",n->n.equals(".hidden")).equals(".hidden (1)"),"duplicate hidden");}
+        check(FileNames.unique(".hidden",n->n.equals(".hidden")).equals(".hidden (1)"),"duplicate hidden");
+        String[][] texts={{"Meeting at 5 pm.\nBring the slides","Meeting at 5 pm.txt"},{"  \n https://example.com/a","Link.txt"},{"   ","Text.txt"},{"???","Text.txt"},
+            {"The quick brown fox jumps over the lazy dog again and again","The quick brown fox jumps over the lazy.txt"},{"a/b: c","a_b_ c.txt"}};
+        for(String[] row:texts)check(FileNames.forText(row[0]).equals(row[1]),"text name "+row[0]+" -> "+FileNames.forText(row[0]));}
     private static void sas(){String[] fpI={"11".repeat(32),"59eb3cb130074f7b1ddb99c8fe14f27e1dbca735bb3da82e1ff0305340a32419"};
         String[] fpR={"22".repeat(32),"6dcde155f1f900e157d25bb5c24b1a54d71ea35b78661ed9b1a8be3532c3d4f5"};
         String[] ni={"33".repeat(32),"90c25e389b9cdf641350c7572c1d030f051747d44809a6ec1243eb9227fc0c96"};

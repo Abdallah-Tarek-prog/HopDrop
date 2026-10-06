@@ -33,6 +33,7 @@ import androidx.compose.material.icons.rounded.Gavel
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.PrivacyTip
 import androidx.compose.material.icons.rounded.RocketLaunch
+import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -165,6 +166,18 @@ fun SettingsScreen(state: HopUiState, actions: HopActions, snackbar: SnackbarHos
                         leadingContent = { LogoMark(36.dp) },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     )
+                    if (s.updatesSupported) {
+                        SwitchRow("Check for updates", "Looks at GitHub once a day", s.updateChecks, actions::setUpdateChecks)
+                        SettingRow(
+                            clickable = actions::checkForUpdates, icon = Icons.Rounded.SystemUpdate,
+                            title = state.update?.let { "Update to ${it.version}" } ?: "Check now",
+                            detail = when {
+                                state.checkingUpdates -> "Checking…"
+                                state.update != null -> "Tap to download and install"
+                                else -> "Look for a newer version now"
+                            },
+                        )
+                    }
                     SettingRow(clickable = { actions.openLink("https://github.com/Abdallah-Tarek-prog/HopDrop") }, icon = Icons.Rounded.Code,
                         title = "Source code", detail = "github.com/Abdallah-Tarek-prog/HopDrop")
                     SettingRow(clickable = { actions.openLink("https://github.com/Abdallah-Tarek-prog/HopDrop/blob/main/PRIVACY.md") },

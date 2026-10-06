@@ -10,6 +10,8 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Updates: HopDrop downloads a new version from GitHub and hands it to Android's installer (the user confirms). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <queries><intent><action android:name="android.intent.action.SEND" /><data android:mimeType="*/*" /></intent><intent><action android:name="android.intent.action.SEND_MULTIPLE" /><data android:mimeType="*/*" /></intent></queries>
     <application android:name=".HopApp" android:label="${appLabel}" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher"
@@ -20,6 +22,9 @@
                 <category android:name="android.intent.category.DEFAULT" /><data android:mimeType="*/*" /></intent-filter>
         </activity>
         <activity android:name=".QrScanActivity" android:exported="false" android:theme="@style/HopDropScanTheme" android:screenOrientation="portrait" />
+        <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.updates" android:exported="false" android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/update_files" />
+        </provider>
         <provider android:name=".SharedTextProvider" android:authorities="${applicationId}.sharedtext" android:exported="false" android:grantUriPermissions="true" />
         <service android:name=".TransferService" android:exported="false" android:foregroundServiceType="dataSync" />
         <service android:name=".ReceiveService" android:exported="false" android:foregroundServiceType="connectedDevice" />

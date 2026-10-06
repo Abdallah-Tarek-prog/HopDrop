@@ -58,6 +58,7 @@ import com.hop.drop.ui.QrUi
 import com.hop.drop.ui.SettingsUi
 import com.hop.drop.ui.Tab
 import com.hop.drop.ui.ThemeMode
+import com.hop.drop.ui.UpdateUi
 import com.hop.drop.ui.isDark
 import java.util.Locale
 import java.util.concurrent.ExecutorService
@@ -75,6 +76,9 @@ class MainActivity : ComponentActivity(), HopActions {
     private val offers = HashMap<String, Peer.Offer>()
     private var shownPrompt: HopApp.Prompt? = null
     private val prefs get() = getSharedPreferences(PREFS, MODE_PRIVATE)
+    private var updateTask: java.util.concurrent.Future<*>? = null
+    /** Waiting for the user to allow "Install unknown apps" in Android's settings; the update continues when they return. */
+    private var installAllowedPending = false
 
     private val openFiles = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { addFiles(it, persist = true) }
     private val pickMedia = registerForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) { addFiles(it, persist = false) }
@@ -131,6 +135,9 @@ class MainActivity : ComponentActivity(), HopActions {
         }
         state.settings = loadSettings()
         refreshAll()
+        offerKnownUpdate()
+        if (Updater.due(this)) checkUpdates(quiet = true)
+        if (installAllowedPending && packageManager.canRequestPackageInstalls()) { installAllowedPending = false; startUpdate() }
     }
 
     override fun onStop() {
@@ -333,6 +340,8 @@ class MainActivity : ComponentActivity(), HopActions {
             customFolder = p.getString("folder", null) != null,
             batteryRestricted = batteryRestricted(),
             autoStartHint = Build.MANUFACTURER.lowercase(Locale.ROOT) in AUTO_START_BRANDS,
+            updateChecks = Updater.enabled(this),
+            updatesSupported = Updater.supported(this),
         )
     }
 
@@ -467,6 +476,14 @@ class MainActivity : ComponentActivity(), HopActions {
         }
         addFiles(uris, persist = false)
         state.tab = Tab.Send
+    }
+
+    override fun addText(text: String) {
+        try {
+            addFiles(listOf(SharedTextProvider.create(this, text)), persist = false)
+        } catch (e: Exception) {
+            state.say("Couldn't prepare the text.")
+        }
     }
 
     // ---- Sending ----
@@ -837,6 +854,93 @@ class MainActivity : ComponentActivity(), HopActions {
         } catch (e: Exception) {
             state.say("No browser on this phone can open the link.")
         }
+    }
+
+    // ---- Updates (Updater.kt) ----
+
+    /** Shows the newer version the last check found, unless the user chose "Later" for it in the last three days. */
+    private fun offerKnownUpdate() {
+        if (!Updater.supported(this) || !Updater.enabled(this) || state.update != null) return
+        val release = Updater.known(this) ?: return
+        val later = prefs.getString("update_later", null) == release.version &&
+            System.currentTimeMillis() - prefs.getLong("update_later_at", 0) < 3L * 24 * 60 * 60 * 1000
+        if (!later) state.update = UpdateUi(release.version, release.size)
+    }
+
+    private fun checkUpdates(quiet: Boolean) {
+        if (state.checkingUpdates) return
+        state.checkingUpdates = true
+        work.execute {
+            val result = runCatching { Updater.check(this) }
+            main.post {
+                state.checkingUpdates = false
+                result.onSuccess { release ->
+                    when {
+                        release == null -> { if (state.update?.downloading != true) state.update = null; if (!quiet) state.say("HopDrop is up to date.") }
+                        quiet -> offerKnownUpdate()
+                        state.update == null -> state.update = UpdateUi(release.version, release.size)
+                    }
+                }.onFailure { if (!quiet) state.say("Couldn't reach GitHub. Check the internet connection.") }
+            }
+        }
+    }
+
+    override fun setUpdateChecks(on: Boolean) {
+        Updater.setEnabled(this, on)
+        state.settings = loadSettings()
+        if (!on && state.update?.downloading != true) state.update = null
+        if (on) checkUpdates(quiet = true)
+    }
+
+    override fun checkForUpdates() {
+        if (state.update != null) { state.settingsOpen = false; startUpdate() } else checkUpdates(quiet = false)
+    }
+
+    override fun startUpdate() {
+        val update = state.update ?: return
+        if (update.downloading) return
+        val release = Updater.known(this) ?: return
+        if (!packageManager.canRequestPackageInstalls()) {
+            // Android asks once per app: allow HopDrop to install apps. Coming back here continues the update.
+            installAllowedPending = true
+            state.say("Allow HopDrop to install updates, then come back.")
+            try {
+                startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+            } catch (e: Exception) {
+                openAppSettings()
+            }
+            return
+        }
+        state.update = update.copy(downloading = true, fraction = null, error = null)
+        updateTask = work.submit {
+            try {
+                val apk = Updater.download(this, release) { fraction ->
+                    main.post { state.update?.takeIf { it.downloading }?.let { state.update = it.copy(fraction = fraction.takeIf { f -> f >= 0 }) } }
+                }
+                main.post {
+                    if (state.update?.downloading != true) return@post
+                    state.update = state.update?.copy(downloading = false, fraction = null)
+                    if (!Updater.install(this, apk)) state.update = state.update?.copy(error = "Allow HopDrop to install updates first")
+                }
+            } catch (e: InterruptedException) {
+                // Cancelled.
+            } catch (e: Exception) {
+                main.post {
+                    if (state.update?.downloading == true) state.update = state.update?.copy(downloading = false, fraction = null, error = e.message ?: "The download failed")
+                }
+            }
+        }
+    }
+
+    override fun dismissUpdate() {
+        val update = state.update ?: return
+        if (update.downloading) {
+            updateTask?.cancel(true)
+            state.update = update.copy(downloading = false, fraction = null)
+            return
+        }
+        prefs.edit().putString("update_later", update.version).putLong("update_later_at", System.currentTimeMillis()).apply()
+        state.update = null
     }
 
     private fun batteryRestricted(): Boolean {

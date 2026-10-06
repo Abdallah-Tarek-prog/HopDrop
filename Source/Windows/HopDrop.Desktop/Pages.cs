@@ -40,6 +40,7 @@ public sealed partial class MainWindow
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 12, 0, 0) };
         buttons.Children.Add(Ui.Button("Browse files", Browse, true, SymbolRegular.DocumentAdd24));
         buttons.Children.Add(Ui.Button("Add a folder", BrowseFolder, false, SymbolRegular.FolderAdd24));
+        buttons.Children.Add(Ui.Button("Text", WriteText, false, SymbolRegular.TextDescription24));
         dropContent.Children.Add(buttons);
         var dashColor = new SolidColorBrush(Palette.Primary.Color) { Opacity = 0.7 };
         var dropBackground = new SolidColorBrush(Palette.PrimaryBg.Color) { Opacity = 0 };
@@ -100,6 +101,19 @@ public sealed partial class MainWindow
         var picker = new OpenFolderDialog { Multiselect = true, Title = "Choose folders to send" };
         if (picker.ShowDialog(this) == true) AddFiles(picker.FolderNames);
     }
+    /// <summary>Typed or pasted text, added to the Send list as a .txt file named after its first line.</summary>
+    private void WriteText()
+    {
+        var dialog = new TextNoteDialog { Owner = this };
+        if (dialog.ShowDialog() != true) return;
+        string folder = Path.Combine(TypedTextFolder, Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        string path = Path.Combine(folder, FileNames.ForText(dialog.Text));
+        File.WriteAllText(path, dialog.Text, new System.Text.UTF8Encoding(false));
+        AddFiles([path]);
+    }
+    private static string TypedTextFolder => Path.Combine(Path.GetTempPath(), "HopDrop text");
+    private static bool IsTypedText(string path) => path.StartsWith(TypedTextFolder + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
     private void AddFiles(IEnumerable<string> paths)
     {
         int previousCount = _files.Count;
@@ -163,7 +177,7 @@ public sealed partial class MainWindow
         {
             string path = item.Path;
             var remove = Ui.IconButton(SymbolRegular.Dismiss24, "Remove " + Path.GetFileName(path), () => { _files.Remove(item); RefreshFiles(); });
-            var row = Ui.ListRow(Ui.Badge(Ui.FileIcon(path), Palette.OnPrimaryBg, Palette.PrimaryBg, 36), Path.GetFileName(path), $"{Fmt.Size(SizeOf(path))} · {Path.GetDirectoryName(path) ?? ""}", remove);
+            var row = Ui.ListRow(Ui.Badge(Ui.FileIcon(path), Palette.OnPrimaryBg, Palette.PrimaryBg, 36), Path.GetFileName(path), $"{Fmt.Size(SizeOf(path))} · {(IsTypedText(path) ? "Typed text" : Path.GetDirectoryName(path) ?? "")}", remove);
             row.ToolTip = path;
             _fileHost.Children.Add(row);
             Appear(row, added?.Contains(path) == true);
