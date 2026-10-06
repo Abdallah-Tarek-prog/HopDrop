@@ -25,14 +25,13 @@ Velopack package id, the firewall rule, sign-in entry, pipes and mutexes, MCP se
   test and why, and any deviation from this spec. Never claim something works if you did not run it.
 - If the sandbox blocks something, work around it inside the repo (gitignored folders), or stop and report it.
 
-### Toolchain on this PC
+### Toolchain
 
-| Tool | Path |
+| Tool | Notes |
 |---|---|
-| Android SDK | `G:\Programs\Android\AndroidSdk` (build-tools 36.0.0, platform android-36, platform-tools/adb) |
-| JDK 21 | `C:\Users\LOQ\AppData\Local\Programs\Eclipse Adoptium\jdk-21.0.8.9-hotspot` — the `java` on PATH is Java 8; do not use it for d8/apksigner |
-| .NET SDK | 10.0.401 (`dotnet` on PATH; 9.0.306 is also installed) |
-| Python | `py -3` |
+| JDK 17+ | `JAVA_HOME`, or any installed Temurin / Microsoft / Oracle JDK (`Source/Android/build.ps1` finds it) |
+| Android SDK | `ANDROID_HOME`, or Android Studio's default `%LOCALAPPDATA%\Android\Sdk`; Gradle installs the platform it needs (android-37) |
+| .NET SDK | 10.x (`dotnet` on PATH) for the Windows app; the Windows SDK (makeappx, makepri) for the Store package |
 | Test phone | Realme 6 Pro (RMX2061), Android 11 / API 30 |
 
 ---
@@ -315,7 +314,10 @@ receive folder. The first part (the sent folder) gets a new name when it already
 
 **Code layout:** `com.hop.drop` (activities, services, notifications), `com.hop.drop.core` (framing, messages, SAS, QR URI, file names, transfer state — pure Java, no `android.*`, so it can be tested on the desktop JVM), `com.hop.drop.net` (discovery, local interfaces), `com.hop.drop.store` (paired devices, settings, history).
 
-**Screens** (four tabs in a custom bottom bar — pill indicator behind the icon, centred labels; no AndroidX):
+**Screens** — Kotlin + Jetpack Compose with Material 3 (`src/com/hop/drop/ui`), hosted by `MainActivity.kt`; the engine stays plain
+Java. Three tabs in a bottom navigation bar (**Send**, **Activity**, **Devices**); the top bar has the logo, a "Ready" / "Off" pill (tap →
+this phone's name and addresses) and Settings (gear). Back from another tab returns to Send. The paragraphs below describe what each
+screen holds; where they say "tab" for Settings, it is the full-screen Settings page.
 - **Header (all tabs):** logo, "HopDrop", this phone's name, and a status chip ("Ready" / "Not receiving"; tap → why, and this phone's addresses).
   Below it, a **live transfer card** per transfer in either direction (R13): direction icon, "Sending 3 files to …" /
   "Receiving 3 files from …", current file and k of N, progress bar, "412.0 MB of 1.60 GB · 25%", "11.8 MB/s · 1 min 44 s left", **Cancel**.
@@ -331,7 +333,12 @@ receive folder. The first part (the sent folder) gets a new name when it already
   button, **Show my QR code**); **Paired devices** (online now / last seen, paired date; tap → **Trust this device**, rename, remove; note that pairing is
   permanent until removed); **Pair a new device** (*Scan QR*, *Pair by IP*); **Nearby devices** (every device found, paired ones
   marked "Paired", others tap → number match; clear empty states for "not receiving", "no local network", "searching").
-- **Activity:** history with direction icons (received / sent / failed / cancelled), files, size, time, result; tap a received item → open it. **Clear** (list only).
+- **Activity:** live transfers under "Now", then the history grouped by day (Today, Yesterday, date) with a search field (file or device
+  names) and an All / Received / Sent filter. Each row: a photo thumbnail when the transfer has one (else a direction badge), "From/To
+  <device>", "first file + N more" (never a comma list), "N files · size" or the problem in plain words, and the time. Tap → the files,
+  one per line (tap opens, long-press shares), size and time taken, where they were saved, **Share** and **Remove from list**;
+  long-press a row → Share / Remove from list. Overflow menu → **Clear activity** (list only). Sent transfers keep where their first 50
+  source files are, so they can be opened later while the phone can still read them.
 - **Settings:** **Appearance** (System / Light / Dark); this phone's name; **Receive folder** (current place; **Change** via
   `ACTION_OPEN_DOCUMENT_TREE` with persisted read/write permission; **Use default**); **Receive in the background** (switch,
   default on, R11; turning it on requests the battery-optimisation exemption; a warning with **Allow background activity** while
@@ -349,7 +356,8 @@ receive folder. The first part (the sent folder) gets a new name when it already
 
 **Notifications** (channels: "Transfers in progress" = low, "Finished transfers" = default, "Files received" = high, so arrivals
 pop up on screen, "Pairing requests" = high, "Requests to send you files" = high). Progress notifications update at most once a second.
-Files from a sent folder are named once as "<folder> folder" in summaries ("Photos folder, notes.pdf +2").
+Files from a sent folder are named once as "<folder> folder" in summaries ("Photos folder + 2 more"). Lists are never comma-separated:
+one line summaries say "a.jpg and b.pdf" / "a.jpg + 3 more"; expanded lists put one name per line.
 - Ask before receiving: "<device> wants to send you 3 files" · names and size · **Accept** / **Decline** (expires with the request);
   a dialog too while HopDrop is open.
 - A dropped connection: "Reconnecting to …" / "Waiting for … to reconnect" until the transfer continues.
@@ -358,7 +366,7 @@ Copy rule: the title says what is happening and with whom, the collapsed line ho
   speed · progress bar · **Cancel** · small icon = up arrow.
 - Receiving: same shape, "Receiving 3 files from …", small icon = down arrow. It replaces the receiver's "Ready to receive files ·
   Visible as <name> · <address>" notification while it runs.
-- Sent: "Sent 3 files to LOQ Laptop" · "IMG_2031.jpg, report.pdf +1 · 1.7 MB" · expanded: all names, "Saved in Downloads\HopDrop on LOQ Laptop", size and time taken.
+- Sent: "Sent 3 files to LOQ Laptop" · "IMG_2031.jpg + 2 more · 1.7 MB" · expanded: the names one per line, "Saved in Downloads\HopDrop on LOQ Laptop", size and time taken.
 - Received: "Received 3 files from LOQ Laptop" · names and size · expanded "Saved in Download/HopDrop" · **Open** (one file) / **Show files**.
 - Failed / cancelled: "Couldn't finish sending to …" / "Receiving from … stopped" / "… cancelled" + the real reason in plain words
   (who cancelled, unreachable, no space, …) + how many files made it.
@@ -368,13 +376,13 @@ Copy rule: the title says what is happening and with whom, the collapsed line ho
 - Share sheet (`SEND`, `SEND_MULTIPLE`) opens the Send tab with the files added. Shared text becomes a cached `.txt` served by a small in-app `ContentProvider` — no `file://` URIs leave the app.
 - Bluetooth (R10): pick the `ACTION_SEND` target whose package name contains `bluetooth`; if none, open the system chooser.
   Each use first explains: on the laptop click HopDrop → Receive via Bluetooth (it waits and saves into its receive folder), then pick the laptop in Android's list; much slower than Wi-Fi.
-- **Look:** flat design with semantic color tokens in `values/colors.xml` and `values-night/colors.xml` (ink, muted, surface, card,
-  primary + container, success, danger, amber + containers); brand navy `#11213A`, blue `#2563EB`, amber `#F5A524`; dark theme uses
-  tonal navy surfaces (`#0B1220` / `#141D2F`) and a lighter blue `#7AA2FF` for text/icons. Bordered 20 dp cards, 48 dp pill
-  buttons with the icon next to the label, 8 dp spacing grid, 48 dp touch targets, ripple feedback, system-bar insets handled
-  (edge-to-edge on Android 15). It must look like a polished modern app, not a form.
+- **Look:** Material 3, flat cards on navy-tinted neutrals, Plus Jakarta Sans. Colour themes (Settings → Colour): **HopDrop** (orange
+  `#C2410C` on light, `#FFB693` on dark, navy secondary), **Ocean**, **Forest**, **Berry**, **Midnight**, and **Wallpaper** (Material You,
+  Android 12+), each in light and dark; with System / Light / Dark they apply instantly. Primary text and buttons meet 4.5:1 contrast.
+  Subtitles stay short (one line, only where the title isn't enough). 48 dp touch targets, edge-to-edge, short (150–260 ms) motion.
 - Permissions: INTERNET, ACCESS_NETWORK_STATE, ACCESS_WIFI_STATE, CHANGE_WIFI_MULTICAST_STATE, FOREGROUND_SERVICE, FOREGROUND_SERVICE_DATA_SYNC, FOREGROUND_SERVICE_CONNECTED_DEVICE, POST_NOTIFICATIONS, WRITE_EXTERNAL_STORAGE (maxSdkVersion 28), CAMERA (Stage 4 only), REQUEST_IGNORE_BATTERY_OPTIMIZATIONS (background receiving).
-- Version: versionCode 1, versionName 1.0.0. Output `HopDrop.apk` at the repo root, signed with the release key so it updates in place.
+- Build: Gradle (Android plugin 9.4, Kotlin 2.4, Compose BOM 2026.09), `compileSdk` 37, `targetSdk` 36, `minSdk` 26; release shrunk with R8 (about 2 MB).
+  Version: versionCode 1, versionName 1.0.0. Output `HopDrop.apk` at the repo root, signed with the release key (CN=HopDrop) so updates install in place.
 - Activity keeps the first 1,000 file names of a transfer (and the real count), and looks up where the first 50 were saved.
 
 ---

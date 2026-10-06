@@ -1,37 +1,42 @@
 # HopDrop Android
 
-Plain Java and Android platform APIs, built with the installed Android SDK and JDK 21. No Gradle or AndroidX.
+Kotlin + Jetpack Compose (Material 3) screens on top of a plain-Java transfer engine, built with Gradle.
+Needs JDK 17+ and the Android SDK (`ANDROID_HOME`, or Android Studio's default `%LOCALAPPDATA%\Android\Sdk`);
+Gradle downloads everything else on the first build.
 
 From the repository root:
 
 ```powershell
 powershell -File Source/Android/build.ps1 -Test
+powershell -File Source/Android/build.ps1 -Interop
 powershell -File Source/Android/build.ps1 -Debug
 powershell -File Source/Android/build.ps1 -Release
 powershell -File Source/Android/build.ps1 -Release -Install
-powershell -File Source/Android/build.ps1 -Interop
 ```
 
-- `-Release` signs `HopDrop.apk` at the repository root with the existing release key (the build script reads the password file; never print or copy it). `-Install` also installs it on the phone attached over adb, updating the app in place and keeping its pairings.
-- `-Debug` builds `com.hop.drop.dev` ("HopDrop Dev"), a separate app with its own identity and pairings.
-- `-Test` runs the pure-Java core tests (SAS vectors, QR URI, file names, framing, speed/time-left meter) and two Java peers talking to each other (pairing, transfers, Ask before receiving and trust, folders, 1,500 files in one transfer, resuming after a dropped connection).
-- `-Interop` runs the phone's Java engine against the Windows CLI on ports 17410/17411, so a running HopDrop (port 7410) is not disturbed. It covers pairing, transfers, Ask before receiving, folders, big selections and resuming, in both directions. It needs Windows .NET TLS credentials and fails inside a restricted sandbox with `SEC_E_NO_CREDENTIALS`; run it outside that sandbox.
+- `-Test` checks the engine on the desktop JVM: core rules (SAS, QR URI, file names, framing, speed/time-left meter) and two Java peers talking to each other (pairing, transfers, Ask before receiving and trust, folders, 1,500 files, resuming after a dropped connection, slow uploads). No Android SDK needed.
+- `-Interop` runs the phone's engine against the Windows command-line peer on ports 17410/17411, so a running HopDrop (port 7410) isn't disturbed.
+- `-Debug` builds "HopDrop Dev" (`com.hop.drop.dev`): a separate app with its own pairings, so testing never replaces the real one.
+- `-Release` builds the shrunk release app (about 2 MB) and copies it to `HopDrop.apk` at the repository root. It's signed with the key in `Private signing key/` (kept off git); without that folder the build signs with the debug key. `-Install` also installs it on the phone connected over adb; updates install over the old version and keep pairings.
+- `./gradlew recordRoborazziDebug` draws every screen with sample data (light, dark, each colour theme, dialogs) into `screenshots/` (not in git), to review the design without a phone.
 
 ## Code map
 
-- `core/` — pure Java, no `android.*`: protocol, pairing, SAS, QR URI, file names, `TransferMeter` (smoothed speed and time left), `Format` (sizes, durations).
-- `net/` — `Discovery` (UDP 7410; every send is independent and runs off the main thread) and `LocalSockets` (local-only sockets, and this phone's labelled addresses).
-- `store/` — identity (Android Keystore), paired devices, receive folder.
-- App layer — `MainActivity` (header, live-transfer cards, bottom navigation, theme override), the four tabs, `Live` (what is moving right now), `Notices` (every notification), `ReceiveService`, `TransferService`, `FolderScan` (a picked folder: name, and its files when counted or sent), `QrScanActivity` (the pairing-code scanner).
+- `src/com/hop/drop/core/` — pure Java, no `android.*`: protocol, pairing, SAS, QR URI, file names, `TransferMeter`, `Format`.
+- `src/com/hop/drop/net/` — `Discovery` (UDP 7410) and `LocalSockets` (local-only sockets, this phone's labelled addresses).
+- `src/com/hop/drop/store/` — identity (Android Keystore), paired devices, receive folder.
+- `src/com/hop/drop/` — the app's Android parts: `HopApp` (engine, notification channels, Activity history), `ReceiveService`, `TransferService`, `Notices` (every notification), `Live` (what is moving right now), `FolderScan`, `QrScanActivity` (the camera scanner), and `MainActivity.kt`, which hosts the screens and connects them to the engine.
+- `src/com/hop/drop/ui/` — the Compose screens: `Theme.kt` (six colour themes in light and dark, Plus Jakarta Sans), `App.kt` (top bar, bottom tabs, transitions), `SendScreen`, `ActivityScreen`, `DevicesScreen`, `SettingsScreen`, `Dialogs` (pairing number, incoming files, QR code, pair options), `Components` and `Thumbnails`. The screens only read `HopUiState` and call `HopActions`.
+- `uitests/` — the screenshot tests (Robolectric + Roborazzi).
 
 ## Behaviour worth knowing
 
-- Receiving runs all the time while **Settings → Receive in the background** is on (the default). Realme/Oppo phones block the start-after-update until the app is opened once unless Auto-launch is allowed. On first start the app asks once to be exempted from battery optimisation, and again when the switch is turned on; some phones also need Auto-launch. With the switch off it receives only while the app is open. Arrivals use the high-importance "Files received" channel, so they pop up on screen.
-- Battery: discovery holds Wi-Fi's multicast lock and announces every 5 s only while HopDrop is on screen; in the background it announces every 20 s and lets the Wi-Fi chip filter group traffic. Paired devices still reach the phone at its saved address.
-- **Ask before receiving** (Settings) shows a notification with Accept/Decline (and a dialog while the app is open); devices with **Trust this device** (Devices → tap a device) skip it. **Privacy → Paired only** hides the phone's name from devices it isn't paired with, except while the Devices tab is open.
-- **Folder** on the Send tab adds the folder as one item (counted in the background); `TransferService` lists its files (except `.hidden` ones) when it sends, so a huge folder never passes between the app's parts as thousands of entries. Received folders keep their structure in the receive folder. Bluetooth has no folders, so it gets the files inside them.
-- **Scan QR** opens a full-screen scanner: preview without stretching, pinch / double-tap / chip zoom up to 4×, tap to focus, reading anywhere in the frame, messages for a different QR code or another version, a camera-permission screen, and "Can't scan? Pair by comparing numbers". After a scan, a "Pairing with …" dialog shows until it works or explains why not.
-- Settings → Appearance: System, Light or Dark (applied on top of the system setting).
-- Bluetooth hands files to Android's own Bluetooth app. The Windows app's **Receive via Bluetooth** puts the PC in receive mode and moves the files into its receive folder.
+- Three tabs: **Send** (pick Files, Photos or a Folder, then Send next to a device; progress shows on that device), **Activity** (every transfer, grouped by day, with search, a Sent/Received filter and photo previews; tap to see the files one per line, tap a file to open it, long-press to share), **Devices** (this phone and its addresses, paired devices, nearby devices with a Pair button, and **Pair device** for QR or an IP address). Settings is the gear at the top.
+- Receiving runs all the time while **Settings → Receive in the background** is on (the default). Realme/Oppo phones block the start-after-update until the app is opened once unless Auto-launch is allowed; Settings shows an "Allow auto-launch" row on those brands. On first start the app asks once to be exempted from battery optimisation.
+- Battery: discovery announces every 5 s only while HopDrop is on screen; in the background it announces every 20 s and lets the Wi-Fi chip filter group traffic. Paired devices still reach the phone at its saved address.
+- **Ask before receiving** shows a notification with Accept/Decline (and a dialog while the app is open); trusted devices (Devices → tap a device → Trust this device) skip it. **Who can see this phone → Paired only** hides the phone's name from unpaired devices, except while the Devices tab is open.
+- A picked folder is one item (counted in the background); `TransferService` lists its files when it sends. Activity keeps where the first 50 files of each transfer are, so it can open and share them (received files, and sent files whose source the phone can still read).
+- The QR scanner: preview without stretching, pinch / double-tap / chip zoom up to 4×, tap to focus, and "Pair with numbers instead". No standing hint text.
+- Appearance: System, Light or Dark, and a colour theme (HopDrop, Ocean, Forest, Berry, Midnight, or Wallpaper on Android 12+). Both apply instantly.
 
-On a real phone, check an upgrade over the installed release app; the scanner (zoom, tap to focus, a laptop screen at arm's length, permission denied and allowed again); a folder of a few hundred files as one item; phone-to-laptop and laptop-to-phone pairing and transfers; live progress on both ends; number match cancellation and timeout; the receive folder and persistence; background receiving after leaving the app and after a reboot; file picker multi-select, photos, share sheet, and Bluetooth; notifications; and all four tabs in light and dark mode at normal and larger font sizes.
+On a real phone, check: the scanner on a laptop screen at arm's length; a folder of a few hundred files; phone-to-laptop and laptop-to-phone transfers with the app closed; Accept/Decline from the notification; opening and sharing from Activity.

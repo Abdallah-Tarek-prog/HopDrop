@@ -63,7 +63,7 @@ if ($Publish) {
 }
 if ($Store) {
     # Microsoft Store package (MSIX) for PCs and ARM laptops, plus one .msixbundle holding both for Partner Center, in
-    # "Windows App/Store". Store/identity.json has the identity Partner Center gives the app (test values until then).
+    # "Windows App/Store". Store/identity.json has the identity Partner Center gave the app.
     # The Store signs the package itself, so nothing is signed here. -Install also installs the x64 build on this PC for
     # testing (needs Windows' Developer Mode; it replaces an earlier test install).
     $version = ([xml](Get-Content $desktopProject)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
@@ -81,7 +81,12 @@ if ($Store) {
     $assets = Join-Path $PSScriptRoot 'out/store-assets'
     & powershell -NoProfile -File (Join-Path $PSScriptRoot 'Store/make-assets.ps1') -Out $assets
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    if ($Install) { Get-AppxPackage -Name $identity.Name | Remove-AppxPackage }
+    # Test installs get their own identity and live outside the repository, so they never clash with the Store version
+    # and keep working when the repository folder moves.
+    $testName = 'HopDrop.LocalTest'
+    # Not under AppData: Windows refuses to register a package folder from there.
+    $testFolder = Join-Path $env:USERPROFILE 'HopDrop Store test'
+    if ($Install) { Get-AppxPackage -Name $testName | Remove-AppxPackage }
     foreach ($runtime in 'win-x64', 'win-arm64') {
         $arch = $runtime.Substring(4)
         Restore-Target $desktopProject $runtime
@@ -114,8 +119,22 @@ if ($Store) {
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     Write-Host "PASS Store bundle: $(Split-Path $bundle -Leaf) ($([math]::Round((Get-Item $bundle).Length / 1MB, 1)) MiB) - upload this one to Partner Center"
     if ($Install) {
-        Add-AppxPackage -Register (Join-Path $PSScriptRoot 'out/store-x64/AppxManifest.xml')
-        Write-Host "PASS Installed the x64 Store build on this PC for testing ($($identity.Name))"
+        if (Test-Path $testFolder) { Remove-Item -Recurse -Force $testFolder }
+        Copy-Item (Join-Path $PSScriptRoot 'out/store-x64') $testFolder -Recurse
+        $manifest = $template.Replace('{Name}', $testName).Replace('{Publisher}', 'CN=HopDrop Local Test').
+            Replace('{PublisherDisplayName}', 'HopDrop test').Replace('{Version}', $msixVersion).Replace('{Arch}', 'x64')
+        [System.IO.File]::WriteAllText((Join-Path $testFolder 'AppxManifest.xml'), $manifest, [System.Text.UTF8Encoding]::new($false))
+        # resources.pri is indexed by package name, so the test copy needs its own.
+        $pri = Join-Path $PSScriptRoot 'out/store-pri-test'
+        if (Test-Path $pri) { Remove-Item -Recurse -Force $pri }
+        New-Item -ItemType Directory -Force $pri | Out-Null
+        Copy-Item $assets (Join-Path $pri 'Assets') -Recurse
+        Copy-Item (Join-Path $testFolder 'AppxManifest.xml') $pri
+        & $makepri createconfig /cf (Join-Path $pri 'priconfig.xml') /dq en-US /pv 10.0.0 /o | Out-Null
+        & $makepri new /pr $pri /cf (Join-Path $pri 'priconfig.xml') /mn (Join-Path $pri 'AppxManifest.xml') /of (Join-Path $testFolder 'resources.pri') /o | Out-Null
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        Add-AppxPackage -Register (Join-Path $testFolder 'AppxManifest.xml')
+        Write-Host "PASS Installed the x64 Store build on this PC for testing ($testName, from $testFolder)"
     }
     exit 0
 }
