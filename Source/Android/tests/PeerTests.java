@@ -37,7 +37,7 @@ public final class PeerTests {
             try{pa.send(pa.pairingDevice(pb.id()),items(note));throw new AssertionError("Declined offer was sent");}catch(java.io.IOException expected){check(expected.getMessage().startsWith("declined"),"declined code: "+expected.getMessage());}
             check(DesktopPeer.sawWaiting,"sender reports that the receiver is asking");check(!Files.exists(br.resolve("note.txt")),"declined file not saved");
             DesktopPeer.answerOffers=true;pa.send(pa.pairingDevice(pb.id()),items(note));check(Files.exists(br.resolve("note.txt")),"accepted file saved");
-            pb.setTrusted(pa.id(),true);DesktopPeer.answerOffers=false;pa.send(pa.pairingDevice(pb.id()),items(note));check(Files.exists(br.resolve("note (1).txt")),"trusted device isn't asked");
+            pb.setTrusted(pa.id(),true);check(pb.pairingDevice(pa.id()).trusted,"trust is saved");DesktopPeer.answerOffers=false;pa.send(pa.pairingDevice(pb.id()),items(note));check(Files.exists(br.resolve("note (1).txt")),"trusted device isn't asked");
             pa.pairQr(pb.issueQr(Collections.singletonList("127.0.0.1"),17611));check(pb.pairingDevice(pa.id()).trusted,"re-pairing keeps trust");
             DesktopPeer.answerOffers=null;System.out.println("PASS Java ask before receiving: decline, accept, trusted devices skip, trust survives re-pairing");}
         try(Peer pa=DesktopPeer.open(a,ar,"Java A");Peer pb=DesktopPeer.open(b,br,"Java B")){pa.start(17610);pb.start(17611);Peer.Device toB=pa.pairingDevice(pb.id());
@@ -48,6 +48,17 @@ public final class PeerTests {
             check(Files.readString(br.resolve("Photos").resolve("2024").resolve("beach.jpg")).equals("beach"),"folder structure kept");check(Files.exists(br.resolve("_").resolve("_").resolve("outside").resolve("evil.txt")),"unsafe folder names cleaned");
             pa.send(toB,folder);check(Files.exists(br.resolve("Photos (1)").resolve("2024").resolve("beach.jpg")),"second folder send doesn't merge");
             System.out.println("PASS Java folders keep their structure, unsafe names cleaned, no merging");
+            // Backups ("merge"): the same folder name fills the existing folder instead of making "Camera (1)".
+            Path camera=src.resolve("Camera");Files.createDirectories(camera);Path one=camera.resolve("one.jpg"),two=camera.resolve("two.jpg");Files.writeString(one,"1");Files.writeString(two,"2");
+            pa.send(toB,Collections.singletonList(new Peer.FileItem("one.jpg",1,()->Files.newInputStream(one),"Camera")),true);
+            pa.send(toB,Collections.singletonList(new Peer.FileItem("two.jpg",1,()->Files.newInputStream(two),"Camera")),true);
+            check(Files.exists(br.resolve("Camera").resolve("one.jpg"))&&Files.exists(br.resolve("Camera").resolve("two.jpg"))&&!Files.exists(br.resolve("Camera (1)")),"backup merges into the existing folder");
+            System.out.println("PASS Java backups merge into the existing folder");
+            // Text arrives as text (with the clipboard mark), not as a file.
+            DesktopPeer.lastText=null;check(pa.sendText(toB,"https://example.com/?q=\"hop\" ✓",true),"text went as text");
+            check("https://example.com/?q=\"hop\" ✓".equals(DesktopPeer.lastText)&&DesktopPeer.lastClip,"text received: "+DesktopPeer.lastText);
+            check(pb.pairingDevice(pa.id()).lastSeen>0,"contact recorded");
+            System.out.println("PASS Java text messages");
             // A big selection goes in one transfer (the offer is split over several messages).
             Path many=root.resolve("many");Files.createDirectories(many);List<Peer.FileItem> lots=new ArrayList<>();
             for(int i=0;i<1500;i++){Path p=many.resolve(String.format("a-rather-long-file-name-that-fills-the-offer-quickly-%04d.txt",i));Files.writeString(p,""+i);lots.add(new Peer.FileItem(p.getFileName().toString(),Files.size(p),()->Files.newInputStream(p)));}

@@ -1,6 +1,7 @@
 # HopDrop — Product and Protocol Spec
 
-Status: approved direction from the owner, 2026-09-29. This file is the single source of truth for the app.
+Status: approved direction from the owner, 2026-09-29; version 1.1 additions approved 2026-10-13. This file is the single source of
+truth for the app.
 If code and this spec disagree, fix the code or raise it — do not silently change the spec.
 
 **Name (owner decision, 2026-10-05):** **HopDrop** everywhere — what people see and every technical name: Android package
@@ -17,9 +18,10 @@ Velopack package id, the firewall rule, sign-in entry, pipes and mutexes, MCP se
 - **Never touch `Private signing key/`** except where a build script must *read* the keystore to sign.
   Never print, log, copy, or commit the keystore or its password. `.gitignore` blocks it.
 - **v1 is gone.** The owner approved removing v1 on 2026-09-29; v2 is the only version. Do not reintroduce v1 files.
-- **Android stays plain Java + platform APIs.** No Gradle, no AndroidX, no Kotlin. minSdk 26, targetSdk 35,
-  compile against `android-36`. Third-party code only where section 8 allows it.
-- **Windows is .NET 9 + WPF.** Third-party NuGet packages only where section 8 allows it.
+- **Android:** the screens are Kotlin + Jetpack Compose (Material 3), built with Gradle; the transfer engine (`core/`, `net/`, `store/`)
+  stays plain Java with platform APIs, so it also runs on the desktop JVM for tests. minSdk 26, targetSdk 36, compileSdk 37.
+  Third-party code only where section 8 allows it.
+- **Windows is .NET 10 + WPF.** Third-party NuGet packages only where section 8 allows it.
 - **Local only.** No cloud, no accounts, no telemetry, never route over mobile data (section 5).
 - **Report honestly.** In your final message, list what you built, what you ran, what passed, what you could not
   test and why, and any deviation from this spec. Never claim something works if you did not run it.
@@ -40,20 +42,28 @@ Velopack package id, the firewall rule, sign-in entry, pipes and mutexes, MCP se
 
 | ID | Requirement |
 |---|---|
-| R1 | **Three ways to connect:** (a) same Wi-Fi router, (b) hotspot in both directions (phone hosts, laptop joins; laptop hosts, phone joins), (c) Bluetooth via the operating system's own Bluetooth file transfer ("option a"). No Wi-Fi Direct. |
+| R1 | **Ways to connect:** (a) same Wi-Fi router, (b) hotspot in both directions (phone hosts, laptop joins; laptop hosts, phone joins), (c) the PC's **direct link** (R16: its own Wi-Fi Direct network, so phone and PC need no shared network; owner decision 2026-10-13, replacing "No Wi-Fi Direct"), (d) Bluetooth via the operating system's own Bluetooth file transfer ("option a"). |
 | R2 | **The receiver decides where files are saved**, on the phone and on the laptop. Editable in the UI, saved permanently, survives restarts/reboots. (Bluetooth exception: the OS saves those; the laptop's Windows wizard asks where.) |
-| R3 | **Any device to any device.** Every device can send and receive. Phone↔laptop, laptop↔laptop and phone↔phone all use the same protocol, over local Wi-Fi, hotspot, and (after Stage 6) Bluetooth through HopDrop itself. |
+| R3 | **Any device to any device.** Every device can send and receive. Phone↔laptop, laptop↔laptop and phone↔phone all use the same protocol, over local Wi-Fi, hotspot, and the PC's direct link (phone↔PC). |
 | R4 | **Multi-select on the phone:** an in-app list of chosen files; "Add files" appends (never replaces); remove one file (✕); "Clear all"; a hint that the system picker multi-selects by long-press; a "Photos & videos" button with tap-to-select multi-pick; the Android Share sheet still works. |
 | R5 | **Pair once, remembered on both sides.** Two pairing methods: (a) **QR** — a device shows a QR code, a phone scans it; (b) **number match** — both screens show the same 6-digit code, the user confirms on both. No PIN or trust code per send. Unpaired devices cannot send files. Paired devices are accepted automatically (no accept pop-up). |
 | R6 | **Find devices by name** on the local network (needed by R3 and R5b). Manual "Add by IP address" fallback. |
 | R7 | **Real Windows app:** window + tray icon, modern Windows 11 look, device list, pairing with QR, activity history, settings, drag & drop, Explorer "Send to", Windows notifications. ~100 MB is acceptable. |
 | R8 | **Notifications look good on both ends.** Sender: what was sent, to which device, where it landed. Receiver: what arrived, from whom, with Open / Show in folder. Progress shows file, count, speed, time left, and Cancel. |
 | R9 | **Hotspot both directions works;** transfers never go over mobile data; the laptop listens on all its local networks. |
-| R10 | **Bluetooth handoff (option a) works and is honest:** the phone finds the system Bluetooth share target by itself (never a hard-coded package), shows real error reasons, and tells the user the PC must be waiting. The laptop app's **Receive via Bluetooth** opens Windows' Bluetooth File Transfer wizard (`fsquirt.exe`) and presses "Receive files" itself (fsquirt has no working receive/send switch — `-receive` only opens the first page; verified 2026-09-29), then presses Finish when files arrive and moves them into HopDrop's receive folder, with a toast and an Activity entry; it keeps waiting for more until the user closes the wizard (15 min idle limit). **Send via Bluetooth** opens the wizard on its send page. If a step can't be automated, the wizard is left to the user. **Later (Stage 6, option b):** HopDrop's own Bluetooth link on both platforms — same pairing, receive folder, progress and notifications as Wi-Fi, any device to any device. |
+| R10 | **Bluetooth handoff (option a) works and is honest:** the phone finds the system Bluetooth share target by itself (never a hard-coded package), shows real error reasons, and tells the user the PC must be waiting. The laptop app's **Receive via Bluetooth** opens Windows' Bluetooth File Transfer wizard (`fsquirt.exe`) and presses "Receive files" itself (fsquirt has no working receive/send switch — `-receive` only opens the first page; verified 2026-09-29), then presses Finish when files arrive and moves them into HopDrop's receive folder, with a toast and an Activity entry; it keeps waiting for more until the user closes the wizard (15 min idle limit). **Send via Bluetooth** opens the wizard on its send page. If a step can't be automated, the wizard is left to the user. HopDrop's own Bluetooth link (the former Stage 6, "option b") is dropped (owner, 2026-10-13): the direct link (R16) covers "no shared network". |
 | R11 | **Phone receiving** (changed 2026-10-05 on the owner's request "receive notification even when in background"): the phone receives, and notifies, even when the app is closed. Settings has a **"Receive in the background"** switch, now **on by default** (it was off, so updating to 2.3.0 switches it on once; turning it off afterwards sticks), that keeps the receiver running with its ongoing notification. On first start HopDrop asks once to be exempted from battery optimisation; turning the switch on asks too. With the switch off, the phone listens only while the app is open, and a transfer that has started continues if the user leaves the app. **Laptop receiving:** whenever HopDrop runs, including hidden in the tray; "Start with Windows" starts it hidden at sign-in. Settings has a **"Receive in the background"** switch (default off): quitting then closes the window and tray icon but keeps a hidden receiver in the user's session, which also starts at sign-in; it shows toasts for arrivals and opens the window for a pairing request. |
 | R12 | Both apps look polished and consistent: same structure (Send · Devices · Activity · Settings), same brand colors and semantic color tokens, light and dark themes with a **System / Light / Dark** choice in Settings. |
 | R13 | **Live progress on both ends, in the app and in notifications:** direction, device, current file and k of N, bytes done of total, percent, smoothed speed, time left, and Cancel — for sending and receiving. |
 | R14 | **Each device shows its own local IP addresses** (labelled Wi-Fi / Hotspot / Ethernet …) so the other side can pair by address. Nearby lists show every HopDrop device found, marking the ones already paired. |
+| R16 | **Direct link and smart pairing** (owner, 2026-10-13: "fewest clicks, fastest pairing, try the shared network first"): whenever HopDrop runs on a PC and a phone is paired (or the pairing QR is on screen), the PC offers its own Wi-Fi Direct network (section 3.10). Its name and passphrase travel in the pairing QR code and, afterwards, only to paired devices. A phone tries the network both are on first, and joins the PC's link by itself when that fails — for pairing and for sending. Android asks "Connect?" once per PC; after that it's silent. A setting turns it off on the PC. |
+| R17 | **Text as text:** typed, pasted and shared text arrives as text (with **Copy**, **Open link** for a single link, **Share**), not as a .txt file; older versions still get a .txt. Activity lists text messages. |
+| R18 | **Clipboard:** phone → PC: the Text dialog opens with the clipboard; the Quick Settings tile sends it in one tap. PC → phone: tray menu **Send clipboard to <device>**, and optionally (off by default) **Share what I copy** to online phones. Text sent from a clipboard goes straight onto the other device's clipboard (each side has a switch, on by default). |
+| R19 | **Send when it's back:** a send to a device that can't be reached waits (saved across restarts) and goes by itself when the device is back; the device row says so and has **Cancel**. |
+| R20 | **Fewer taps:** send to several devices at once (Select several / checkboxes); paired devices in Android's share sheet (Direct Share: one tap sends); a Quick Settings tile (clipboard, latest photo, files); the PC opens on its pairing code until a phone is paired. |
+| R21 | **Auto-backup (phone setting, off by default):** a chosen folder's new files go to a chosen paired device whenever both are on the same network, into one folder of the same name there (merged, 3.9.7), optionally only while charging. Already-sent files are remembered and never sent twice. |
+| R22 | **Tour:** the phone's first start (and Settings → Show the tour again) shows a short, skippable tour with pictures of the real screens and what each part does, ending in "Pair my first device". |
+| R23 | **Speed:** many small files don't wait for a round trip each (3.9.6); no Nagle delays; bigger socket buffers and data chunks; the phone keeps Wi-Fi at full speed and the processor awake while files move. |
 | R15 | **AI agents** (owner request 2026-10-05): AI assistants on the PC (Claude Code, Claude Desktop, Codex, Cursor… through MCP; anything else through a command line) can list paired devices, send files and whole folders to them, check a transfer, list recent transfers, and wait for files from a device. They cannot pair, change settings or accept files. Off by default (Windows Settings → AI agents); only the signed-in Windows user can connect. Section 7.1. |
 
 ---
@@ -61,7 +71,7 @@ Velopack package id, the firewall rule, sign-in entry, pipes and mutexes, MCP se
 ## 2. Architecture
 
 ```
-Phone (Java)                         Laptop (.NET 9)
+Phone (Kotlin UI, Java engine)       Laptop (.NET 10)
  ├─ UI (Activities, notifications)    ├─ HopDrop.Desktop (WPF UI, tray, toasts)
  ├─ ReceiveService (listener+discovery)├─ HopDrop.Cli (headless peer for tests)
  ├─ TransferService (outgoing)        └─ HopDrop.Core (protocol, identity, pairing,
@@ -96,8 +106,11 @@ Phone (Java)                         Laptop (.NET 9)
 
 ### 3.3 Hello (both directions, first message after TLS)
 ```json
-{"type":"hello","proto":2,"id":"<64 hex>","name":"LOQ Laptop","platform":"windows","app":"1.0.0","paired":true,"features":["consent","folders","pages","resume"]}
+{"type":"hello","proto":2,"id":"<64 hex>","name":"LOQ Laptop","platform":"windows","app":"1.1.0","paired":true,
+ "features":["consent","folders","pages","resume","text","pipeline","merge"],"link":{"ssid":"DIRECT-HopDrop-7K2Q","key":"…","ip":"192.168.137.1"}}
 ```
+- `link` (optional, 1.1+): the sender's direct link (3.10). Sent **only when `paired` is true** (the sender has the receiver paired), so
+  the passphrase never reaches strangers on the network. Receivers that know the sender as paired store it with the device.
 - `features` (optional) lists the protocol extensions this build understands (3.9). A connection uses an extension only when
   **both** hellos list it; a missing list means none (the baseline below), so older peers keep working unchanged.
 - The **client** sends hello first. The **server** replies with its own hello. `paired` = whether the sender of this hello has the peer in its paired list.
@@ -114,8 +127,11 @@ Phone (Java)                         Laptop (.NET 9)
 | `{"type":"pair_sas"}` | anyone | SAS flow (3.5.2) |
 | `{"type":"offer",…}` | paired | transfer flow (3.6) |
 | `{"type":"unpair"}` | paired | `{"type":"ok"}`; server removes the client from its list |
+| `{"type":"text","text":"…","clip":true\|false}` | paired | `{"type":"ok"}`; only to servers that list `text` (3.9.5) |
 
-Unpaired client sending `ping`/`offer`/`unpair` → `{"type":"error","code":"not_paired"}`, close.
+Unpaired client sending `ping`/`offer`/`unpair`/`text` → `{"type":"error","code":"not_paired"}`, close.
+A server that gets `ping`, `offer` or `text` from a paired device puts the connection's source address first in that device's
+`lastAddresses` and treats the device as reachable now (for example to send what waits for it, R19).
 
 Error message: `{"type":"error","code":"<code>","message":"<human text>"}`. Codes: `not_paired`, `identity_mismatch`,
 `bad_token`, `token_expired`, `busy`, `rejected`, `cancelled`, `no_space`, `checksum_mismatch`, `io_error`,
@@ -125,7 +141,8 @@ Receivers also record `disconnected` (the sender dropped and didn't come back, 3
 ### 3.5 Pairing
 
 Both methods end with each side storing a **paired-device record**:
-`{id, name, platform, pairedAt, lastAddresses[], lastSeen, alias?}`. Removing a device on one side sends a best-effort `unpair` to the other.
+`{id, name, platform, pairedAt, lastAddresses[], lastSeen, alias?, trusted, link?}` (`link`: its direct link, 3.10). Removing a device on one
+side sends a best-effort `unpair` to the other.
 
 #### 3.5.1 QR pairing
 - The **shower** opens "Pair with QR". It creates a one-time **token** (16 random bytes, base64url without padding, 22 chars), valid **5 minutes**, single use. Only one active token at a time. Closing the QR screen invalidates it. The QR is refreshed automatically on expiry.
@@ -134,6 +151,8 @@ Both methods end with each side storing a **paired-device record**:
   hopdrop://pair?v=2&id=<64 lowercase hex>&n=<percent-encoded UTF-8 name>&pl=<android|windows>&p=<tcp port>&a=<ipv4>,<ipv4>...&t=<token>
   ```
   `a` = all of the shower's local private IPv4 addresses, best first (Wi-Fi/Ethernet with a gateway, then hotspot, then others).
+  1.1+: a PC with its direct link up appends `&ws=<percent-encoded SSID>&wk=<percent-encoded passphrase>&wa=<its IPv4 on the link>`.
+  Parsers ignore unknown parameters, and a malformed `ws`/`wk`/`wa` is ignored rather than failing the scan.
 - **Showing the code (both apps):** error correction level **M** (fewer, bigger squares than Q, still tolerant of glare) and a white quiet
   zone of at least 2 modules. Windows draws it as sharp vector squares at 232 DIP with a 4-module quiet zone; clicking it opens a 460 DIP
   copy. The phone draws one pixel per module and scales it up without smoothing.
@@ -144,6 +163,8 @@ Both methods end with each side storing a **paired-device record**:
   with **Allow camera** (or Settings when Android won't ask again), and "Can't scan? Pair by comparing numbers". The camera is released
   while the scanner isn't on screen. After a scan the app shows "Pairing with <name>…" until it succeeds, or the reason with **Scan again**.
 - The **scanner** parses it, connects to all addresses in parallel (first one whose certificate matches `id` wins), exchanges hello, sends `pair_qr` with the token.
+  **Smart pairing (phone, 1.1+):** when none of `a` is on a network the phone is on, or connecting fails, and the code has a direct link,
+  the phone joins the link (3.10) and pairs over it at `wa`. The link from the code is stored with the paired PC.
 - The shower checks the token (constant-time compare, unexpired, unused) → stores the scanner as paired → replies `pair_ok` → the scanner stores the shower as paired. Both screens show "Paired with <name>". The shower's QR screen closes.
 - Wrong token → `bad_token`; expired → `token_expired`.
 
@@ -187,7 +208,7 @@ Strings are ASCII bytes; `‖` = concatenation. **Test vectors (both implementat
    Receiver writes to a temporary file in the receive folder, hashes while writing, and on `file_end` compares:
    match → move to the final unique name → `{"type":"file_ok","i":k,"savedAs":"<final file name>"}`;
    mismatch → `checksum_mismatch`, delete the temp file, close. If `size ≥ 0` and the byte count differs → `io_error`.
-   The sender waits for `file_ok` before the next file. Zero-byte files send no DATA frames.
+   The sender waits for `file_ok` before the next file (with `pipeline`, 3.9.6, it doesn't). Zero-byte files send no DATA frames.
 4. Sender → `{"type":"done"}`; receiver → `{"type":"done_ok","saved":N}`; close cleanly.
 - **Cancel:** either side may send `{"type":"cancel"}` and close at any time. The receiver deletes the unfinished file (completed files stay).
   The sender MUST read control frames concurrently while sending DATA, so a cancel or error from the receiver is noticed at once.
@@ -282,6 +303,35 @@ receive folder. The first part (the sent folder) gets a new name when it already
   still reads the earlier bytes to compute the whole-file SHA-256). An `offset` the receiver didn't offer → `protocol_error`.
 - If the sender doesn't come back in time, the receiver deletes the half-received file and records `disconnected`.
 
+#### 3.9.5 `text` — text messages
+- `{"type":"text","text":"…","clip":true|false}` → `{"type":"ok"}` (paired devices only). `text` is 1..16,000 UTF-16 units and the whole
+  message stays under 60,000 bytes; longer text, and receivers without `text`, get it as a `.txt` file named after its first line, as
+  before. `clip`: the sender copied it (clipboard sharing): the receiver may put it straight onto its clipboard.
+- The receiver shows it (Copy; Open link when the whole text is one http(s) link; Share on Android) and records it in Activity.
+
+#### 3.9.6 `pipeline` — no round trip per file
+- The sender starts the next file right after `file_end`, without waiting for its `file_ok`; at most 64 files may wait for theirs.
+  `file_ok`s arrive in order and are matched to the oldest unconfirmed file; the sender waits for all of them before `done`.
+  Receivers need no change (they already handle one file after another); resume (3.9.4) is unchanged.
+
+#### 3.9.7 `merge` — backups
+- An offer may carry `"merge":true`: the sent top folder goes into an existing folder of the same name in the receive folder (files
+  inside still get unique names) instead of a new `Photos (1)`. Used by auto-backup (R21).
+
+### 3.10 Direct link (R16)
+- **PC side:** a Wi-Fi Direct group in "legacy" mode (`WiFiDirectAdvertisementPublisher`, autonomous group owner, legacy settings on), so
+  phones join it like an ordinary WPA2 network; Windows gives them addresses (192.168.137.x) and the PC's normal Wi-Fi stays connected.
+  No admin rights needed (verified on the owner's laptop, also from the Store package). SSID `DIRECT-HopDrop-XXXX` (4 random characters),
+  passphrase 20 random characters, both made once and kept; the link's own IPv4 is found on the "Wi-Fi Direct Virtual Adapter".
+  It runs while HopDrop runs (window, tray or hidden receiver), a phone is paired or the pairing code is shown, and Settings →
+  Direct connection is on (default). It's restarted after errors (Wi-Fi off, …) and network changes.
+- **Phone side:** Android 10+: a local-only network request for exactly that SSID and passphrase (`WifiNetworkSpecifier`, no internet
+  capability); Android asks "Connect to …?" once per PC and remembers it. Android 8–9: the network is added and selected, and removed
+  afterwards. Sockets to the PC go through that network. The link is used only when the PC isn't reachable on a shared network, and is
+  let go two minutes after the last transfer over it (sooner with **Done**). Background work (queue retries, backups) never joins it.
+- **Order when sending from the phone:** the PC announced on the network → its last addresses on a network the phone is on (ping) →
+  its direct link → wait (R19).
+
 ---
 
 ## 4. Security notes
@@ -294,6 +344,9 @@ receive folder. The first part (the sent folder) gets a new name when it already
   device identity and are always marked. A receive folder on a drive that can't store the mark (FAT32/exFAT) is pointed out in Settings.
 - **Ask before receiving** (off by default, both apps): files from devices that aren't trusted wait for the user's Accept.
 - At most **32** connections are handled at once; more are dropped immediately, so a flood from the network can't exhaust the receiver.
+- **Direct link:** its passphrase is shown only inside the pairing QR code and told only to paired devices. Joining it gives a device a
+  network path to the PC, nothing more: everything on it is still TLS with pinned identities and pairing rules. Its name is visible to
+  neighbours (it carries no device or user name).
 - The Windows firewall rule allows only `HopDrop.exe`, only from the local subnet, on TCP and UDP 7410 (it replaces the older
   port-only rules that opened the port to every program).
 
@@ -312,12 +365,21 @@ receive folder. The first part (the sent folder) gets a new name when it already
 
 ## 6. Android app
 
-**Code layout:** `com.hop.drop` (activities, services, notifications), `com.hop.drop.core` (framing, messages, SAS, QR URI, file names, transfer state — pure Java, no `android.*`, so it can be tested on the desktop JVM), `com.hop.drop.net` (discovery, local interfaces), `com.hop.drop.store` (paired devices, settings, history).
+**Code layout:** `com.hop.drop` (activities, services, notifications; `Sends` = jobs, reaching a device, the waiting queue; `Backup`;
+`Shortcuts`, `ShareActivity`, `QuickTile` + `QuickSendActivity`), `com.hop.drop.core` (framing, messages, SAS, QR URI, file names,
+transfer state — pure Java, no `android.*`, so it can be tested on the desktop JVM), `com.hop.drop.net` (discovery, local interfaces,
+`DirectLink`), `com.hop.drop.store` (paired devices, settings, history), `com.hop.drop.ui` (Compose screens, the tour, `Preview` sample data).
 
 **Screens** — Kotlin + Jetpack Compose with Material 3 (`src/com/hop/drop/ui`), hosted by `MainActivity.kt`; the engine stays plain
 Java. Three tabs in a bottom navigation bar (**Send**, **Activity**, **Devices**); the top bar has the logo, a "Ready" / "Off" pill (tap →
 this phone's name and addresses) and Settings (gear). Back from another tab returns to Send. The paragraphs below describe what each
 screen holds; where they say "tab" for Settings, it is the full-screen Settings page.
+- **Tour (R22):** on the first start of 1.1 (also after updating) and from Settings → Show the tour again: six pages (what HopDrop is;
+  pair once with a scan, any network; send in two taps; share from any app and the tile; Activity, text and waiting sends; ready), each
+  with a picture — the real screens drawn with sample data inside a phone outline and a pulsing spotlight on the part explained, or an
+  illustration — a title and two lines. **Skip** on every page, **Next**, swipe, back = previous page, page dots. The last page:
+  **Pair my first device** (opens the scanner) and **I'll do it later**; returning users get **Start sending**. Android's questions
+  (notifications, battery) come after the tour.
 - **Header (all tabs):** logo, "HopDrop", this phone's name, and a status chip ("Ready" / "Not receiving"; tap → why, and this phone's addresses).
   Below it, a **live transfer card** per transfer in either direction (R13): direction icon, "Sending 3 files to …" /
   "Receiving 3 files from …", current file and k of N, progress bar, "412.0 MB of 1.60 GB · 25%", "11.8 MB/s · 1 min 44 s left", **Cancel**.
@@ -327,28 +389,47 @@ screen holds; where they say "tab" for Settings, it is the full-screen Settings 
   as a folder; its files, except `.hidden` ones, are listed by `TransferService` when it sends, so thousands of files never travel
   between HopDrop's parts as separate entries), **Photos**
   (`MediaStore.ACTION_PICK_IMAGES` when available, else `ACTION_GET_CONTENT` image/video with multiple), **Clear all**,
-  tip "In the file picker, long-press a file to select several". Send-to card: paired devices as rows (platform icon, name,
-  live online dot, **Send**); tap → sends the selected files; the row shows live progress and the last result. Bluetooth card as a secondary action.
+  tip "In the file picker, long-press a file to select several". **Text** opens with what's on the clipboard ("From your clipboard").
+  Send-to card: paired devices as rows (platform icon, name, live online dot or "connects directly", **Send**); tap → sends the selected
+  files; the row shows live progress and the last result, "Connecting directly…", or "N sends are waiting. They go when … is back" with
+  **Cancel** (R19). **Select several** (2+ devices, something chosen) → checkboxes → **Send to N devices** (side by side). While joined to a
+  PC's link, a card "Connected directly to …" with **Done**. "Other ways: Bluetooth" as a quiet last action.
 - **Devices:** **This phone** (name, visible/not receiving, each local address with its kind — Wi-Fi, Hotspot, … — and a copy
-  button, **Show my QR code**); **Paired devices** (online now / last seen, paired date; tap → **Trust this device**, rename, remove; note that pairing is
+  button, **Show my QR code**); **Paired devices** (online now / last seen, paired date, a link icon when it offers a direct link; tap →
+  **Connect directly** (so the PC can reach the phone too) / **Done**, **Trust this device**, rename, remove; note that pairing is
   permanent until removed); **Pair a new device** (*Scan QR*, *Pair by IP*); **Nearby devices** (every device found, paired ones
   marked "Paired", others tap → number match; clear empty states for "not receiving", "no local network", "searching").
 - **Activity:** live transfers under "Now", then the history grouped by day (Today, Yesterday, date) with a search field (file or device
   names) and an All / Received / Sent filter. Each row: a photo thumbnail when the transfer has one (else a direction badge), "From/To
   <device>", "first file + N more" (never a comma list), "N files · size" or the problem in plain words, and the time. Tap → the files,
   one per line (tap opens, long-press shares), size and time taken, where they were saved, **Share** and **Remove from list**;
-  long-press a row → Share / Remove from list. Overflow menu → **Clear activity** (list only). Sent transfers keep where their first 50
+  long-press a row → Share / Remove from list. Text messages: "Text from/to <device>", the text (3 lines, all of it selectable when
+  opened), **Copy**, **Open link**, **Share**; search finds text too. Overflow menu → **Clear activity** (list only). Sent transfers keep where their first 50
   source files are, so they can be opened later while the phone can still read them.
-- **Settings:** **Appearance** (System / Light / Dark); this phone's name; **Receive folder** (current place; **Change** via
+- **Settings** (order: everyday first): this phone's name; **Receive folder** (current place; **Change** via
   `ACTION_OPEN_DOCUMENT_TREE` with persisted read/write permission; **Use default**); **Receive in the background** (switch,
   default on, R11; turning it on requests the battery-optimisation exemption; a warning with **Allow background activity** while
   still restricted; a hint and button for Auto-launch on Realme/Oppo/Xiaomi-style phones); **Ask before receiving** (switch, default off);
-  **Privacy** (who can see this phone's name: Everyone / Paired only); about (logo, version, short device id).
+  **Clipboard and quick send** (Copy text from my devices, default on; **Add the quick send tile**, one tap on Android 13+);
+  **Auto-backup** (R21: switch, off; turning it on → pick the folder → pick the device (skipped with one) → "Send the N files already
+  there, or only new ones?"; then Folder, Send to, Only while charging, **Back up now** with its status and last time);
+  **Privacy** (who can see this phone's name: Everyone / Paired only); **Appearance** (System / Light / Dark, colour); about (logo,
+  version, **Show the tour again**, short device id).
 
 **Services**
 - `ReceiveService`: foreground service type `connectedDevice` (needs `CHANGE_WIFI_MULTICAST_STATE`). Started when the app comes to the foreground; runs the TCP listener and discovery. When the app goes to the background it stops after any running transfer finishes — unless **Receive in the background** is on (R11), in which case it keeps running (and restarts after the app process is recreated). Low-importance notification "Ready to receive as <name>".
-- `TransferService`: foreground service type `dataSync` for outgoing transfers (queue, one at a time; its notification stays until the
-  last queued send ends). Cancel closes the connection at once. Android 15's six-hour daily limit for `dataSync` (`onTimeout`) stops it cleanly.
+- `TransferService`: foreground service type `dataSync` for what the user sends: one job per device, devices side by side (a queue per
+  device); its notification stays until the last job ends. Cancel (per device, or all) closes the connection at once. Android 15's
+  six-hour daily limit for `dataSync` (`onTimeout`) stops it cleanly. Being in the foreground is what allows joining a PC's direct link.
+- **Reaching a device** (`Sends.reach`): announced on the network → saved addresses on a network the phone is on (a ping) → the device's
+  direct link (only for what the user started; Android may ask "Connect?" once) → otherwise the job waits in the saved queue (R19).
+  The queue is retried when the device shows up or connects, every 30 s while the receiver runs (same network only), and when HopDrop
+  opens (then the direct link is allowed). Backups never wait in the queue: the next round picks their files up.
+- While anything moves, HopDrop holds a full-speed Wi-Fi lock and a processor wake lock, released 3 s after the last transfer ends.
+- **Share targets:** `ShareActivity` takes `SEND`/`SEND_MULTIPLE`. Through a device's Direct Share target (dynamic long-lived shortcuts,
+  most recently seen first, also in the launcher icon's menu) it sends at once and closes ("Sending to …"); as "HopDrop" it opens Send.
+- **Quick Settings tile** (`QuickTile`): opens a bottom sheet over the current screen: the device (last used preselected) and
+  **Clipboard** (sent as clipboard text), **Latest photo** (asks for photo access once), **Files**; one tap sends and closes.
 
 **Receive storage**
 - Default: `Download/HopDrop` — MediaStore Downloads with `RELATIVE_PATH` and `IS_PENDING` on API 29+; on API 26–28 the public Downloads folder via `WRITE_EXTERNAL_STORAGE` (maxSdkVersion 28), requested when first needed.
@@ -371,18 +452,25 @@ Copy rule: the title says what is happening and with whom, the collapsed line ho
 - Failed / cancelled: "Couldn't finish sending to …" / "Receiving from … stopped" / "… cancelled" + the real reason in plain words
   (who cancelled, unreachable, no space, …) + how many files made it.
 - A problem starting the receiver gets its own notification with the reason.
+- Text: "Text from <device>" (channel "Files received") with **Copy**, **Open link**, **Share**; text from a clipboard that was put on the
+  phone's clipboard: "Copied from <device>" in the quiet channel "Copied from your devices".
+- A send that waits: "<device> isn't reachable right now" · "<what> will send when <device> is back." · **Cancel**.
 
 **Other**
-- Share sheet (`SEND`, `SEND_MULTIPLE`) opens the Send tab with the files added. Shared text, and text typed in the Send tab's **Text** dialog, becomes a cached `.txt` served by a small in-app `ContentProvider` — no `file://` URIs leave the app. Its name is the text's first line, cut at a word to about 40 characters ("Link.txt" for a URL, "Text.txt" when nothing usable is left); `FileNames.forText` / `FileNames.ForText` apply the same rule on both platforms.
+- Share sheet (`SEND`, `SEND_MULTIPLE`) opens the Send tab with the files added (or sends at once through a device's target). Shared text, and text typed in the Send tab's **Text** dialog, becomes a cached `.txt` served by a small in-app `ContentProvider` — no `file://` URIs leave the app; when sending, it travels as text (3.9.5) to devices that can show it. Its name is the text's first line, cut at a word to about 40 characters ("Link.txt" for a URL, "Text.txt" when nothing usable is left); `FileNames.forText` / `FileNames.ForText` apply the same rule on both platforms.
 - Bluetooth (R10): pick the `ACTION_SEND` target whose package name contains `bluetooth`; if none, open the system chooser.
   Each use first explains: on the laptop click HopDrop → Receive via Bluetooth (it waits and saves into its receive folder), then pick the laptop in Android's list; much slower than Wi-Fi.
 - **Look:** Material 3, flat cards on navy-tinted neutrals, Plus Jakarta Sans. Colour themes (Settings → Colour): **HopDrop** (orange
   `#C2410C` on light, `#FFB693` on dark, navy secondary), **Ocean**, **Forest**, **Berry**, **Midnight**, and **Wallpaper** (Material You,
   Android 12+), each in light and dark; with System / Light / Dark they apply instantly. Primary text and buttons meet 4.5:1 contrast.
   Subtitles stay short (one line, only where the title isn't enough). 48 dp touch targets, edge-to-edge, short (150–260 ms) motion.
-- Permissions: INTERNET, ACCESS_NETWORK_STATE, ACCESS_WIFI_STATE, CHANGE_WIFI_MULTICAST_STATE, FOREGROUND_SERVICE, FOREGROUND_SERVICE_DATA_SYNC, FOREGROUND_SERVICE_CONNECTED_DEVICE, POST_NOTIFICATIONS, WRITE_EXTERNAL_STORAGE (maxSdkVersion 28), CAMERA (Stage 4 only), REQUEST_IGNORE_BATTERY_OPTIMIZATIONS (background receiving).
+- Permissions: INTERNET, ACCESS_NETWORK_STATE, ACCESS_WIFI_STATE, CHANGE_WIFI_MULTICAST_STATE, CHANGE_NETWORK_STATE and CHANGE_WIFI_STATE
+  (direct link), WAKE_LOCK (full speed while files move), FOREGROUND_SERVICE, FOREGROUND_SERVICE_DATA_SYNC, FOREGROUND_SERVICE_CONNECTED_DEVICE,
+  POST_NOTIFICATIONS, WRITE_EXTERNAL_STORAGE (maxSdkVersion 28), READ_MEDIA_IMAGES / READ_EXTERNAL_STORAGE (maxSdkVersion 32; the tile's
+  Latest photo, asked when first used), CAMERA (QR scanning), REQUEST_IGNORE_BATTERY_OPTIMIZATIONS (background receiving),
+  REQUEST_INSTALL_PACKAGES (updates), RECEIVE_BOOT_COMPLETED.
 - Build: Gradle (Android plugin 9.4, Kotlin 2.4, Compose BOM 2026.09), `compileSdk` 37, `targetSdk` 36, `minSdk` 26; release shrunk with R8 (about 2 MB).
-  Version: versionCode 1, versionName 1.0.0. Output `HopDrop.apk` at the repo root, signed with the release key (CN=HopDrop) so updates install in place.
+  Version: versionCode 2, versionName 1.1.0. Output `HopDrop.apk` at the repo root, signed with the release key (CN=HopDrop) so updates install in place.
 - Activity keeps the first 1,000 file names of a transfer (and the real count), and looks up where the first 50 were saved.
 
 ---
@@ -394,41 +482,54 @@ Copy rule: the title says what is happening and with whom, the collapsed line ho
 - `HopDrop.Cli` (net10.0): headless peer for tests and automation — e.g. `serve`, `qr` (prints the pairing URI),
   `pair-qr <uri>`, `pair-sas <ip[:port]> [--auto-confirm]`, `send <deviceId|ip[:port]> <files or folders…>`, `devices`, `nearby`;
   options `--data <dir>`, `--port <n>`, `--name <text>`, `--receive-dir <dir>`, `--auto-confirm-sas`, `--ask accept|decline`,
-  and the testing aid `--drop-after <bytes>` (the first send connection drops after that many bytes).
+  `text <deviceId> <text> [--clip]`, and the testing aids `--drop-after <bytes>` (the first send connection drops after that many bytes),
+  `--link <ssid,key,ip>` (a direct link to announce) and `--merge` (send folders as a backup, 3.9.7).
 - `HopDrop.Desktop` (net10.0-windows, WPF): the app.
 - `HopDrop.Tests`: automated tests (xUnit if NuGet is allowed, otherwise a console test runner that exits non-zero on failure).
 
-**Desktop UI** (Windows 11 Fluent look, solid themed background, rounded cards; **System / Light / Dark** in Settings; brand blue accent,
-including the navigation highlight; the window opens at a size that fits the screen's work area):
+**Desktop UI** (Windows 11 Fluent look, solid themed background, rounded cards; **System / Light / Dark** in Settings; HopDrop orange
+accent, including the navigation highlight; the window opens at a size that fits the screen's work area; with no paired device it opens
+on Devices, with the pairing code first):
 - **Live transfers bar (all pages, bottom of the window):** one row per transfer in either direction (R13): direction icon, "Receiving 3 files
   from …", file and k of N, progress bar, amount and percent, speed and time left, **Cancel**; outcome shown for a few seconds after.
   The tray tooltip shows the percentage. While the window is hidden or inactive, an incoming transfer also shows a Windows progress toast (Cancel button).
-- **Send:** dashed drop zone ("Drop files or folders here", **Browse files**, **Add a folder**, **Text** — typed or pasted text, added as a `.txt` named after its first line), file list: a folder is **one row** (folder icon,
+- **Send:** dashed drop zone ("Drop files or folders here", **Browse files**, **Add a folder**, **Text** — a dialog prefilled with the
+  clipboard, a device picker (last used first) and **Send**, sent as text, 3.9.5), file list: a folder is **one row** (folder icon,
   name, "Folder · N files · size", where it is, remove), loose files one row each (type icon, name, size, where it is, remove);
   **Clear all**; paired device cards with live online status and **Send** (disabled until files are added); progress and result on the card.
-  Bluetooth row: **Send via Bluetooth**.
-- **Devices:** **This computer** (name, "Ready", each real local address with its kind and a copy button); **Pair a phone** (QR code, countdown);
+  With 2+ devices each card has a checkbox; 2+ ticked → **Send to N devices** (side by side). A device that can't be reached gets the
+  send queued (R19): "Offline · sends when it's back", its button becomes **Cancel**; retried every 20 s while it's seen on the network,
+  every 2 minutes otherwise, and when it connects. "Other ways": **Send via Bluetooth**.
+- **Devices:** **This computer** (name, "Ready", direct link state, each real local address with its kind and a copy button); **Pair a phone**
+  (QR code with the direct link, countdown; "Your phone doesn't need to be on the same Wi-Fi");
   **Paired devices** (online now / last seen, platform, paired date, last address; **Trust files from this device**; rename, remove with confirmation; pairing is permanent until removed);
   **Nearby devices** (every device found; paired ones marked "Paired", others **Pair** by number match), **Refresh**, **Pair by IP address**.
   Lists update in place when discovery changes.
-- **Activity:** grouped by day; direction/outcome icons; **Open** / **Show in folder**; Bluetooth arrivals listed as "from Bluetooth"; **Clear list**.
+- **Activity:** grouped by day; direction/outcome icons; **Open** / **Show in folder**; Bluetooth arrivals listed as "from Bluetooth";
+  text messages with the text, **Copy** and **Open link**; **Clear list**.
 - **Settings** (Windows 11 settings rows: icon, title, one-line description, control on the right): General (this PC's name, appearance);
   Receiving (receive folder Change…/Open/Default, with a note when its drive can't mark files; "Ask before receiving"; "Close to the tray";
-  "Receive in the background" (R11); Start with Windows); Privacy ("Who can see this PC's name": everyone / only paired devices);
+  "Receive in the background" (R11); Start with Windows; **Direct connection** (R16: switch, its state, and a firewall hint with **Allow
+  direct link** on installer builds whose rule doesn't cover public networks)); **Clipboard** ("Put text from my devices on the
+  clipboard", default on; "Share what I copy", default off); Privacy ("Who can see this PC's name": everyone / only paired devices);
   Windows integration (Explorer "Send to"; Windows Firewall status in plain words + **Allow HopDrop** with UAC, optional public networks);
   AI agents (R15: switch, off by default; when on, **Copy for Claude Code** / **Copy for Codex** / **Copy MCP settings (JSON)**);
   Bluetooth (**Receive**, **Send**, R10); About (version, device id, **Updates**: check now / restart to update, installed copies only).
-- **Tray icon:** left-click opens the window; menu: Open HopDrop, Send files…, Pair a phone, Receive via Bluetooth, Send via Bluetooth, Quit HopDrop. With background receiving on, the last items are **Close HopDrop (keep receiving)** and **Quit and stop receiving**.
+- **Tray icon:** left-click opens the window; menu: Open HopDrop, Send files…, Pair a phone, **Send clipboard to <device>** (last used),
+  Receive via Bluetooth, Send via Bluetooth, Quit HopDrop. With background receiving on, the last items are **Close HopDrop (keep receiving)** and **Quit and stop receiving**.
 - **Toasts:** "Received 3 files from Realme 6 Pro" + names and size + "Saved in Downloads\HopDrop" + **Open** (one file; not for programs
   from devices that aren't trusted) / **Open folder**; clicking the toast shows the files in their folder. "Ask before receiving":
   "<device> wants to send you 3 files" with **Accept** / **Decline**, kept on screen until answered or expired;
   "Sent …" when the window isn't active; failures with the reason and how many files made it; Bluetooth arrivals; pairing request → opens the number-match dialog.
+  Text: "Text from <device>" + the text + **Copy** / **Open link**, or "Copied from <device>" when it went onto the clipboard.
 - **Number-match dialog:** peer name, the 6-digit code large, **They match** / **Cancel**.
 - **Single instance:** a second launch forwards its arguments to the running instance (named pipe) and exits. Command line: `HopDrop.exe [--minimized | --background] [--send <files…>] [--pair] [--receive-bluetooth] [--page send|devices|activity|settings]`;
   for agents `HopDrop.exe --mcp` and `HopDrop.exe agent …` (7.1).
 - Activity keeps the first 1,000 file names of a transfer (and the real count); files sent from a folder are recorded by their place in it.
-- **Data:** `%APPDATA%\HopDrop\` (settings.json, devices.json, history.json, identity.pfx, identity.key, desktop.json for window/theme preferences); logs in `%LOCALAPPDATA%\HopDrop\logs`. Default receive folder `%USERPROFILE%\Downloads\HopDrop`.
-- **App icon:** the HopDrop logo (from `Source/Android/res/drawable/ic_logo.xml`) as a multi-size `.ico`.
+- **Data:** `%APPDATA%\HopDrop\` (settings.json, devices.json, history.json, identity.pfx, identity.key, desktop.json for preferences and the
+  direct link's name and passphrase, queue.json for sends waiting for their device; the Store package keeps them in its own AppData); logs in `%LOCALAPPDATA%\HopDrop\logs`. Default receive folder `%USERPROFILE%\Downloads\HopDrop`.
+- **App icon:** the HopDrop logo (from `Source/Android/res/drawable/ic_logo.xml`) on a black rounded tile (#121212, like the phone's
+  launcher icon; owner decision 2026-10-13) as a multi-size `.ico`; the Store logos use the same tile.
 - **Memory:** the window is freed one minute after it's closed to the tray (it reopens in about half a second), so HopDrop waiting in the
   tray or in the background uses about 20–35 MB instead of about 200 MB.
 - **Output** (`build.ps1 -Publish`): portable self-contained single-file `Windows App\HopDrop.exe` (x64) and `HopDrop-arm64.exe`; installers
@@ -485,7 +586,8 @@ Keep dependencies few; record every package and version in the stage report.
 3. **Windows desktop app:** the WPF app per section 7, published to `Windows App\HopDrop.exe`.
 4. **QR scanning + polish:** camera QR scanning on Android, final UI polish on both, README update.
 5. **Review fixes.**
-6. **HopDrop's own Bluetooth link (option b):** a second transport under the same protocol (RFCOMM on both platforms, TLS over the Bluetooth stream, same pairing and receive folder), selectable when Wi-Fi/hotspot is not available. Only after stages 1–5 are done and reviewed.
+6. ~~HopDrop's own Bluetooth link (option b)~~ — dropped by the owner on 2026-10-13; the direct link (R16) covers "no shared network".
+7. **1.1 (2026-10-13):** R16–R23.
 
 ## 10. Acceptance checklist (organizer verifies each)
 - [ ] R1 Wi-Fi router, hotspot ×2, Bluetooth handoff each tried
@@ -500,3 +602,11 @@ Keep dependencies few; record every package and version in the stage report.
 - [ ] R10 Bluetooth target found dynamically; real errors; Windows wizard buttons
 - [ ] R11 receiving while app open; in-flight transfer survives leaving the app; background switch works
 - [ ] R12 consistent, polished look, light and dark
+- [ ] R16 phone pairs with a PC by QR on a different network (or none) through the direct link; later sends use it on their own
+- [ ] R17 text both ways arrives as text (Copy / Open link); an older version gets a .txt
+- [ ] R18 clipboard both ways (tile / Text dialog; tray item / Share what I copy), landing on the other clipboard
+- [ ] R19 a send to an away device waits and goes when it's back (both apps), Cancel works
+- [ ] R20 several devices at once; Direct Share target sends at once; tile; PC opens on pairing
+- [ ] R21 auto-backup sends only new files, into one folder, survives restarts
+- [ ] R22 tour on first start, Skip, Show the tour again, ends in pairing
+- [ ] R23 many small files and large files at least as fast as 1.0

@@ -26,6 +26,7 @@ import androidx.compose.material.icons.rounded.QrCode2
 import androidx.compose.material.icons.rounded.Radar
 import androidx.compose.material.icons.rounded.VerifiedUser
 import androidx.compose.material.icons.rounded.WifiOff
+import androidx.compose.material.icons.rounded.WifiTethering
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -111,10 +112,10 @@ fun DevicesScreen(state: HopUiState, actions: HopActions, padding: PaddingValues
                     HopCard { EmptyState(Icons.Rounded.ErrorOutline, "Not searching", "HopDrop isn't receiving right now. Reopen the app.") }
                 }
                 state.phone.addresses.isEmpty() -> item(key = "nearby-offline") {
-                    HopCard { EmptyState(Icons.Rounded.WifiOff, "Not on Wi-Fi", "Join the other device's Wi-Fi, or turn on your hotspot.") }
+                    HopCard { EmptyState(Icons.Rounded.WifiOff, "Not on Wi-Fi", "No problem: scan the QR code on your PC and HopDrop connects to it directly.") }
                 }
                 state.nearby.isEmpty() -> item(key = "nearby-empty") {
-                    HopCard { EmptyState(Icons.Rounded.Radar, "Looking for devices…", "Open HopDrop on the other device.") }
+                    HopCard { EmptyState(Icons.Rounded.Radar, "Looking for devices…", "Devices on this Wi-Fi show up here. For a PC, scanning its QR code is quicker and works on any network.") }
                 }
                 else -> items(state.nearby, key = { "nearby:" + it.id }) { device ->
                     NearbyRow(device, Modifier.animateItem()) { actions.pairNearby(device) }
@@ -159,9 +160,12 @@ private fun PairedRow(device: DeviceUi, now: Long, modifier: Modifier, onClick: 
             DeviceAvatar(device.platform, device.online)
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                 Text(device.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text((if (device.platform == Platform.Windows) "Windows" else "Android") + "  ·  " + presence(device.online, device.lastSeen, now),
+                Text((if (device.platform == Platform.Windows) "Windows" else "Android") + "  ·  " +
+                    if (device.direct) "Connected directly" else presence(device.online, device.lastSeen, now),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            if (device.hasLink) Icon(Icons.Rounded.WifiTethering, contentDescription = "Can connect directly", tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(end = 6.dp).size(20.dp))
             if (device.trusted) Icon(Icons.Rounded.VerifiedUser, contentDescription = "Trusted", tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp))
             Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -206,6 +210,16 @@ private fun DeviceSheet(device: DeviceUi, now: Long, actions: HopActions, onDism
                 supportingContent = { Text("Sends without asking first") },
                 leadingContent = { Icon(Icons.Rounded.VerifiedUser, contentDescription = null) },
                 trailingContent = { Switch(checked = device.trusted, onCheckedChange = { actions.setTrusted(device, it) }) },
+                colors = transparent,
+            )
+            if (device.hasLink) ListItem(
+                headlineContent = { Text(if (device.direct) "Connected directly" else "Connect directly") },
+                supportingContent = { Text(if (device.direct) "No shared Wi-Fi needed right now" else "When you're not on the same Wi-Fi, so it can send to this phone") },
+                leadingContent = { Icon(Icons.Rounded.WifiTethering, contentDescription = null) },
+                trailingContent = {
+                    if (device.direct) TextButton(onClick = actions::disconnectDirect) { Text("Done") }
+                    else FilledTonalButton(onClick = { actions.connectDirectly(device) }) { Text("Connect") }
+                },
                 colors = transparent,
             )
             ListItem(

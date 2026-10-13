@@ -289,6 +289,9 @@ fun LiveCard(live: LiveUi, onCancel: (Boolean) -> Unit, modifier: Modifier = Mod
     val badgeFg = when { ok -> scheme.onPrimaryContainer; failed -> scheme.onErrorContainer; else -> scheme.onSecondaryContainer }
     val title = when (state) {
         LiveState.Connecting -> "Connecting to ${live.peer}…"
+        LiveState.ConnectingDirectly -> "Connecting directly to ${live.peer}…"
+        LiveState.Queued -> "Waiting for ${live.peer}"
+        LiveState.TextSent -> "Text sent to ${live.peer}"
         is LiveState.Waiting -> "Waiting for ${live.peer} to accept"
         LiveState.Reconnecting -> if (live.incoming) "Waiting for ${live.peer} to reconnect" else "Reconnecting to ${live.peer}"
         is LiveState.Moving -> if (live.incoming) "Receiving from ${live.peer}" else "Sending to ${live.peer}"
@@ -298,6 +301,9 @@ fun LiveCard(live: LiveUi, onCancel: (Boolean) -> Unit, modifier: Modifier = Mod
     }
     val detail = when (state) {
         LiveState.Connecting -> null
+        LiveState.ConnectingDirectly -> "Not on the same Wi-Fi"
+        LiveState.Queued -> "Sends when it's back"
+        LiveState.TextSent -> null
         is LiveState.Waiting -> Format.files(state.count)
         LiveState.Reconnecting -> "Continues where it stopped"
         is LiveState.Moving -> if (state.count > 1) "${state.file}  ·  ${state.index} of ${state.count}" else state.file

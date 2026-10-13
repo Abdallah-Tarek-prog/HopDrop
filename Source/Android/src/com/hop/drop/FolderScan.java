@@ -25,12 +25,21 @@ final class FolderScan {
         final String folder;
         /** Bytes, or -1 when the provider doesn't say. */
         final long size;
+        /** The provider's id for the file (stable while it exists), and when it last changed (ms, 0 when unknown). */
+        final String documentId;
+        final long modified;
 
         Item(Uri uri, String name, String folder, long size) {
+            this(uri, name, folder, size, uri.toString(), 0);
+        }
+
+        Item(Uri uri, String name, String folder, long size, String documentId, long modified) {
             this.uri = uri;
             this.name = name;
             this.folder = folder;
             this.size = size;
+            this.documentId = documentId;
+            this.modified = modified;
         }
     }
 
@@ -53,7 +62,7 @@ final class FolderScan {
         ArrayDeque<String[]> pending = new ArrayDeque<>();
         pending.add(new String[]{DocumentsContract.getTreeDocumentId(tree), name(resolver, tree)});
         String[] columns = {Document.COLUMN_DOCUMENT_ID, Document.COLUMN_DISPLAY_NAME, Document.COLUMN_MIME_TYPE,
-                Document.COLUMN_SIZE};
+                Document.COLUMN_SIZE, Document.COLUMN_LAST_MODIFIED};
         while (!pending.isEmpty() && found.size() < LIMIT) {
             String[] next = pending.poll();
             try (Cursor c = resolver.query(DocumentsContract.buildChildDocumentsUriUsingTree(tree, next[0]), columns,
@@ -66,7 +75,7 @@ final class FolderScan {
                         pending.add(new String[]{c.getString(0), next[1] + "/" + name});
                     } else {
                         found.add(new Item(DocumentsContract.buildDocumentUriUsingTree(tree, c.getString(0)), name,
-                                next[1], c.isNull(3) ? -1 : c.getLong(3)));
+                                next[1], c.isNull(3) ? -1 : c.getLong(3), c.getString(0), c.isNull(4) ? 0 : c.getLong(4)));
                     }
                 }
             }

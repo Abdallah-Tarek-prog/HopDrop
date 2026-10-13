@@ -35,9 +35,19 @@ public static class Sas
     }
 }
 
-public sealed record PairUri(string Id, string Name, string Platform, int Port, IReadOnlyList<IPAddress> Addresses, byte[] Token)
+/// <summary>A private Wi-Fi network a device offers so others can reach it without a shared network (a PC's Wi-Fi Direct link).</summary>
+/// <param name="Address">The offering device's own address on that network.</param>
+public sealed record DirectLinkInfo(string Ssid, string Key, string Address)
 {
-    public override string ToString() => $"hopdrop://pair?v=2&id={Id}&n={Uri.EscapeDataString(Name)}&pl={Platform}&p={Port}&a={string.Join(',', Addresses)}&t={TokenCodec.Encode(Token)}";
+    public bool Valid => Ssid.Length is >= 1 and <= 32 && Key.Length is >= 8 and <= 63 && IPAddress.TryParse(Address, out var a)
+        && a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork && NetworkAddresses.IsPrivateOrLoopback(a);
+}
+
+/// <param name="Link">The shower's direct link, so a phone that isn't on the same network can still reach it to pair.</param>
+public sealed record PairUri(string Id, string Name, string Platform, int Port, IReadOnlyList<IPAddress> Addresses, byte[] Token, DirectLinkInfo? Link = null)
+{
+    public override string ToString() => $"hopdrop://pair?v=2&id={Id}&n={Uri.EscapeDataString(Name)}&pl={Platform}&p={Port}&a={string.Join(',', Addresses)}&t={TokenCodec.Encode(Token)}"
+        + (Link is { Valid: true } l ? $"&ws={Uri.EscapeDataString(l.Ssid)}&wk={Uri.EscapeDataString(l.Key)}&wa={l.Address}" : "");
     public static PairUri Parse(string uri)
     {
         if (!Uri.TryCreate(uri, UriKind.Absolute, out var value) || value.Scheme != "hopdrop" || value.Host != "pair") throw new FormatException("Invalid pair URI");
@@ -51,7 +61,14 @@ public sealed record PairUri(string Id, string Name, string Platform, int Port, 
         IPAddress[] addresses = rawAddresses.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(IPAddress.Parse).ToArray();
         if (addresses.Length == 0 || addresses.Any(a => a.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork)) throw new FormatException("Invalid addresses");
         byte[] token = TokenCodec.Decode(rawToken);
-        return new(id, name, pl, port, addresses, token);
+        // Optional (1.1+): the direct link. Older codes don't have it; a malformed one is ignored rather than failing the scan.
+        DirectLinkInfo? link = null;
+        if (parts.TryGetValue("ws", out string? ws) && parts.TryGetValue("wk", out string? wk) && parts.TryGetValue("wa", out string? wa))
+        {
+            var candidate = new DirectLinkInfo(Uri.UnescapeDataString(ws), Uri.UnescapeDataString(wk), wa);
+            if (candidate.Valid) link = candidate;
+        }
+        return new(id, name, pl, port, addresses, token, link);
     }
 }
 

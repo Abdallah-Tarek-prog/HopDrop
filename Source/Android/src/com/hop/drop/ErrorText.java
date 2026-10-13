@@ -75,6 +75,12 @@ public final class ErrorText {
                 return "Update HopDrop on both devices, then try again.";
             case "timeout":
                 return name + " stopped responding.";
+            case "unreachable":
+                return "Can't reach " + name + ". Open HopDrop on it, or get both on the same Wi-Fi.";
+            case "direct_failed":
+                return message.contains(": ") ? message.substring(message.indexOf(": ") + 2) : "Couldn't connect directly to " + name + ".";
+            case "wifi_off":
+                return "Turn on Wi-Fi so HopDrop can connect directly to " + name + ".";
             default:
                 break;
         }

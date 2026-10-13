@@ -371,6 +371,89 @@ public class PeerTests
         protected override void Dispose(bool disposing) { if (disposing) inner.Dispose(); base.Dispose(disposing); }
     }
     [Fact]
+    public async Task TextArrivesAsTextAndIsRecordedOnBothSides()
+    {
+        await using var a = await Peer(Scratch()); await using var b = await Peer(Scratch());
+        await PairAsync(a, b);
+        var received = new TaskCompletionSource<TextMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
+        string? contacted = null;
+        a.TextReceived += message => received.TrySetResult(message);
+        a.DeviceContacted += id => contacted = id;
+        await b.SendTextAsync(a.Id, "https://example.com/a?b=1 \"quoted\" ✓", clipboard: true);
+        var text = await received.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal("https://example.com/a?b=1 \"quoted\" ✓", text.Text);
+        Assert.True(text.Clipboard);
+        Assert.Equal(b.Id, text.PeerId);
+        Assert.Equal(b.Id, contacted);
+        Assert.Equal("https://example.com/a?b=1 \"quoted\" ✓", Assert.Single(await a.HistoryAsync()).Text);
+        Assert.Equal("sent", Assert.Single(await b.HistoryAsync()).Direction);
+    }
+    [Fact]
+    public async Task TextToAnOlderVersionArrivesAsATextFile()
+    {
+        string aRoot = Scratch();
+        await using var a = await HopDropPeer.OpenAsync(new PeerOptions(new HopDropPaths(Path.Combine(aRoot, "data"), Path.Combine(aRoot, "logs"), Path.Combine(aRoot, "receive")), 0, "Older peer")
+        { Features = ["consent", "folders", "pages", "resume"] });
+        await using var b = await Peer(Scratch());
+        await PairAsync(a, b);
+        bool texted = false; a.TextReceived += _ => texted = true;
+        await b.SendTextAsync(a.Id, "Shopping list\nmilk");
+        Assert.False(texted);
+        string saved = Assert.Single(Directory.GetFiles(Path.Combine(aRoot, "receive")));
+        Assert.Equal("Shopping list.txt", Path.GetFileName(saved));
+        Assert.Equal("Shopping list\nmilk", await File.ReadAllTextAsync(saved));
+    }
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ManySmallFilesArriveInOrderWithAndWithoutPipelining(bool receiverPipelines)
+    {
+        string aRoot = Scratch(), bRoot = Scratch();
+        await using var a = await HopDropPeer.OpenAsync(new PeerOptions(new HopDropPaths(Path.Combine(aRoot, "data"), Path.Combine(aRoot, "logs"), Path.Combine(aRoot, "receive")), 0, "Receiver")
+        { Features = receiverPipelines ? null : ["consent", "folders", "pages", "resume"] });
+        await using var b = await Peer(bRoot);
+        await PairAsync(a, b);
+        string folder = Path.Combine(bRoot, "Notes"); Directory.CreateDirectory(folder);
+        for (int i = 0; i < 300; i++) await File.WriteAllTextAsync(Path.Combine(folder, $"note{i:D3}.txt"), $"note {i} " + new string('x', i));
+        var result = await b.SendAsync(a.Id, SendItem.From([folder]));
+        Assert.Null(result.ErrorCode);
+        Assert.Equal(300, result.SavedPaths.Count);
+        for (int i = 0; i < 300; i++)
+            Assert.Equal($"note {i} " + new string('x', i), await File.ReadAllTextAsync(Path.Combine(aRoot, "receive", "Notes", $"note{i:D3}.txt")));
+    }
+    [Fact]
+    public async Task BackupsMergeIntoTheExistingFolder()
+    {
+        string aRoot = Scratch(), bRoot = Scratch();
+        await using var a = await Peer(aRoot); await using var b = await Peer(bRoot);
+        await PairAsync(a, b);
+        string camera = Path.Combine(bRoot, "Camera"); Directory.CreateDirectory(camera);
+        await File.WriteAllTextAsync(Path.Combine(camera, "one.jpg"), "1");
+        await b.SendAsync(a.Id, SendItem.From([camera]), default, merge: true);
+        File.Delete(Path.Combine(camera, "one.jpg")); await File.WriteAllTextAsync(Path.Combine(camera, "two.jpg"), "2");
+        await b.SendAsync(a.Id, SendItem.From([camera]), default, merge: true);
+        Assert.Equal(new[] { "one.jpg", "two.jpg" }, Directory.GetFiles(Path.Combine(aRoot, "receive", "Camera")).Select(f => Path.GetFileName(f)).Order().ToArray());
+        await b.SendAsync(a.Id, SendItem.From([camera]));
+        Assert.True(File.Exists(Path.Combine(aRoot, "receive", "Camera (1)", "two.jpg")));
+    }
+    [Fact]
+    public async Task DirectLinkTravelsInQrCodesAndNotToStrangers()
+    {
+        await using var server = await Peer(Scratch());
+        server.DirectLink = new DirectLinkInfo("DIRECT-ab-HopDrop", "secretpassphrase1", "192.168.137.1");
+        await server.StartAsync();
+        var qr = PairUri.Parse(server.CreateQrUri([IPAddress.Loopback]));
+        Assert.Equal(server.DirectLink, qr.Link);
+        Assert.Null(PairUri.Parse(new PairUri(server.Id, "PC", "windows", 7410, [IPAddress.Loopback], new byte[16]).ToString()).Link);
+        using var identity = Identity.LoadOrCreate(new HopDropPaths(Path.Combine(Scratch(), "data"), Scratch()));
+        var (client, stream) = await RawAsync(server, identity);
+        using (client) using (stream)
+        {
+            using var hello = await Messages.ReadAsync(stream);
+            Assert.False(hello.RootElement.TryGetProperty("link", out _));
+        }
+    }
+    [Fact]
     public async Task ActivityKeepsTheNewest500Entries()
     {
         string root = Scratch();

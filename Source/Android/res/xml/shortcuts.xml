@@ -1,0 +1,8 @@
+<!-- Android's share sheet shows each paired device as its own target (Direct Share): one tap sends straight to it.
+     Shortcuts.java publishes the devices; this says which shares they take (anything) and which screen handles them. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <share-target android:targetClass="com.hop.drop.ShareActivity">
+        <data android:mimeType="*/*" />
+        <category android:name="com.hop.drop.category.SHARE_TARGET" />
+    </share-target>
+</shortcuts>

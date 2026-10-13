@@ -27,6 +27,9 @@ public sealed partial class MainWindow
     private StackPanel? _fileHost;
     private Button? _clearFiles;
     private StackPanel? _deviceHost;
+    private Button? _sendMany;
+    private readonly HashSet<string> _selectedDevices = [];
+    private string? _sampleQueued;
     private readonly Dictionary<string, (TextBlock Presence, System.Windows.Shapes.Ellipse Dot, TextBlock Status, ProgressBar Bar, Button Send)> _deviceRows = [];
 
     internal FrameworkElement BuildSendPage()
@@ -83,11 +86,16 @@ public sealed partial class MainWindow
         RefreshFiles();
 
         page.Children.Add(Ui.Section("Send to"));
+        _sendMany = Ui.Button("Send to 2 devices", () =>
+        {
+            foreach (var device in _devices.Where(d => _selectedDevices.Contains(d.Id)).ToArray()) _ = SendToAsync(device);
+        }, true, SymbolRegular.Send24);
+        _sendMany.Visibility = Visibility.Collapsed; page.Children.Add(_sendMany);
         _deviceHost = new StackPanel(); page.Children.Add(_deviceHost); FillSendDevices();
 
-        page.Children.Add(Ui.Section("No shared Wi-Fi?"));
+        page.Children.Add(Ui.Section("Other ways"));
         page.Children.Add(Ui.SettingRow(SymbolRegular.Bluetooth24, "Send with Bluetooth",
-            "Opens Windows' Bluetooth window. Slower than Wi-Fi; the phone accepts the file in its Bluetooth notification.",
+            "Rarely needed: phones reach this PC directly even without a shared Wi-Fi. Opens Windows' Bluetooth window; much slower, and the phone accepts the file in its Bluetooth notification.",
             Ui.Button("Send via Bluetooth", BluetoothWizard.Send, icon: SymbolRegular.Bluetooth24)));
         return Ui.Scroll(page);
     }
@@ -101,19 +109,15 @@ public sealed partial class MainWindow
         var picker = new OpenFolderDialog { Multiselect = true, Title = "Choose folders to send" };
         if (picker.ShowDialog(this) == true) AddFiles(picker.FolderNames);
     }
-    /// <summary>Typed or pasted text, added to the Send list as a .txt file named after its first line.</summary>
-    private void WriteText()
+    private async void WriteText()
     {
-        var dialog = new TextNoteDialog { Owner = this };
+        if (_devices.Count == 0) { Navigate("devices"); return; }
+        var dialog = new TextNoteDialog(_devices, ClipboardShare.ReadText()) { Owner = this };
         if (dialog.ShowDialog() != true) return;
-        string folder = Path.Combine(TypedTextFolder, Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(folder);
-        string path = Path.Combine(folder, FileNames.ForText(dialog.Text));
-        File.WriteAllText(path, dialog.Text, new System.Text.UTF8Encoding(false));
-        AddFiles([path]);
+        if (dialog.DeviceId is null) return;
+        try { await App.Instance.Queue.SendTextAsync(dialog.DeviceId, dialog.Text); }
+        catch (Exception ex) { ShowError(Platform.ExplainException(ex, _devices.First(d => d.Id == dialog.DeviceId).Name)); }
     }
-    private static string TypedTextFolder => Path.Combine(Path.GetTempPath(), "HopDrop text");
-    private static bool IsTypedText(string path) => path.StartsWith(TypedTextFolder + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
     private void AddFiles(IEnumerable<string> paths)
     {
         int previousCount = _files.Count;
@@ -177,7 +181,7 @@ public sealed partial class MainWindow
         {
             string path = item.Path;
             var remove = Ui.IconButton(SymbolRegular.Dismiss24, "Remove " + Path.GetFileName(path), () => { _files.Remove(item); RefreshFiles(); });
-            var row = Ui.ListRow(Ui.Badge(Ui.FileIcon(path), Palette.OnPrimaryBg, Palette.PrimaryBg, 36), Path.GetFileName(path), $"{Fmt.Size(SizeOf(path))} · {(IsTypedText(path) ? "Typed text" : Path.GetDirectoryName(path) ?? "")}", remove);
+            var row = Ui.ListRow(Ui.Badge(Ui.FileIcon(path), Palette.OnPrimaryBg, Palette.PrimaryBg, 36), Path.GetFileName(path), $"{Fmt.Size(SizeOf(path))} · {(Path.GetDirectoryName(path) ?? "")}", remove);
             row.ToolTip = path;
             _fileHost.Children.Add(row);
             Appear(row, added?.Contains(path) == true);
@@ -200,8 +204,19 @@ public sealed partial class MainWindow
         foreach (var device in devices.OrderBy(d => d.Alias ?? d.Name))
         {
             var badge = Ui.Badge(device.Platform == "android" ? SymbolRegular.Phone24 : SymbolRegular.Laptop24, Palette.OnPrimaryBg, Palette.PrimaryBg, 44);
-            var send = Ui.Button("Send", () => _ = SendToAsync(device), true, SymbolRegular.Send24); send.Margin = new Thickness(0);
+            var send = Ui.Button("Send", () =>
+            {
+                if (_peer is not null && App.Instance.Queue.Has(device.Id)) App.Instance.Queue.Cancel(device.Id);
+                else _ = SendToAsync(device);
+            }, true, SymbolRegular.Send24); send.Margin = new Thickness(0);
             var row = Ui.ListRow(badge, device.Alias ?? device.Name, null, send);
+            if (devices.Count >= 2)
+            {
+                var check = new System.Windows.Controls.CheckBox { IsChecked = _selectedDevices.Contains(device.Id), ToolTip = "Select " + (device.Alias ?? device.Name), Margin = new Thickness(8, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center };
+                check.Checked += (_, _) => { _selectedDevices.Add(device.Id); UpdateMany(); };
+                check.Unchecked += (_, _) => { _selectedDevices.Remove(device.Id); UpdateMany(); };
+                ((StackPanel)row.Children[2]).Children.Insert(0, check);
+            }
             var text = Ui.TextOf(row);
             var presence = Ui.Status("", Palette.Muted); text.Children.Add(presence);
             var status = Ui.Subtle(""); status.Visibility = Visibility.Collapsed; text.Children.Add(status);
@@ -212,11 +227,19 @@ public sealed partial class MainWindow
             {
                 for (DependencyObject? current = e.OriginalSource as DependencyObject; current is not null; current = VisualTreeHelper.GetParent(current))
                     if (current is System.Windows.Controls.Primitives.ButtonBase) return;
+                if (_peer is not null && App.Instance.Queue.Has(device.Id)) return;
                 _ = SendToAsync(device);
             };
             _deviceHost.Children.Add(card);
         }
         UpdateSendDevices();
+    }
+    private void UpdateMany()
+    {
+        if (_sendMany is null) return;
+        _sendMany.Visibility = _selectedDevices.Count >= 2 ? Visibility.Visible : Visibility.Collapsed;
+        _sendMany.Content = $"Send to {_selectedDevices.Count} devices";
+        _sendMany.IsEnabled = _files.Count > 0;
     }
     /// <summary>Updates online state and live progress under each device, in place.</summary>
     private void UpdateSendDevices()
@@ -229,10 +252,13 @@ public sealed partial class MainWindow
             row.Presence.Foreground = online ? Palette.Success : Palette.Muted; row.Dot.Fill = row.Presence.Foreground;
             var item = Outgoing(id);
             bool busy = item is not null && !item.Finished;
-            row.Send.IsEnabled = _files.Count > 0 && !busy;
-            row.Send.ToolTip = _files.Count == 0 ? "Add files first" : null;
+            bool queued = _peer is not null && App.Instance.Queue.Has(id) || App.SnapshotMode && _sampleQueued == id;
+            row.Send.Content = queued ? "Cancel" : "Send";
+            row.Send.IsEnabled = queued || _files.Count > 0 && !busy;
+            row.Send.ToolTip = !queued && _files.Count == 0 ? "Add files first" : null;
             row.Bar.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
-            row.Status.Visibility = item is null ? Visibility.Collapsed : Visibility.Visible;
+            row.Status.Visibility = item is null && !queued ? Visibility.Collapsed : Visibility.Visible;
+            if (queued) { row.Presence.Text = "Offline · sends when it's back"; row.Presence.Foreground = Palette.Muted; row.Dot.Fill = Palette.Muted; row.Status.Text = "Waiting for this device"; row.Status.Foreground = Palette.Muted; row.Bar.Visibility = Visibility.Collapsed; continue; }
             if (item is null) continue;
             if (item.Failure is not null) { row.Status.Text = item.Failure; row.Status.Foreground = Palette.Danger; }
             else if (item.Result is TransferResult r)
@@ -256,15 +282,17 @@ public sealed partial class MainWindow
             }
             else { row.Status.Text = "Connecting…"; row.Status.Foreground = Palette.Muted; row.Bar.IsIndeterminate = true; }
         }
+        UpdateMany();
     }
     private async Task SendToAsync(PairedDevice device)
     {
         if (_peer is null) return;
         if (_files.Count == 0) { ShowError("Add at least one file first."); return; }
+        if (App.Instance.Queue.Has(device.Id)) return;
         var current = Outgoing(device.Id);
         if (current is not null && !current.Finished) return;
         Connecting(device); UpdateSendDevices();
-        try { await _peer.SendAsync(device.Id, _files.ToList()); }
+        try { await App.Instance.Queue.SendFilesAsync(device.Id, _files.ToList()); }
         catch (Exception ex)
         {
             string name = device.Alias ?? device.Name;
@@ -272,7 +300,6 @@ public sealed partial class MainWindow
             {
                 string reason = Platform.ExplainException(ex, name);
                 FailedToStart(device, reason);
-                if (!IsActive) Platform.Notify($"Couldn't send to {name}", reason);
             }
         }
         finally { UpdateSendDevices(); }
@@ -293,9 +320,13 @@ public sealed partial class MainWindow
         var page = Ui.Page("Devices", "Pair once, and devices recognise each other from then on, in both directions.");
         page.Children.Add(Ui.Section("This computer"));
         var thisPc = new StackPanel();
+        var pcChips = new StackPanel { Orientation = Orientation.Horizontal };
+        pcChips.Children.Add(Ui.Chip("Ready", Palette.Success, Palette.SuccessBg));
+        var linkState = _peer is null ? DirectLinkState.On : App.Instance.Link.State;
+        string linkLabel = linkState switch { DirectLinkState.On => "Direct link on", DirectLinkState.Off => "Direct link off", DirectLinkState.Unavailable => App.Instance.Link.Reason, DirectLinkState.Starting => "Direct link starting", _ => "Direct link waiting" };
+        pcChips.Children.Add(Ui.Chip(linkLabel, linkState == DirectLinkState.On ? Palette.Success : Palette.Muted, linkState == DirectLinkState.On ? Palette.SuccessBg : Palette.PrimaryBg));
         thisPc.Children.Add(Ui.ListRow(Ui.Badge(SymbolRegular.Laptop24, Palette.OnPrimaryBg, Palette.PrimaryBg, 44), _peer?.Name ?? "HopDrop Laptop",
-            "Ready to receive from paired devices while HopDrop is running (also from the tray).",
-            Ui.Chip("Ready", Palette.Success, Palette.SuccessBg)));
+            "Ready to receive from paired devices while HopDrop is running (also from the tray).", pcChips));
         var addresses = _peer is null ? [new NetworkAddresses.LocalAddress(IPAddress.Parse("192.168.1.5"), "Wi-Fi")] : NetworkAddresses.Describe();
         if (addresses.Count == 0) thisPc.Children.Add(Ui.Colored("Not connected to a local network. Join Wi-Fi, or turn on Windows Mobile hotspot.", Palette.Danger));
         var addressRow = new WrapPanel { Margin = new Thickness(58, 6, 0, 0) };
@@ -304,7 +335,7 @@ public sealed partial class MainWindow
             var chip = new StackPanel { Orientation = Orientation.Horizontal };
             chip.Children.Add(new TextBlock { Text = address.Kind + "  ", FontSize = 13, Foreground = Palette.Muted, VerticalAlignment = VerticalAlignment.Center });
             chip.Children.Add(new TextBlock { Text = address.Address.ToString(), FontSize = 14, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) });
-            var copy = Ui.IconButton(SymbolRegular.Copy24, "Copy " + address.Address, () => { System.Windows.Clipboard.SetText(address.Address.ToString()); });
+            var copy = Ui.IconButton(SymbolRegular.Copy24, "Copy " + address.Address, () => { App.Instance.PutClipboardText(address.Address.ToString()); });
             chip.Children.Add(copy);
             addressRow.Children.Add(new Border { Child = chip, Background = Palette.SurfaceAlt, CornerRadius = new CornerRadius(8), Padding = new Thickness(10, 2, 2, 2), Margin = new Thickness(0, 0, 8, 6) });
         }
@@ -314,6 +345,12 @@ public sealed partial class MainWindow
         page.Children.Add(Ui.Section("Pair a phone"));
         _qrHost = new StackPanel(); page.Children.Add(Ui.Card(_qrHost));
         if (_qrSuccessName is not null) ShowQrSuccess(); else ShowQr();
+        if (_devices.Count == 0)
+        {
+            var pairSection = page.Children[4]; var pairCard = page.Children[5];
+            page.Children.Remove(pairCard); page.Children.Remove(pairSection);
+            page.Children.Insert(2, pairSection); page.Children.Insert(3, pairCard);
+        }
 
         var pairedHeader = new Grid(); pairedHeader.ColumnDefinitions.Add(new ColumnDefinition()); pairedHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         pairedHeader.Children.Add(Ui.Section("Paired devices"));
@@ -381,8 +418,8 @@ public sealed partial class MainWindow
         if (nearby.Count == 0)
         {
             _nearbyHost.Children.Add(Ui.Card(Ui.EmptyState(SymbolRegular.Search24, "Searching…",
-                "Open HopDrop on the other device. Both must be on the same Wi-Fi, or one on the other's hotspot. " +
-                "Still nothing? Use Pair by IP address — the phone shows its address under Devices → This phone.")));
+                "Nearby devices need the same Wi-Fi. The pairing QR above works without it. You can also pair by IP address.")));
+
             return;
         }
         foreach (var n in nearby.Where(n => n.Name.Length > 0 || _devices.Any(d => d.Id == n.Id)).OrderBy(n => n.Name))
@@ -409,11 +446,12 @@ public sealed partial class MainWindow
         string shownUri = _qrUri;
         var frame = new Border { Child = image, Background = Brushes.White, CornerRadius = new CornerRadius(12), Padding = new Thickness(4), Margin = new Thickness(0, 0, 24, 0), VerticalAlignment = VerticalAlignment.Center,
             Cursor = System.Windows.Input.Cursors.Hand, ToolTip = "Click to show a bigger code" };
-        frame.MouseLeftButtonUp += (_, _) => new QrZoomWindow(QrImage(shownUri)) { Owner = this }.ShowDialog();
+        frame.MouseLeftButtonUp += (_, _) => new QrZoomWindow(QrImage(shownUri), _peer?.DirectLink is not null || App.SnapshotMode) { Owner = this }.ShowDialog();
         row.Children.Add(frame);
         var info = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         info.Children.Add(Ui.Label("Scan with HopDrop on your phone", 18, true));
-        info.Children.Add(Ui.Subtle("On the phone: Devices → Pair device → Scan a QR code. Click the code to make it bigger."));
+        info.Children.Add(Ui.Subtle("On your phone: HopDrop \u2192 Pair \u2192 Scan. Click the code to make it bigger."));
+        if (_peer?.DirectLink is not null || App.SnapshotMode) info.Children.Add(Ui.Subtle("Your phone doesn't need to be on the same Wi-Fi."));
         var timer = Ui.Label("", 14, true); timer.Margin = new Thickness(0, 14, 0, 4); info.Children.Add(timer);
         info.Children.Add(Ui.Subtle("Each code works once. A new one appears every 5 minutes."));
         Grid.SetColumn(info, 1); row.Children.Add(info); _qrHost.Children.Add(row);
@@ -510,6 +548,17 @@ public sealed partial class MainWindow
             var badge = Ui.Badge(ok ? (received ? SymbolRegular.ArrowDownload24 : SymbolRegular.ArrowUpload24) : SymbolRegular.ErrorCircle24,
                 ok ? (received ? Palette.Success : Palette.OnPrimaryBg) : cancelled ? Palette.Amber : Palette.Danger,
                 ok ? (received ? Palette.SuccessBg : Palette.PrimaryBg) : cancelled ? Palette.AmberBg : Palette.DangerBg, 40);
+            if (h.Text is { } textValue)
+            {
+                var textActions = new List<UIElement> { Ui.Button("Copy", () => App.Instance.PutClipboardText(textValue), icon: SymbolRegular.Copy24) };
+                if (Platform.IsWebLink(textValue)) textActions.Add(Ui.Button("Open link", () => Platform.OpenLink(textValue), icon: SymbolRegular.Open24));
+                var textRow = Ui.ListRow(badge, $"Text {(received ? "from" : "to")} {peer}", h.At.LocalDateTime.ToString("t"), textActions.ToArray());
+                var preview = Ui.Subtle(textValue); preview.TextWrapping = TextWrapping.Wrap; preview.TextTrimming = TextTrimming.CharacterEllipsis;
+                preview.MaxHeight = 54;
+                Ui.TextOf(textRow).Children.Add(preview);
+                page.Children.Add(Ui.Card(textRow, 14, 6));
+                continue;
+            }
             string title = ok ? $"{(received ? "Received" : "Sent")} {Fmt.Files(h.FileCount)} {(received ? "from" : "to")} {peer}"
                 : cancelled ? $"{(received ? "Receiving from" : "Sending to")} {peer} was cancelled"
                 : received ? $"Receiving from {peer} stopped" : $"Couldn't send to {peer}";
@@ -587,6 +636,36 @@ public sealed partial class MainWindow
         page.Children.Add(Ui.SettingRow(SymbolRegular.Power24, "Start with Windows",
             "HopDrop starts hidden in the tray when you sign in, so this PC can receive without opening it.", run));
 
+        var directSwitch = new ToggleSwitch { IsChecked = Preferences.DirectLink };
+        directSwitch.Checked += (_, _) => { Preferences.DirectLink = true; if (_peer is not null) App.Instance.Link.Refresh(); };
+        directSwitch.Unchecked += (_, _) => { Preferences.DirectLink = false; if (_peer is not null) App.Instance.Link.Refresh(); };
+        string directStatus = _peer is null ? "On · DIRECT-HopDrop-AB12 · 192.168.137.1" : App.Instance.Link.State switch
+        {
+            DirectLinkState.On => "On · " + App.Instance.Link.Ssid + " · " + App.Instance.Link.Address,
+            DirectLinkState.Off => "Off", DirectLinkState.Waiting => "Waiting for a paired phone or pairing",
+            DirectLinkState.Starting => "Starting…", _ => App.Instance.Link.Reason
+        };
+        var directInfo = new StackPanel(); directInfo.Children.Add(Ui.Subtle(directStatus));
+        if (!Store.Packaged && Preferences.DirectLink && Platform.FirewallStatus() is { Public: false })
+        {
+            directInfo.Children.Add(Ui.Colored("Windows Firewall may block phones on this direct link.", Palette.Amber));
+            directInfo.Children.Add(Ui.Button("Allow direct link", () => Platform.AllowFirewall(true), icon: SymbolRegular.ShieldCheckmark24));
+        }
+        page.Children.Add(Ui.SettingRow(SymbolRegular.Link24, "Direct connection",
+            "Phones can reach this PC without a shared Wi-Fi. Neighbours' Wi-Fi lists show a protected network named " + (_peer is null ? "DIRECT-HopDrop-AB12" : Preferences.DirectSsid) + ".", directSwitch, directInfo));
+
+        page.Children.Add(Ui.Section("Clipboard"));
+        var receiveText = new ToggleSwitch { IsChecked = Preferences.PutReceivedTextOnClipboard };
+        receiveText.Checked += (_, _) => Preferences.PutReceivedTextOnClipboard = true;
+        receiveText.Unchecked += (_, _) => Preferences.PutReceivedTextOnClipboard = false;
+        page.Children.Add(Ui.SettingRow(SymbolRegular.Copy24, "Put text from my devices on the clipboard",
+            "Text copied on your phone is ready to paste here.", receiveText));
+        var shareText = new ToggleSwitch { IsChecked = Preferences.ShareCopiedText };
+        shareText.Checked += (_, _) => Preferences.ShareCopiedText = true;
+        shareText.Unchecked += (_, _) => Preferences.ShareCopiedText = false;
+        page.Children.Add(Ui.SettingRow(SymbolRegular.Share24, "Share what I copy",
+            "Text you copy here goes to your paired phones that are online.", shareText));
+
         page.Children.Add(Ui.Section("Privacy"));
         var visibility = new System.Windows.Controls.ComboBox { MinWidth = 210, ItemsSource = new[] { "Everyone on the network", "Only my paired devices" } };
         visibility.SelectedIndex = _peer?.Visibility == "paired" ? 1 : 0;
@@ -631,8 +710,9 @@ public sealed partial class MainWindow
             var copied = Ui.Subtle(""); copied.Visibility = Visibility.Collapsed;
             void Copy(string text, string where)
             {
-                try { System.Windows.Clipboard.SetText(text); copied.Text = "Copied. " + where; copied.Foreground = Palette.Success; }
-                catch (System.Runtime.InteropServices.ExternalException) { copied.Text = "Couldn't use the clipboard. Try again."; copied.Foreground = Palette.Danger; }
+                bool ok = App.Instance.PutClipboardText(text);
+                copied.Text = ok ? "Copied. " + where : "Couldn't use the clipboard. Try again.";
+                copied.Foreground = ok ? Palette.Success : Palette.Danger;
                 copied.Visibility = Visibility.Visible;
             }
             var buttons = new WrapPanel { Margin = new Thickness(0, 4, 0, 6) };

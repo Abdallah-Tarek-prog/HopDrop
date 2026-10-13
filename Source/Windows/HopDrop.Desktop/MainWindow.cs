@@ -71,7 +71,7 @@ public sealed partial class MainWindow : FluentWindow
         Loaded += (_, _) =>
         {
             ApplyTheme();
-            _navigation.Navigate(typeof(SendPage));
+            _navigation.Navigate(_devices.Count == 0 && _peer is not null ? typeof(DevicesPage) : typeof(SendPage));
         };
         _themeChanged = (_, _) => Dispatcher.InvokeAsync(() => { ApplyBrandAccent(); RenderCurrent(); RenderLive(); });
         ApplicationThemeManager.Changed += _themeChanged;
@@ -99,6 +99,7 @@ public sealed partial class MainWindow : FluentWindow
         bool shown = IsVisible && WindowState != WindowState.Minimized;
         _peer?.SetForeground(shown);
         _peer?.SetPairingVisible(shown && On("devices"));
+        if (_peer is not null) App.Instance.Link.SetPairingVisible(shown && On("devices"));
         if (shown) { _tick?.Start(); RenderLive(); }
         else { _tick?.Stop(); if (!IsVisible) StopQr(); }
     }
@@ -112,7 +113,9 @@ public sealed partial class MainWindow : FluentWindow
     internal void RenderCurrent() { if (CurrentPage is not null) CurrentPage.Content = Build(CurrentPage.Key); }
     internal FrameworkElement Build(string key)
     {
-        _peer?.SetPairingVisible(key == "devices" && IsVisible);
+        bool pairing = key == "devices" && IsVisible && WindowState != WindowState.Minimized;
+        _peer?.SetPairingVisible(pairing);
+        if (_peer is not null) App.Instance.Link.SetPairingVisible(pairing);
         return key switch
         {
             "devices" => BuildDevicesPage(), "activity" => BuildActivityPage(), "settings" => BuildSettingsPage(), _ => BuildSendPage()
@@ -177,6 +180,7 @@ public sealed partial class MainWindow : FluentWindow
         _quit = true; StopQr(); _tick?.Stop();
         Motion.StopTree(this);
         _peer?.SetForeground(false); _peer?.SetPairingVisible(false);
+        if (_peer is not null) App.Instance.Link.SetPairingVisible(false);
         ApplicationThemeManager.Changed -= _themeChanged;
         Updates.Changed -= _updatesChanged;
         try { SystemThemeWatcher.UnWatch(this); } catch (InvalidOperationException) { }
@@ -187,6 +191,7 @@ public sealed partial class MainWindow : FluentWindow
     {
         var added = list.FirstOrDefault(device => _devices.All(old => old.Id != device.Id));
         _devices = list.ToList();
+        _selectedDevices.IntersectWith(_devices.Select(d => d.Id));
         if (_qrHost is not null && added is not null) { _qrSuccessName = added.Alias ?? added.Name; StopQr(); ShowQrSuccess(); }
         if (_peer is not null) _history = await _peer.HistoryAsync();
         if (On("send")) FillSendDevices();
@@ -196,6 +201,22 @@ public sealed partial class MainWindow : FluentWindow
     {
         if (On("devices")) { FillPaired(); FillNearby(); }
         if (On("send")) UpdateSendDevices();
+    }
+    internal void OnQueueChanged()
+    {
+        foreach (var id in App.Instance.Queue.Entries.Select(e => e.DeviceId).Distinct()) _live.Remove("pending:" + id);
+        RenderLive();
+        if (On("send")) UpdateSendDevices();
+    }
+    internal void OnQueueTransferStopped(Guid id)
+    {
+        _live.Remove(id.ToString()); RenderLive();
+        if (On("send")) UpdateSendDevices();
+    }
+    internal void OnDirectLinkChanged()
+    {
+        if (On("devices")) { _qrUri = null; RenderCurrent(); }
+        else if (On("settings")) RenderCurrent();
     }
     internal void OnIncomingPairing(PairingRequest request) => Dispatcher.InvokeAsync(() =>
     {
@@ -406,10 +427,15 @@ public sealed partial class MainWindow : FluentWindow
     }
 
     // ---- Helpers ----
-    private static List<PairedDevice> SampleDevices() => [new(new string('b', 64), "Realme 6 Pro", "android", DateTimeOffset.Now.AddDays(-3), ["192.168.1.7"], DateTimeOffset.Now)];
+    private static List<PairedDevice> SampleDevices() =>
+    [
+        new(new string('b', 64), "Realme 6 Pro", "android", DateTimeOffset.Now.AddDays(-3), ["192.168.1.7"], DateTimeOffset.Now),
+        new(new string('d', 64), "Pixel 8", "android", DateTimeOffset.Now.AddDays(-5), ["192.168.1.8"], DateTimeOffset.Now.AddHours(-1))
+    ];
     private static List<HistoryEntry> SampleHistory() =>
     [
         new(DateTimeOffset.Now.AddMinutes(-14), new string('b', 64), "received", "ok", ["Holiday photo.jpg", "Notes.pdf"], "Downloads\\HopDrop"),
+        new(DateTimeOffset.Now.AddMinutes(-22), new string('b', 64), "received", "ok", [], "", Text: "https://example.com/holiday"),
         new(DateTimeOffset.Now.AddHours(-2), new string('b', 64), "sent", "ok", ["Project proposal.pdf"], "Download/HopDrop"),
         new(DateTimeOffset.Now.AddHours(-3), new string('b', 64), "sent", "timeout", [], "Download/HopDrop")
     ];
@@ -435,6 +461,16 @@ public sealed partial class MainWindow : FluentWindow
             {
                 Navigate(page); await Task.Delay(700); RenderCurrent(); await Task.Delay(300);
                 SaveVisual(this, Path.Combine(folder, $"{page}-{theme}.png"));
+                if (page == "send")
+                {
+                    _selectedDevices.UnionWith(_devices.Select(d => d.Id)); RenderCurrent(); await Task.Delay(250);
+                    ScrollToSendCards(); await Task.Delay(250);
+                    SaveVisual(this, Path.Combine(folder, $"send-multi-{theme}.png"));
+                    _sampleQueued = _devices[0].Id; RenderCurrent(); await Task.Delay(250);
+                    ScrollToSendCards(); await Task.Delay(250);
+                    SaveVisual(this, Path.Combine(folder, $"send-queued-{theme}.png"));
+                    _sampleQueued = null; _selectedDevices.Clear();
+                }
                 if (page == "settings" && Descendants<TextBlock>(this).FirstOrDefault(t => t.Text == "AI agents") is { } agents)
                 {
                     DependencyObject? up = agents;
@@ -447,7 +483,7 @@ public sealed partial class MainWindow : FluentWindow
             var sample = new NumberMatchDialog(new PairingRequest("Realme 6 Pro", "428962")) { Owner = this, Left = -32000, Top = -32000, ShowInTaskbar = false };
             sample.Show(); await Task.Delay(300);
             SaveVisual(sample, Path.Combine(folder, $"number-match-{theme}.png")); sample.Close();
-            var note = new TextNoteDialog { Owner = this, Left = -32000, Top = -32000, ShowInTaskbar = false };
+            var note = new TextNoteDialog(_devices, "https://example.com/holiday") { Owner = this, Left = -32000, Top = -32000, ShowInTaskbar = false };
             note.Show(); await Task.Delay(300);
             SaveVisual(note, Path.Combine(folder, $"text-dialog-{theme}.png")); note.Close();
             var menu = new TrayMenu("Ready to receive", App.Instance.TrayMenuItems()) { Left = -32000, Top = -32000, ShowActivated = false };
@@ -455,6 +491,14 @@ public sealed partial class MainWindow : FluentWindow
             SaveVisual(menu, Path.Combine(folder, $"tray-menu-{theme}.png")); menu.Close();
         }
         Close();
+    }
+    private void ScrollToSendCards()
+    {
+        if (_deviceHost is null) return;
+        DependencyObject? up = _deviceHost;
+        while (up is not null and not ScrollViewer) up = VisualTreeHelper.GetParent(up);
+        if (up is ScrollViewer scroller)
+            scroller.ScrollToVerticalOffset(scroller.VerticalOffset + _deviceHost.TranslatePoint(new Point(0, 0), scroller).Y - 95);
     }
     private static IEnumerable<T> Descendants<T>(DependencyObject parent) where T : DependencyObject
     {

@@ -30,6 +30,8 @@ public sealed record TransferResult(Guid TransferId, string PeerId, bool Incomin
     public long Bytes { get; init; }
     public TimeSpan Duration { get; init; }
 }
+/// <summary>Text from a paired device. <see cref="Clipboard"/>: the sender copied it (it may go straight onto this device's clipboard).</summary>
+public sealed record TextMessage(string PeerId, string PeerName, string Text, bool Clipboard, DateTimeOffset At);
 public sealed class PairingRequest(string peerName, string code)
 {
     private readonly TaskCompletionSource<bool> _answer = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -91,8 +93,10 @@ public sealed partial class HopDropPeer : IAsyncDisposable
     /// <summary>More simultaneous connections than this are dropped at once, so a flood from the network can't exhaust the receiver.</summary>
     private const int MaxConnections = 32;
     /// <summary>Protocol extensions this build understands; peers use one only when both list it in their hello (absent = baseline v2).</summary>
-    internal static readonly string[] Features = ["consent", "folders", "pages", "resume"];
-    public const string AppVersion = "1.0.0";
+    internal static readonly string[] Features = ["consent", "folders", "pages", "resume", "text", "pipeline", "merge"];
+    public const string AppVersion = "1.1.0";
+    /// <summary>This device's direct link (a PC's Wi-Fi Direct network), told to paired devices in hello and put in pairing QR codes. Null when off.</summary>
+    public DirectLinkInfo? DirectLink { get; set; }
     private volatile bool _foreground, _pairingVisible;
     private DiscoveryService? _discovery;
     private AppSettings _current;
@@ -112,6 +116,10 @@ public sealed partial class HopDropPeer : IAsyncDisposable
     public event Action<string>? Error;
     /// <summary>A device that isn't trusted wants to send files and "Ask before receiving" is on. Without a handler the files are accepted.</summary>
     public event Action<IncomingOffer>? OfferReceived;
+    /// <summary>A paired device sent text (a link, a note, or its clipboard).</summary>
+    public event Action<TextMessage>? TextReceived;
+    /// <summary>A paired device just connected to this one (so it's reachable now, at the address it came from). Its id.</summary>
+    public event Action<string>? DeviceContacted;
 
     private HopDropPeer(PeerOptions options, AppSettings current, Identity identity)
     {
@@ -213,7 +221,7 @@ public sealed partial class HopDropPeer : IAsyncDisposable
     {
         var list = (addresses ?? NetworkAddresses.QrAddresses()).ToArray();
         if (list.Length == 0) list = [IPAddress.Loopback];
-        return new PairUri(Id, Name, "windows", Port, list, TokenCodec.Decode(_token.Issue())).ToString();
+        return new PairUri(Id, Name, "windows", Port, list, TokenCodec.Decode(_token.Issue()), DirectLink).ToString();
     }
     public void CloseQr() => _token.Invalidate();
     public void CancelTransfer(Guid id) { if (_transfers.TryGetValue(id, out var cts)) cts.Cancel(); }
@@ -248,6 +256,7 @@ public sealed partial class HopDropPeer : IAsyncDisposable
             {
                 var client = await _listener!.AcceptTcpClientAsync(ct);
                 if (!NetworkAddresses.IsPrivateOrLoopback(((IPEndPoint)client.Client.RemoteEndPoint!).Address)) { client.Dispose(); continue; }
+                Tune(client);
                 if (Interlocked.Increment(ref _connections) > MaxConnections) { Interlocked.Decrement(ref _connections); client.Dispose(); continue; }
                 var handler = HandleClientAsync(client, ct);
                 _handlers.TryAdd(handler, true);
@@ -279,11 +288,13 @@ public sealed partial class HopDropPeer : IAsyncDisposable
                     await SendHelloAsync(ssl, paired, stop);
                     using var request = await ReadControlAsync(ssl, stop);
                     string type = Messages.Type(request.RootElement);
-                    if (!paired && type is "ping" or "offer" or "unpair") throw new HopDropException("not_paired", "Pair this device first");
+                    if (!paired && type is "ping" or "offer" or "unpair" or "text") throw new HopDropException("not_paired", "Pair this device first");
                     var address = ((IPEndPoint)client.Client.RemoteEndPoint!).Address;
+                    if (paired && type is "ping" or "offer" or "text") await NoteContactAsync(known!, address);
                     switch (type)
                     {
                         case "ping": await Messages.WriteAsync(ssl, new { type = "pong" }, stop); break;
+                        case "text": await ReceiveTextAsync(ssl, request.RootElement, peerId, known?.Alias ?? h.Name, stop); break;
                         case "unpair": await RemoveDeviceAsync(peerId, stop); await Messages.WriteAsync(ssl, new { type = "ok" }, stop); break;
                         case "pair_qr":
                             string outcome = _token.Consume(Messages.String(request.RootElement, "token"));
@@ -321,8 +332,53 @@ public sealed partial class HopDropPeer : IAsyncDisposable
                 if (item.ValueKind == JsonValueKind.String && supported.Contains(item.GetString())) features.Add(item.GetString()!);
         return (name, platform, features);
     }
-    private Task SendHelloAsync(Stream stream, bool paired, CancellationToken ct) => Messages.WriteAsync(stream,
-        new { type = "hello", proto = 2, id = Id, name = Name, platform = "windows", app = AppVersion, paired, features = _options.Features ?? Features }, ct);
+    /// <summary>Hello; to a paired device it also carries this device's direct link, so the other side can reach it later without a shared network.</summary>
+    private Task SendHelloAsync(Stream stream, bool paired, CancellationToken ct)
+    {
+        var features = _options.Features ?? Features;
+        object hello = paired && DirectLink is { Valid: true } link
+            ? new { type = "hello", proto = 2, id = Id, name = Name, platform = "windows", app = AppVersion, paired, features, link = new { ssid = link.Ssid, key = link.Key, ip = link.Address } }
+            : new { type = "hello", proto = 2, id = Id, name = Name, platform = "windows", app = AppVersion, paired, features };
+        return Messages.WriteAsync(stream, hello, ct);
+    }
+    /// <summary>Bigger socket buffers keep Wi-Fi busy between writes; no Nagle delay, so the small replies between files go out at once.</summary>
+    private static void Tune(TcpClient client)
+    {
+        try { client.NoDelay = true; client.SendBufferSize = 4 << 20; client.ReceiveBufferSize = 4 << 20; } catch (SocketException) { }
+    }
+    /// <summary>A paired device connected: remember where it came from (a phone on the PC's direct link has a new address) and say it's reachable.</summary>
+    private async Task NoteContactAsync(PairedDevice device, IPAddress address)
+    {
+        try
+        {
+            string text = address.ToString();
+            if (device.LastAddresses.FirstOrDefault() != text || DateTimeOffset.UtcNow - device.LastSeen > TimeSpan.FromMinutes(1))
+            {
+                var list = await _devices.UpdateAsync(old =>
+                {
+                    int index = old.FindIndex(d => d.Id == device.Id);
+                    if (index < 0) return old;
+                    var addresses = old[index].LastAddresses.Where(a => a != text).Prepend(text).Take(8).ToList();
+                    old[index] = old[index] with { LastAddresses = addresses, LastSeen = DateTimeOffset.UtcNow };
+                    return old;
+                });
+                PairedDevicesChanged?.Invoke(list);
+            }
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException) { Error?.Invoke("Devices: " + e.Message); }
+        DeviceContacted?.Invoke(device.Id);
+    }
+    private async Task ReceiveTextAsync(Stream stream, JsonElement request, string peerId, string peerName, CancellationToken ct)
+    {
+        string text = Messages.String(request, "text");
+        if (text.Length is < 1 or > Framing.MaxJson) throw new HopDropException("protocol_error", "Invalid text");
+        bool clip = request.TryGetProperty("clip", out var c) && c.ValueKind == JsonValueKind.True;
+        await Messages.WriteAsync(stream, new { type = "ok" }, ct);
+        TextReceived?.Invoke(new TextMessage(peerId, peerName, text, clip, DateTimeOffset.UtcNow));
+        try { await AddHistoryAsync(peerId, "received", null, [], "", text); } catch (Exception e) { Error?.Invoke("Activity: " + e.Message); }
+    }
+    /// <summary>Text longer than this (UTF-16 units) travels as a .txt file instead (a control message holds at most 64 KiB).</summary>
+    public const int MaxText = 16_000;
     private static async Task<JsonDocument> ReadControlAsync(Stream stream, CancellationToken ct, int seconds = 30)
     { using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct); timeout.CancelAfter(TimeSpan.FromSeconds(seconds)); try { return await Messages.ReadAsync(stream, timeout.Token); } catch (OperationCanceledException) when (!ct.IsCancellationRequested) { throw new HopDropException("timeout", "Peer timed out"); } }
     private sealed class Connection : IDisposable
@@ -347,6 +403,7 @@ public sealed partial class HopDropPeer : IAsyncDisposable
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct); timeout.CancelAfter(TimeSpan.FromSeconds(5));
             await client.ConnectAsync(address, port, timeout.Token);
+            Tune(client);
             var network = _options.ConnectionFilter?.Invoke(client.GetStream()) ?? client.GetStream();
             var ssl = new SslStream(network, false, (_, _, _, _) => true, (_, _, _, _, _) => Identity.Certificate);
             try

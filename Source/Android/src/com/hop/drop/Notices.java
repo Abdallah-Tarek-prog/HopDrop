@@ -161,6 +161,38 @@ final class Notices {
         manager.cancel(OFFER + (o.transferId.hashCode() & 0xffff));
     }
 
+    /** Text from a paired device: the text itself, with Copy (unless it's already copied), Open link and Share. */
+    void text(String peer, String text, boolean copied) {
+        int id = 3000 + (int) (System.nanoTime() & 0x3ff);
+        String trimmed = text.length() > 2000 ? text.substring(0, 2000) + "…" : text;
+        Notification.Builder n = app.notification(copied ? "clipboard" : "received", (copied ? "Copied from " : "Text from ") + peer,
+                trimmed, false, -1).setSmallIcon(R.drawable.ic_direction_in)
+                .setStyle(new Notification.BigTextStyle().bigText(trimmed)).setAutoCancel(true)
+                .setCategory(Notification.CATEGORY_MESSAGE);
+        if (!copied) n.addAction(0, "Copy", PendingIntent.getBroadcast(app, id, new Intent(app, NoticeAction.class)
+                .setAction(NoticeAction.COPY).putExtra("text", text).putExtra("notification", id),
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
+        String link = Links.single(text);
+        if (link != null) n.addAction(0, "Open link", PendingIntent.getActivity(app, id + 1,
+                new Intent(Intent.ACTION_VIEW, Uri.parse(link)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
+        n.addAction(0, "Share", PendingIntent.getActivity(app, id + 2, Intent.createChooser(new Intent(Intent.ACTION_SEND)
+                .setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
+        manager.notify(id, n.build());
+    }
+
+    /** A send couldn't reach its device: it waits and goes when the device is back. Cancel gives up on it. */
+    void queued(String deviceId, String peer, String what) {
+        int id = 4000 + (peer.hashCode() & 0xfff);
+        manager.notify(id, app.notification("results", peer + " isn't reachable right now",
+                what + " will send when " + peer + " is back.", false, -1).setSmallIcon(R.drawable.ic_direction_out)
+                .setAutoCancel(true)
+                .addAction(0, "Cancel", PendingIntent.getBroadcast(app, id, new Intent(app, NoticeAction.class)
+                        .setAction(NoticeAction.CANCEL_QUEUE).putExtra("device", deviceId).putExtra("notification", id),
+                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE)).build());
+    }
+
     /** Who cancelled: this phone ("You cancelled the transfer" / "Transfer cancelled") or the other device. */
     static String cancelReason(Peer.Result r) {
         return r.error.contains("Peer cancelled") || r.error.contains("Sender cancelled")

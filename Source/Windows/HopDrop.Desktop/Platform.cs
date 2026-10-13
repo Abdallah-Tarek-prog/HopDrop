@@ -41,8 +41,16 @@ internal static class Preferences
     public static bool AgentsEnabled { get => Current.Agents; set => Save(Current with { Agents = value }); }
     /// <summary>Store version only: "Start with Windows" (the installer version keeps this in its sign-in entry).</summary>
     public static bool StartWithWindows { get => Current.StartWithWindows; set => Save(Current with { StartWithWindows = value }); }
+    public static bool DirectLink { get => Current.DirectLink; set => Save(Current with { DirectLink = value }); }
+    public static bool PutReceivedTextOnClipboard { get => Current.PutReceivedTextOnClipboard; set => Save(Current with { PutReceivedTextOnClipboard = value }); }
+    public static bool ShareCopiedText { get => Current.ShareCopiedText; set => Save(Current with { ShareCopiedText = value }); }
+    public static string? LastDevice { get => Current.LastDevice; set => Save(Current with { LastDevice = value }); }
+    public static string DirectSsid { get { if (Current.DirectSsid is { Length: > 0 } value) return value; string created = "DIRECT-HopDrop-" + RandomChars(4, "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"); Save(Current with { DirectSsid = created }); return created; } }
+    public static string DirectKey { get { if (Current.DirectKey is { Length: > 0 } value) return value; string created = RandomChars(20, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"); Save(Current with { DirectKey = created }); return created; } }
+    private static string RandomChars(int count, string alphabet) => new(Enumerable.Range(0, count).Select(_ => alphabet[System.Security.Cryptography.RandomNumberGenerator.GetInt32(alphabet.Length)]).ToArray());
     private sealed record DesktopSettings(bool CloseToTray, string? Theme, bool BackgroundReceive = false, bool BackgroundNoticeShown = false, bool Agents = false,
-        bool StartWithWindows = false);
+        bool StartWithWindows = false, bool DirectLink = true, bool PutReceivedTextOnClipboard = true, bool ShareCopiedText = false,
+        string? DirectSsid = null, string? DirectKey = null, string? LastDevice = null);
 }
 
 internal static class Platform
@@ -206,6 +214,36 @@ internal static class Platform
     {
         try { new ToastContentBuilder().AddText(title).AddText(detail).Show(); }
         catch (Exception e) { Debug.WriteLine(e); }
+    }
+    public static bool IsWebLink(string text) => Uri.TryCreate(text.Trim(), UriKind.Absolute, out var uri) &&
+        uri.Scheme is "http" or "https" && !text.Trim().Any(char.IsWhiteSpace);
+    public static void OpenLink(string text)
+    {
+        if (IsWebLink(text)) Process.Start(new ProcessStartInfo(text.Trim()) { UseShellExecute = true });
+    }
+    public static void TextToast(string name, string text, bool copied)
+    {
+        try
+        {
+            string id = Guid.NewGuid().ToString("N");
+            Directory.CreateDirectory(App.DataDirectory);
+            // Toast actions can launch a fresh process, so keep their text outside the window.
+            File.WriteAllText(Path.Combine(App.DataDirectory, "toast-text-" + id + ".txt"), text);
+            foreach (var old in Directory.EnumerateFiles(App.DataDirectory, "toast-text-*.txt").Where(p => File.GetCreationTimeUtc(p) < DateTime.UtcNow.AddDays(-7)))
+                File.Delete(old);
+            var toast = new ToastContentBuilder().AddText((copied ? "Copied from " : "Text from ") + name)
+                .AddText(text.Length > 200 ? text[..200] + "…" : text);
+            if (!copied) toast.AddButton(new ToastButton().SetContent("Copy").AddArgument("action", "textcopy:" + id));
+            if (IsWebLink(text)) toast.AddButton(new ToastButton().SetContent("Open link").AddArgument("action", "textopen:" + id));
+            toast.Show();
+        }
+        catch (Exception ex) { Debug.WriteLine(ex); }
+    }
+    public static string? ToastText(string id)
+    {
+        if (!Guid.TryParseExact(id, "N", out _)) return null;
+        try { return File.ReadAllText(Path.Combine(App.DataDirectory, "toast-text-" + id + ".txt")); }
+        catch (Exception ex) { Debug.WriteLine(ex); return null; }
     }
     public static void PairingToast(string name)
     {

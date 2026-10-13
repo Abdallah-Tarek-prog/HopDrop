@@ -13,6 +13,9 @@ public partial class App : System.Windows.Application
     private CancellationTokenSource? _pipeStop;
     private HopDropPeer? _peer;
     private string? _pendingToast;
+    internal SendQueue Queue { get; private set; } = null!;
+    internal DirectLink Link { get; private set; } = null!;
+    private ClipboardShare? _clipboardShare;
     internal static MainWindow? WindowInstance { get; private set; }
     internal static HopDropPeer Peer => ((App)Current)._peer!;
     internal static bool SnapshotMode { get; private set; }
@@ -77,7 +80,15 @@ public partial class App : System.Windows.Application
                 await File.WriteAllTextAsync(e2eReady, System.Text.Json.JsonSerializer.Serialize(new { _peer.Id, _peer.Port, Qr = _peer.CreateQrUri([System.Net.IPAddress.Loopback]), Store.Packaged }));
                 return;
             }
+            Queue = new SendQueue(_peer, DataDirectory);
+            Queue.Changed += () => Dispatcher.InvokeAsync(() => WindowInstance?.OnQueueChanged());
+            Link = new DirectLink(_peer);
+            Link.Changed += () => Dispatcher.InvokeAsync(() => WindowInstance?.OnDirectLinkChanged());
             AttachPeer(_peer);
+            _pairedDevices = await _peer.DevicesAsync();
+            Link.SetPairedPhones(_pairedDevices);
+            _clipboardShare = new ClipboardShare(this);
+            Queue.RetryNearby();
             if (Updates.Installed) { Platform.RepairSignIn(); Updates.Start(); }
             if (_pendingToast is not null) { HandleToast(_pendingToast); _pendingToast = null; }
             if (background || minimized && !args.Contains("--send"))
@@ -164,6 +175,14 @@ public partial class App : System.Windows.Application
         if (resultPath is null || send < 0 || send + 2 >= args.Count || _peer is null) return;
         try
         {
+            // --e2e-queue: through the "sends when it's back" queue, like the Send button (QUEUED when the device is away).
+            if (args.Contains("--e2e-queue"))
+            {
+                var items = SendItem.From(args.Skip(send + 2).Where(a => a != "--e2e-queue"));
+                await Queue.SendFilesAsync(args[send + 1], items);
+                await File.WriteAllTextAsync(resultPath, Queue.Has(args[send + 1]) ? "QUEUED" : "PASS " + items.Count);
+                return;
+            }
             var result = await _peer.SendAsync(args[send + 1], args.Skip(send + 2).ToArray());
             await File.WriteAllTextAsync(resultPath, "PASS " + result.SavedPaths.Count);
         }
@@ -171,6 +190,9 @@ public partial class App : System.Windows.Application
     }
     protected override void OnExit(ExitEventArgs e)
     {
+        _clipboardShare?.Dispose();
+        if (Link is not null) Link.Dispose();
+        if (Queue is not null) Queue.Dispose();
         _pipeStop?.Cancel();
         _mutex?.Dispose();
         base.OnExit(e);

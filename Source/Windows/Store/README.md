@@ -16,7 +16,7 @@ The Store version is the same Windows app, packed as an **MSIX package**: a file
 ## 2. What was built (done)
 
 - `Store/AppxManifest.xml` — the package description: name and publisher (filled in from identity.json), the Share target, the startup task, the `hopdrop.exe` command, the notification activator, the two firewall rules (TCP and UDP 7410), and the capabilities (network, and *runFullTrust* — "this is a normal desktop app").
-- `Store/make-assets.ps1` — draws every logo size Windows asks for (Start, taskbar, Store, 100–400 % scaling): the vector logo on a white tile, so no images live in git.
+- `Store/make-assets.ps1` — draws every logo size Windows asks for (Start, taskbar, Store, 100–400 % scaling): the vector logo on a black tile (#121212, like the phone's icon), so no images live in git.
 - `Store/identity.json` — the app's Store identity, with the real values from Partner Center (AbdallahTarek.HopDrop).
 - App code (`HopDrop.Desktop/Store.cs` and small changes): detects that it's the Store version; turns a Share into "add these files to the Send list"; uses the startup task for "Start with Windows" / "Receive in the background"; shows the Share menu instead of "Send to" in Settings; leaves updates to the Store; gives agents the `hopdrop.exe` command.
 - `build.ps1 -Store` — publishes the app for PCs (x64) and ARM laptops (arm64), adds the manifest and logos, builds the logo index (`resources.pri`), packs `HopDrop_<version>_x64.msix` and `_arm64.msix`, and bundles both into **`Windows App\Store\HopDrop_<version>.msixbundle`** — the file you upload.

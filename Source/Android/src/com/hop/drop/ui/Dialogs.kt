@@ -24,6 +24,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.BatteryChargingFull
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.ErrorOutline
@@ -72,6 +73,7 @@ fun GlobalDialogs(state: HopUiState, actions: HopActions) {
         pairing != null -> PairingDialog(pairing, actions)
     }
     state.qr?.let { QrSheet(it, actions) }
+    state.backupSetup?.let { BackupSetupDialog(it, state.devices, actions) { state.backupSetup = null } }
     if (state.pairSheet) PairOptionsSheet(actions) { state.pairSheet = false }
     if (state.askBackground) {
         AlertDialog(
@@ -146,7 +148,11 @@ private fun PairingDialog(pairing: PairingUi, actions: HopActions) {
         title = { Text(if (failed) "Couldn't pair" else "Pairing with ${pairing.name}…", textAlign = TextAlign.Center) },
         text = {
             if (failed) Text(pairing.error ?: "")
-            else ProgressBar(null, Modifier.padding(top = 8.dp))
+            else Column {
+                if (pairing.direct) Text("Not on the same Wi-Fi, so HopDrop is connecting to it directly. If Android asks, tap Connect.",
+                    style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 12.dp))
+                ProgressBar(null, Modifier.padding(top = 8.dp))
+            }
         },
         confirmButton = {
             if (failed) TextButton(onClick = { actions.dismissPairing(); actions.scanQr() }) { Text("Scan again") }
@@ -235,6 +241,48 @@ private fun PairOption(icon: androidx.compose.ui.graphics.vector.ImageVector, ti
     Spacer(Modifier.height(8.dp))
 }
 
+/**
+ * Turning auto-backup on, after the folder is picked: which device to back up to (skipped when only one is paired),
+ * then whether to send the files already in the folder or only new ones.
+ */
+@Composable
+private fun BackupSetupDialog(setup: BackupSetupUi, devices: List<DeviceUi>, actions: HopActions, onDismiss: () -> Unit) {
+    var device by remember { mutableStateOf(devices.singleOrNull()?.id ?: devices.firstOrNull { it.online }?.id) }
+    var choosing by remember { mutableStateOf(devices.size > 1) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Rounded.Backup, contentDescription = null) },
+        title = { Text(if (choosing) "Back up to which device?" else "Back up ${setup.folderName}", textAlign = TextAlign.Center) },
+        text = {
+            if (choosing) Column {
+                for (d in devices) {
+                    Row(
+                        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).clickable { device = d.id }.padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        androidx.compose.material3.RadioButton(selected = device == d.id, onClick = { device = d.id })
+                        DeviceAvatar(d.platform, d.online, size = 32.dp)
+                        Text(d.name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 12.dp))
+                    }
+                }
+            } else Text(
+                if (setup.existing > 0) "It already has ${Format.files(setup.existing)}. Send those too, or only files added from now on?"
+                else "New files added to it go to ${devices.firstOrNull { it.id == device }?.name ?: "your device"} by themselves, whenever it's on the same Wi-Fi."
+            )
+        },
+        confirmButton = {
+            if (choosing) TextButton(onClick = { choosing = false }, enabled = device != null) { Text("Next") }
+            else TextButton(onClick = { device?.let { actions.startBackup(it, setup.existing > 0) } }) {
+                Text(if (setup.existing > 0) "Send all ${setup.existing}" else "Turn on")
+            }
+        },
+        dismissButton = {
+            if (!choosing && setup.existing > 0) TextButton(onClick = { device?.let { actions.startBackup(it, false) } }) { Text("Only new ones") }
+            else TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
+}
+
 /** One text field with Save / Cancel. [onSave] returns null when it worked, or the problem to show under the field. */
 @Composable
 fun TextInputDialog(
@@ -264,10 +312,10 @@ fun TextInputDialog(
     )
 }
 
-/** Type or paste text to send; it arrives as a .txt file named after its first line. */
+/** Type or paste text to send; [initial] is what's on the clipboard. It arrives as text with Copy and Open buttons. */
 @Composable
-fun TextNoteDialog(onDismiss: () -> Unit, onAdd: (String) -> Unit) {
-    var text by remember { mutableStateOf("") }
+fun TextNoteDialog(initial: String, onDismiss: () -> Unit, onAdd: (String) -> Unit) {
+    var text by remember { mutableStateOf(initial) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Send text") },
@@ -276,7 +324,7 @@ fun TextNoteDialog(onDismiss: () -> Unit, onAdd: (String) -> Unit) {
                 value = text,
                 onValueChange = { text = it },
                 placeholder = { Text("Type or paste text") },
-                supportingText = { Text("Arrives as a .txt file") },
+                supportingText = { Text(if (initial.isNotEmpty() && text == initial) "From your clipboard" else "Arrives as text, ready to copy") },
                 minLines = 5, maxLines = 10,
                 keyboardOptions = KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences),
                 modifier = Modifier.fillMaxWidth(),

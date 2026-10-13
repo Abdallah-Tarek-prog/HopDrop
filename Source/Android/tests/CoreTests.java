@@ -24,7 +24,11 @@ public final class CoreTests {
             check(Sas.code(Protocol.unhex(fpI[i]),Protocol.unhex(fpR[i]),Protocol.unhex(ni[i]),Protocol.unhex(nr[i])).equals(codes[i]),"SAS code "+i);}}
     private static void qr(){String example="hopdrop://pair?v=2&id=59eb3cb130074f7b1ddb99c8fe14f27e1dbca735bb3da82e1ff0305340a32419&n=LOQ%20Laptop&pl=windows&p=7410&a=192.168.1.5,192.168.137.1&t=AAECAwQFBgcICQoLDA0ODw";
         PairUri q=PairUri.parse(example);check(q.name.equals("LOQ Laptop")&&q.addresses.size()==2&&q.port==7410&&Arrays.equals(Base64.getUrlDecoder().decode(q.token),new byte[]{0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15}),"QR example");
-        check(PairUri.parse(q.toString()).id.equals(q.id),"QR round trip");}
+        check(PairUri.parse(q.toString()).id.equals(q.id),"QR round trip");check(q.linkSsid==null,"QR without a direct link");
+        PairUri linked=PairUri.parse(example+"&ws=DIRECT-HopDrop-7K2Q&wk=pass%20word%2B12&wa=192.168.137.1");
+        check("DIRECT-HopDrop-7K2Q".equals(linked.linkSsid)&&"pass word+12".equals(linked.linkKey)&&"192.168.137.1".equals(linked.linkIp),"QR direct link "+linked.linkKey);
+        check("pass word+12".equals(PairUri.parse(linked.toString()).linkKey),"QR direct link round trip");
+        check(PairUri.parse(example+"&ws=x&wk=short&wa=192.168.137.1").linkSsid==null,"QR invalid direct link ignored");}
     private static void json(){Map<String,Object> m=Json.obj("type","hello","n","a\"b\n📁","p",2,"paired",true,"files",Arrays.asList(Json.obj("i",0,"name","α.txt")));
         Map<String,Object> got=Json.parseObject(Json.string(m));check(Json.string(got).equals(Json.string(m)),"JSON round trip");
         try{Json.parseObject("{\"type\":}");throw new AssertionError("Invalid JSON accepted");}catch(IllegalArgumentException expected){count++;}}

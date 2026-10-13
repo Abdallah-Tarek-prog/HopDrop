@@ -77,6 +77,10 @@ fun HopDropApp(state: HopUiState, actions: HopActions) {
     }
     BackHandler(enabled = state.settingsOpen) { state.settingsOpen = false }
     BackHandler(enabled = !state.settingsOpen && state.tab != Tab.Send) { state.tab = Tab.Send }
+    if (state.onboarding) {
+        Onboarding(state, actions)
+        return
+    }
     Box(Modifier.background(MaterialTheme.colorScheme.surface)) {
         AnimatedContent(
             targetState = state.settingsOpen,
@@ -93,9 +97,10 @@ fun HopDropApp(state: HopUiState, actions: HopActions) {
     GlobalDialogs(state, actions)
 }
 
+/** Top bar, the three tabs and their content. Also drawn, untouchable, in the tour's phone pictures. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MainScreen(state: HopUiState, actions: HopActions, snackbar: SnackbarHostState) {
+internal fun MainScreen(state: HopUiState, actions: HopActions, snackbar: SnackbarHostState) {
     var statusOpen by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     var confirmClear by remember { mutableStateOf(false) }

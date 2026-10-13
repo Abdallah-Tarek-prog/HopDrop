@@ -14,6 +14,9 @@ public final class Peer implements AutoCloseable {
         public String id,name,platform,alias; public int port; public long pairedAt,lastSeen;
         /** The user trusts this device: its files arrive without asking, even with "Ask before receiving" on. */
         public boolean trusted;
+        /** The device's direct link (a PC's own Wi-Fi network: name, passphrase, its address there), or nulls. Told in hello and pairing QR codes. */
+        public String linkSsid,linkKey,linkIp;
+        public boolean hasLink(){return linkSsid!=null&&linkKey!=null&&linkIp!=null;}
         public final List<String> addresses=new ArrayList<>();
         public Device(String id,String name,String platform,int port,String address) { this.id=id;this.name=name;this.platform=platform;this.port=port;pairedAt=lastSeen=System.currentTimeMillis();if(address!=null)addresses.add(address); }
         public String label(){return alias==null||alias.isEmpty()?name:alias;}
@@ -66,6 +69,10 @@ public final class Peer implements AutoCloseable {
         default boolean offer(Offer offer) { return false; }
         /** The question is over (answered, timed out, or the sender gave up), so the prompt can close. */
         default void offerClosed(Offer offer) { }
+        /** A paired device sent text. {@code clip}: it was copied there (clipboard sharing). */
+        default void text(Device from,String text,boolean clip) { }
+        /** A paired device just connected to this phone, so it's reachable now (at its first address). */
+        default void contacted(Device d) { }
     }
     public interface Opener { InputStream open() throws IOException; }
     public static final class FileItem { public final String name; public final long size; public final Opener opener;
@@ -79,8 +86,9 @@ public final class Peer implements AutoCloseable {
     private volatile long qrExpires; private volatile ServerSocket listener; private volatile boolean running; private final java.util.concurrent.atomic.AtomicInteger receiving=new java.util.concurrent.atomic.AtomicInteger();
     private final Set<SSLSocket> incomingSockets=Collections.newSetFromMap(new ConcurrentHashMap<SSLSocket,Boolean>());
     private final Set<SSLSocket> cancelledSockets=Collections.newSetFromMap(new ConcurrentHashMap<SSLSocket,Boolean>());
-    private final Set<SSLSocket> outgoingSockets=Collections.newSetFromMap(new ConcurrentHashMap<SSLSocket,Boolean>());
-    private volatile boolean outgoingCancelled;
+    /** Each outgoing connection and the device it sends to, so one send can be cancelled while others to other devices go on. */
+    private final Map<SSLSocket,String> outgoingSockets=new ConcurrentHashMap<>();
+    private final Set<String> cancelledDevices=ConcurrentHashMap.newKeySet();
     /** More simultaneous connections than this are dropped at once, so a flood from the network can't exhaust the phone. */
     private static final int MAX_CONNECTIONS=32;
     private final java.util.concurrent.atomic.AtomicInteger connections=new java.util.concurrent.atomic.AtomicInteger();
@@ -143,7 +151,10 @@ public final class Peer implements AutoCloseable {
     public boolean isReceiving(){return receiving.get()>0;}
     public void cancelIncoming(){for(SSLSocket s:incomingSockets)try{cancelledSockets.add(s);Protocol.send(s.getOutputStream(),"type","cancel");s.close();}catch(Exception ignored){}}
     /** Stops the outgoing transfer at once: closing its connection unblocks a write that a thread interrupt can't. */
-    public void cancelOutgoing(){outgoingCancelled=true;for(SSLSocket s:outgoingSockets)try{s.close();}catch(Exception ignored){}}
+    public void cancelOutgoing(){for(Map.Entry<SSLSocket,String> e:outgoingSockets.entrySet()){cancelledDevices.add(e.getValue());try{e.getKey().close();}catch(Exception ignored){}}}
+    /** Stops sending to one device (its connection is closed at once); sends to other devices go on. */
+    public void cancelOutgoing(String deviceId){cancelledDevices.add(deviceId);for(Map.Entry<SSLSocket,String> e:outgoingSockets.entrySet())if(e.getValue().equalsIgnoreCase(deviceId))try{e.getKey().close();}catch(Exception ignored){}}
+    private boolean cancelled(String deviceId){return cancelledDevices.contains(deviceId);}
     public void setName(String n){if(n.length()<1||n.length()>40)throw new IllegalArgumentException("Name must have 1–40 characters");name=n;}
     public synchronized String issueQr(List<String> addresses,int port){qrToken=PairUri.token();qrExpires=System.currentTimeMillis()+300000;return new PairUri(id,name,"android",port,addresses,qrToken).toString();}
     public synchronized void invalidateQr(){qrToken=null;}
@@ -154,14 +165,22 @@ public final class Peer implements AutoCloseable {
         workers.execute(()->{while(running)try{Socket s=server.accept();if(!sockets.localServerAddress(s.getLocalAddress())){s.close();continue;}
             if(connections.incrementAndGet()>MAX_CONNECTIONS){connections.decrementAndGet();s.close();continue;}
             workers.execute(()->{try{handle(s);}finally{connections.decrementAndGet();}});}catch(IOException e){if(running)try{Thread.sleep(200);}catch(InterruptedException stop){return;}}});}
-    private static final class Link implements AutoCloseable {final SSLSocket s;final InputStream in;final OutputStream out;final String id,name,platform,address;final Set<String> features;
+    private static final class Link implements AutoCloseable {final SSLSocket s;final InputStream in;final OutputStream out;final String id,name,platform,address;final Set<String> features;Map<String,Object> hello;
         Link(SSLSocket s,String id,String name,String platform,String address,Set<String> features)throws IOException{this.s=s;in=s.getInputStream();out=s.getOutputStream();this.id=id;this.name=name;this.platform=platform;this.address=address;this.features=features;}
         public void close()throws IOException{s.close();}}
-    private Link connect(String address,int port,String expected)throws Exception {Socket raw=sockets.connect(address,port);try{
+    private Link connect(String address,int port,String expected)throws Exception {Socket raw=sockets.connect(address,port);try{tune(raw);
         SSLSocket s=(SSLSocket)tls.getSocketFactory().createSocket(raw,address,port,true);s.setUseClientMode(true);s.setEnabledProtocols(new String[]{"TLSv1.2","TLSv1.3"});s.setSoTimeout(idleTimeoutMs);s.startHandshake();
         String peerId=Protocol.id((X509Certificate)s.getSession().getPeerCertificates()[0]);Protocol.hello(s.getOutputStream(),id,name,"android",book.get(peerId)!=null);
         Map<String,Object> h=Protocol.checkHello(Protocol.message(s.getInputStream()),peerId);if(expected!=null&&!expected.equalsIgnoreCase(peerId))throw new IOException("identity_mismatch: This isn't the device you paired with");
-        return new Link(s,peerId,Json.str(h,"name"),Json.str(h,"platform"),address,Protocol.features(h));}catch(Exception e){raw.close();throw e;}}
+        Link link=new Link(s,peerId,Json.str(h,"name"),Json.str(h,"platform"),address,Protocol.features(h));link.hello=h;learnLink(peerId,h);return link;}catch(Exception e){raw.close();throw e;}}
+    /** No Nagle delay, so the small replies between files go out at once; a bigger send buffer keeps Wi-Fi busy between writes. */
+    private static void tune(Socket s){try{s.setTcpNoDelay(true);s.setSendBufferSize(4<<20);s.setReceiveBufferSize(4<<20);}catch(Exception ignored){}}
+    /** A paired device's hello may carry its direct link (only paired devices get it): keep it, so the phone can reach it without a shared Wi-Fi. */
+    @SuppressWarnings("unchecked")
+    private void learnLink(String peerId,Map<String,Object> hello){Object o=hello.get("link");if(!(o instanceof Map))return;Map<String,Object> m=(Map<String,Object>)o;
+        Device d=book.get(peerId);if(d==null)return;try{String ssid=Json.str(m,"ssid"),key=Json.str(m,"key"),ip=Json.str(m,"ip");
+            if(!validLink(ssid,key,ip)||ssid.equals(d.linkSsid)&&key.equals(d.linkKey)&&ip.equals(d.linkIp))return;d.linkSsid=ssid;d.linkKey=key;d.linkIp=ip;book.put(d);}catch(Exception ignored){}}
+    public static boolean validLink(String ssid,String key,String ip){return ssid!=null&&key!=null&&ip!=null&&ssid.length()>=1&&ssid.length()<=32&&key.length()>=8&&key.length()<=63&&PairUri.validIpv4(ip);}
     private Link connectAny(List<String> addresses,int port,String id)throws Exception{
         if(addresses.isEmpty())throw new IOException("No saved address for device");
         CompletionService<Link> completed=new ExecutorCompletionService<>(workers);List<Future<Link>> jobs=new ArrayList<>();java.util.concurrent.atomic.AtomicBoolean won=new java.util.concurrent.atomic.AtomicBoolean();
@@ -171,7 +190,12 @@ public final class Peer implements AutoCloseable {
         throw last==null?new IOException("No reachable address"):last;
     }
     private void remember(Link l,int port){Device d=book.get(l.id);if(d==null)d=new Device(l.id,l.name,l.platform,port,l.address);d.name=l.name;d.platform=l.platform;d.port=port;d.lastSeen=System.currentTimeMillis();d.addresses.remove(l.address);d.addresses.add(0,l.address);book.put(d);events.paired(d);}
-    public Device pairQr(String uri)throws Exception{PairUri q=PairUri.parse(uri);try(Link l=connectAny(q.addresses,q.port,q.id)){Protocol.send(l.out,"type","pair_qr","token",q.token);Protocol.expect(Protocol.message(l.in),"pair_ok");remember(l,q.port);return book.get(l.id);}}
+    public Device pairQr(String uri)throws Exception{return pairQr(PairUri.parse(uri),null);}
+    /** Pairs with a scanned code. {@code addresses}: where to look instead of the code's own (the code's direct link, once joined). */
+    public Device pairQr(PairUri q,List<String> addresses)throws Exception{try(Link l=connectAny(addresses!=null?addresses:q.addresses,q.port,q.id)){Protocol.send(l.out,"type","pair_qr","token",q.token);Protocol.expect(Protocol.message(l.in),"pair_ok");remember(l,q.port);
+        if(q.linkSsid!=null){Device d=book.get(l.id);if(d!=null){d.linkSsid=q.linkSsid;d.linkKey=q.linkKey;d.linkIp=q.linkIp;book.put(d);}}return book.get(l.id);}}
+    /** Quick reachability check: connects and pings. The caller decides what an unreachable device means. */
+    public void ping(Device d)throws Exception{try(Link l=connectAny(d.addresses,d.port,d.id)){rememberAddress(l,d);Protocol.send(l.out,"type","ping");Protocol.expect(Protocol.message(l.in),"pong");}}
     public Device pairSas(String address,int port)throws Exception{try(Link l=connect(address,port,null)){Protocol.send(l.out,"type","pair_sas");Map<String,Object> c=Protocol.message(l.in);Protocol.expect(c,"sas_commit");
         byte[] ni=Protocol.random(32);Protocol.send(l.out,"type","sas_nonce","n",Protocol.hex(ni));Map<String,Object> reveal=Protocol.message(l.in);Protocol.expect(reveal,"sas_reveal");
         byte[] nr=Protocol.unhex(Json.str(reveal,"n"));if(nr.length!=32||!Sas.commit(Protocol.unhex(l.id),Protocol.unhex(id),nr).equalsIgnoreCase(Json.str(c,"c")))throw new IOException("protocol_error: SAS commitment mismatch");
@@ -185,13 +209,16 @@ public final class Peer implements AutoCloseable {
     public void unpair(Device d){try(Link l=connectAny(d.addresses,d.port,d.id)){Protocol.send(l.out,"type","unpair");Protocol.expect(Protocol.message(l.in),"ok");}catch(Exception ignored){}book.remove(d.id);}
     /** A just-paired device, keeping the alias and trust of an earlier pairing with it. */
     private Device fresh(String peerId,String peerName,String platform,String address){Device old=book.get(peerId);Device d=new Device(peerId,peerName,platform,old==null?7410:old.port,address);
-        if(old!=null){d.alias=old.alias;d.trusted=old.trusted;d.pairedAt=old.pairedAt;}return d;}
+        if(old!=null){d.alias=old.alias;d.trusted=old.trusted;d.pairedAt=old.pairedAt;d.linkSsid=old.linkSsid;d.linkKey=old.linkKey;d.linkIp=old.linkIp;}return d;}
     private void error(SSLSocket s,String code,String msg){if(msg!=null&&msg.startsWith(code+": "))msg=msg.substring(code.length()+2);try{Protocol.send(s.getOutputStream(),"type","error","code",code,"message",msg);}catch(Exception ignored){}}
-    private void handle(Socket raw){try(SSLSocket s=(SSLSocket)raw){try{s.setSoTimeout(idleTimeoutMs);s.startHandshake();String peerId=Protocol.id((X509Certificate)s.getSession().getPeerCertificates()[0]);
+    private void handle(Socket raw){try(SSLSocket s=(SSLSocket)raw){try{tune(s);s.setSoTimeout(idleTimeoutMs);s.startHandshake();String peerId=Protocol.id((X509Certificate)s.getSession().getPeerCertificates()[0]);
         Map<String,Object> hello=Protocol.checkHello(Protocol.message(s.getInputStream()),peerId);boolean paired=book.get(peerId)!=null;Protocol.hello(s.getOutputStream(),id,name,"android",paired);
         String peerName=Json.str(hello,"name"),platform=Json.str(hello,"platform"),address=raw.getInetAddress().getHostAddress();Set<String> features=Protocol.features(hello);Map<String,Object> req=Protocol.message(s.getInputStream());String type=Protocol.type(req);
-        if(!paired&&(type.equals("offer")||type.equals("ping")||type.equals("unpair"))){error(s,"not_paired","Pair this device first");return;}
-        switch(type){case "ping":Protocol.send(s.getOutputStream(),"type","pong");break;case "unpair":book.remove(peerId);Protocol.send(s.getOutputStream(),"type","ok");break;
+        if(!paired&&(type.equals("offer")||type.equals("ping")||type.equals("unpair")||type.equals("text"))){error(s,"not_paired","Pair this device first");return;}
+        if(paired){learnLink(peerId,hello);if(type.equals("ping")||type.equals("offer")||type.equals("text"))contact(peerId,address);}
+        switch(type){case "ping":Protocol.send(s.getOutputStream(),"type","pong");break;
+            case "text":{String text=Json.str(req,"text");if(text.isEmpty()||text.length()>Protocol.MAX_JSON){error(s,"protocol_error","Invalid text");return;}
+                Protocol.send(s.getOutputStream(),"type","ok");Device from=book.get(peerId);events.text(from,text,Boolean.TRUE.equals(req.get("clip")));break;}case "unpair":book.remove(peerId);Protocol.send(s.getOutputStream(),"type","ok");break;
             case "pair_qr":String result=consumeQr(Json.str(req,"token"));if(!result.equals("pair_ok")){error(s,result,"QR code expired or invalid");return;}
                 Device q=fresh(peerId,peerName,platform,address);book.put(q);Protocol.send(s.getOutputStream(),"type","pair_ok");events.paired(q);break;
             case "pair_sas":respondSas(s,peerId,peerName,platform,address);break;case "offer":receiving.incrementAndGet();incomingSockets.add(s);try{Device known=book.get(peerId);receive(s,req,peerId,known==null?peerName:known.label(),known!=null&&known.trusted,features);}finally{incomingSockets.remove(s);cancelledSockets.remove(s);receiving.decrementAndGet();}break;default:error(s,"protocol_error","Unknown request");}}
@@ -270,10 +297,30 @@ public final class Peer implements AutoCloseable {
     private static void closeQuietly(Link l){if(l!=null)try{l.close();}catch(IOException ignored){}}
     private void rememberAddress(Link l,Device device){Device known=book.get(l.id);if(known!=null){known.addresses.remove(l.address);known.addresses.add(0,l.address);known.port=device.port;known.lastSeen=System.currentTimeMillis();book.put(known);}}
 
+    /** A paired device connected: remember where it came from (a PC reaches the phone on its direct link at a new address) and say so. */
+    private void contact(String peerId,String address){Device d=book.get(peerId);if(d==null)return;
+        if(!address.equals(d.addresses.isEmpty()?null:d.addresses.get(0))||System.currentTimeMillis()-d.lastSeen>60000){d.addresses.remove(address);d.addresses.add(0,address);while(d.addresses.size()>8)d.addresses.remove(d.addresses.size()-1);d.lastSeen=System.currentTimeMillis();book.put(d);}
+        events.contacted(d);}
+    /** Text longer than this travels as a .txt file instead (a control message holds at most 64 KiB). */
+    public static final int MAX_TEXT=16000;
+    /**
+     * Sends text (a link, a note, a copied clipboard): the receiver shows it with Copy / Open instead of saving a file. Devices
+     * without "text", and text too long for one message, get a .txt file named after its first line. Returns true when it went as text.
+     */
+    public boolean sendText(Device device,String text,boolean clip)throws Exception{if(text==null||text.isEmpty())throw new IOException("Type some text first");
+        if(text.length()<=MAX_TEXT&&Json.string(Json.obj("type","text","text",text,"clip",clip)).getBytes(java.nio.charset.StandardCharsets.UTF_8).length<=60000){
+            try(Link l=connectAny(device.addresses,device.port,device.id)){rememberAddress(l,device);
+                if(l.features.contains("text")){Protocol.send(l.out,"type","text","text",text,"clip",clip);Protocol.expect(Protocol.message(l.in),"ok");return true;}
+                // An older HopDrop: end this connection politely (it expects a request), then send a file instead.
+                try{Protocol.send(l.out,"type","ping");Protocol.message(l.in);}catch(Exception ignored){}}}
+        byte[] bytes=text.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        send(device,Collections.singletonList(new FileItem(FileNames.forText(text),bytes.length,()->new ByteArrayInputStream(bytes))));return false;}
     /** Sends files (with their folders). A very large selection to a device that can't take it in one transfer goes in several. */
-    public List<String> send(Device device,List<FileItem> files)throws Exception{if(files.isEmpty())throw new IOException("Choose files first");outgoingCancelled=false;
-        List<String> saved=new ArrayList<>();for(int start=0;start<files.size();){int[] taken={0};saved.addAll(sendBatch(device,files,start,taken));start+=taken[0];}return saved;}
-    private List<String> sendBatch(Device device,List<FileItem> files,int start,int[] taken)throws Exception{
+    public List<String> send(Device device,List<FileItem> files)throws Exception{return send(device,files,false);}
+    /** {@code merge}: sent folders go into the receiver's existing folders of the same name instead of new "Camera (1)" ones (backups). */
+    public List<String> send(Device device,List<FileItem> files,boolean merge)throws Exception{if(files.isEmpty())throw new IOException("Choose files first");cancelledDevices.remove(device.id);
+        List<String> saved=new ArrayList<>();for(int start=0;start<files.size();){int[] taken={0};saved.addAll(sendBatch(device,files,start,taken,merge));start+=taken[0];}return saved;}
+    private List<String> sendBatch(Device device,List<FileItem> files,int start,int[] taken,boolean merge)throws Exception{
         Link l=connectAny(device.addresses,device.port,device.id);
         String peerName=device.label();boolean resume;List<Offered> offered=new ArrayList<>();List<FileItem> items=new ArrayList<>();long total=0;
         try{rememberAddress(l,device);boolean folders=l.features.contains("folders"),pages=l.features.contains("pages");resume=l.features.contains("resume");
@@ -285,32 +332,33 @@ public final class Peer implements AutoCloseable {
         taken[0]=offered.size();String transferId=UUID.randomUUID().toString();Outgoing state=new Outgoing(offered.size());TransferMeter meter=new TransferMeter(total,System.nanoTime());
         try{for(int attempt=0;;attempt++){
                 try{if(l==null){Device latest=book.get(device.id);if(latest==null)latest=device;l=connectAny(latest.addresses,latest.port,latest.id);rememberAddress(l,latest);}
-                    sendFiles(l,transferId,offered,items,state,peerName,total,meter);break;}
-                catch(Exception e){if(!resume||attempt>=RECONNECTS||outgoingCancelled||e instanceof InterruptedException||!retryable(e))throw e;
+                    sendFiles(l,transferId,offered,items,state,peerName,total,meter,merge);break;}
+                catch(Exception e){if(!resume||attempt>=RECONNECTS||cancelled(device.id)||e instanceof InterruptedException||!retryable(e))throw e;
                     // The connection dropped (Wi-Fi blip, switching networks): reconnect and continue where it stopped.
                     closeQuietly(l);l=null;events.progress(new Progress(transferId,false,peerName,"",0,offered.size(),state.done,total,0,-1,false,true));Thread.sleep(2000L<<attempt);}}}
         catch(Exception e){if(l!=null)try{Protocol.send(l.out,"type","cancel");}catch(Exception ignored){}
-            String error=e instanceof InterruptedException||outgoingCancelled?"cancelled: Transfer cancelled":e.getMessage()==null?"io_error":e.getMessage();
+            String error=e instanceof InterruptedException||cancelled(device.id)?"cancelled: Transfer cancelled":e.getMessage()==null?"io_error":e.getMessage();
             events.finished(new Result(transferId,false,peerName,state.saved(),offered.size(),state.folder,error,state.done,meter.elapsedMillis(System.nanoTime())));
-            if(outgoingCancelled&&!(e instanceof InterruptedException))throw new IOException(error,e);throw e;}
+            if(cancelled(device.id)&&!(e instanceof InterruptedException))throw new IOException(error,e);throw e;}
         finally{closeQuietly(l);}
         events.finished(new Result(transferId,false,peerName,state.saved(),offered.size(),state.folder,null,state.done,meter.elapsedMillis(System.nanoTime())));return state.saved();}
     /** Sends the offer, split over "offer_more" messages when the list doesn't fit in one (receivers that list "pages"). */
-    private static void writeOffer(Link l,String transferId,List<Offered> offered,long total)throws IOException{List<List<Object>> pages=new ArrayList<>();pages.add(new ArrayList<>());int size=0;
+    private static void writeOffer(Link l,String transferId,List<Offered> offered,long total,boolean merge)throws IOException{List<List<Object>> pages=new ArrayList<>();pages.add(new ArrayList<>());int size=0;
         for(Offered o:offered){int b=o.bytes();if(size+b>OFFER_BUDGET&&!pages.get(pages.size()-1).isEmpty()){pages.add(new ArrayList<>());size=0;}pages.get(pages.size()-1).add(o.entry());size+=b;}
-        Protocol.send(l.out,"type","offer","transferId",transferId,"count",offered.size(),"totalBytes",total,"files",pages.get(0),"more",pages.size()>1);
+        Map<String,Object> offer=Json.obj("type","offer","transferId",transferId,"count",offered.size(),"totalBytes",total,"files",pages.get(0),"more",pages.size()>1);
+        if(merge)offer.put("merge",true);Protocol.sendObject(l.out,offer);
         for(int p=1;p<pages.size();p++)Protocol.send(l.out,"type","offer_more","files",pages.get(p),"more",p<pages.size()-1);}
     /**
      * One connection's worth of a transfer: offers the files the receiver hasn't confirmed yet, continues a half-sent one from
      * where the receiver says it stopped, and records each confirmed file in {@code state}.
      */
     @SuppressWarnings("unchecked")
-    private void sendFiles(Link l,String transferId,List<Offered> files,List<FileItem> items,Outgoing state,String peerName,long total,TransferMeter meter)throws Exception{
-        outgoingSockets.add(l.s);
-        try{if(outgoingCancelled)throw new IOException("cancelled: Transfer cancelled");
+    private void sendFiles(Link l,String transferId,List<Offered> files,List<FileItem> items,Outgoing state,String peerName,long total,TransferMeter meter,boolean merge)throws Exception{
+        outgoingSockets.put(l.s,l.id);
+        try{if(cancelled(l.id))throw new IOException("cancelled: Transfer cancelled");
             List<Integer> pending=new ArrayList<>();for(int i=0;i<files.size();i++)if(state.savedAs[i]==null)pending.add(i);
             List<Offered> offered=new ArrayList<>();long offeredTotal=0;for(int j=0;j<pending.size();j++){Offered o=files.get(pending.get(j)).at(j);offered.add(o);offeredTotal=o.size<0||offeredTotal<0?-1:offeredTotal+o.size;}
-            writeOffer(l,transferId,offered,offeredTotal);
+            writeOffer(l,transferId,offered,offeredTotal,merge&&l.features.contains("merge"));
             // A receiver that asks its user first says "pending" (only to senders that list "consent") and may take up to two minutes.
             boolean consent=l.features.contains("consent");if(consent)l.s.setSoTimeout(130000);Map<String,Object> accept;
             while(true){accept=Protocol.message(l.in);if(consent&&"pending".equals(Protocol.type(accept))){events.progress(new Progress(transferId,false,peerName,offered.get(0).name,0,files.size(),state.done,total,0,-1,true,false));continue;}break;}
@@ -326,23 +374,34 @@ public final class Peer implements AutoCloseable {
             // is normal; waiting for each reply is bounded separately by replies.poll(30 s) below.
             workers.execute(()->{try{while(true){Map<String,Object> m;try{m=Protocol.message(l.in);}catch(SocketTimeoutException idle){continue;}replies.put(m);String t=Json.str(m,"type");if(t.equals("done_ok")||t.equals("error")||t.equals("cancel"))break;}}catch(Exception e){try{replies.put(e);}catch(InterruptedException ignored){Thread.currentThread().interrupt();}}});
             // File data is read straight into the frame after its 5-byte header, so each chunk is sent without being copied.
-            byte[] frame=new byte[5+65536];
+            byte[] frame=new byte[5+CHUNK];
+            // "pipeline": the next file starts right after file_end instead of after the receiver's file_ok (one round trip per
+            // file saved, which adds up over thousands of small files). Confirmations are matched as they arrive, in order.
+            boolean pipeline=l.features.contains("pipeline");ArrayDeque<Integer> unconfirmed=new ArrayDeque<>();
             for(int j=0;j<offered.size();j++){if(skip.contains(j))continue;Offered f=offered.get(j);FileItem item=items.get(pending.get(j));long offset=j==partialIndex?partialOffset:0;
                 report(meter,true,transferId,false,peerName,f.name,pending.get(j)+1,files.size(),state.done,total);
                 if(offset>0)Protocol.send(l.out,"type","file","i",j,"offset",offset);else Protocol.send(l.out,"type","file","i",j);
                 MessageDigest hash=MessageDigest.getInstance("SHA-256");
                 try(InputStream input=item.opener.open()){
                     // Continuing a half-sent file: the receiver already has these bytes, but the checksum covers the whole file.
-                    for(long skipped=0;skipped<offset;){int n=input.read(frame,5,(int)Math.min(65536,offset-skipped));if(n<0)throw new IOException("io_error: File is shorter than before");hash.update(frame,5,n);skipped+=n;}
+                    for(long skipped=0;skipped<offset;){int n=input.read(frame,5,(int)Math.min(CHUNK,offset-skipped));if(n<0)throw new IOException("io_error: File is shorter than before");hash.update(frame,5,n);skipped+=n;}
                     state.done+=offset;
-                    int n;while((n=input.read(frame,5,65536))!=-1){if(Thread.currentThread().isInterrupted()||outgoingCancelled)throw new InterruptedException("cancelled: Transfer cancelled");if(n==0)continue;
-                        Object early=replies.poll();if(early!=null)checked(early,"file_ok",false);hash.update(frame,5,n);Protocol.writeData(l.out,frame,n);state.done+=n;
+                    int n;while((n=input.read(frame,5,CHUNK))!=-1){if(Thread.currentThread().isInterrupted()||cancelled(l.id))throw new InterruptedException("cancelled: Transfer cancelled");if(n==0)continue;
+                        for(Object early=replies.poll();early!=null;early=replies.poll())confirm(early,unconfirmed,pending,state);hash.update(frame,5,n);Protocol.writeData(l.out,frame,n);state.done+=n;
                         report(meter,false,transferId,false,peerName,f.name,pending.get(j)+1,files.size(),state.done,total);}}
-                Protocol.send(l.out,"type","file_end","i",j,"sha256",Protocol.hex(hash.digest()));Map<String,Object> reply=checked(replies.poll(30,TimeUnit.SECONDS),"file_ok",true);
-                if(Json.num(reply,"i")!=j)throw new IOException("protocol_error: Wrong file index");state.savedAs[pending.get(j)]=Json.str(reply,"savedAs");}
+                Protocol.send(l.out,"type","file_end","i",j,"sha256",Protocol.hex(hash.digest()));unconfirmed.add(j);
+                // At most 64 files ahead of the receiver, so a slow disk on its side can't pile up unbounded work.
+                while(unconfirmed.size()>(pipeline?64:0))confirm(checked(replies.poll(30,TimeUnit.SECONDS),"file_ok",true),unconfirmed,pending,state);}
+            while(!unconfirmed.isEmpty())confirm(checked(replies.poll(30,TimeUnit.SECONDS),"file_ok",true),unconfirmed,pending,state);
             Protocol.send(l.out,"type","done");checked(replies.poll(30,TimeUnit.SECONDS),"done_ok",true);
             report(meter,true,transferId,false,peerName,files.get(files.size()-1).name,files.size(),files.size(),state.done,total);}
         finally{outgoingSockets.remove(l.s);}}
+    /** Bytes read per data frame when sending (frames may hold up to 1 MiB). */
+    private static final int CHUNK=262144;
+    /** A file_ok for the oldest file still waiting for one. */
+    @SuppressWarnings("unchecked")
+    private static void confirm(Object reply,ArrayDeque<Integer> unconfirmed,List<Integer> pending,Outgoing state)throws Exception{Map<String,Object> m=checked(reply,"file_ok",true);
+        Integer expected=unconfirmed.poll();if(expected==null||Json.num(m,"i")!=expected)throw new IOException("protocol_error: Wrong file index");state.savedAs[pending.get(expected)]=Json.str(m,"savedAs");}
     private void report(TransferMeter meter,boolean force,String transferId,boolean incoming,String peerName,String file,int index,int count,long done,long total){
         long now=System.nanoTime();meter.update(done,now);if(!meter.due(now)&&!force)return;
         events.progress(new Progress(transferId,incoming,peerName,file,index,count,done,total,meter.speed(done,now),meter.secondsLeft(done,now)));}
@@ -374,8 +433,8 @@ public final class Peer implements AutoCloseable {
             page=Protocol.message(s.getInputStream());if(!"offer_more".equals(Protocol.type(page)))throw new IOException("protocol_error: Expected offer_more");}
         if(files.size()!=count)throw new IOException("protocol_error: Invalid offer");return files;}
     /** Where a received file goes: its sent folder under the receive folder. A top folder that already exists gets a new name ("Photos (1)"). */
-    private String targetFolder(String folder,Map<String,String> tops){if(folder==null)return null;int slash=folder.indexOf('/');String top=slash<0?folder:folder.substring(0,slash);
-        synchronized(folderLock){String mapped=tops.get(top);if(mapped==null){mapped=storage.uniqueFolder(top);for(int n=1;tops.containsValue(mapped);n++)mapped=top+" ("+n+")";tops.put(top,mapped);}
+    private String targetFolder(String folder,Map<String,String> tops,boolean merge){if(folder==null)return null;int slash=folder.indexOf('/');String top=slash<0?folder:folder.substring(0,slash);
+        synchronized(folderLock){String mapped=tops.get(top);if(mapped==null){mapped=merge?top:storage.uniqueFolder(top);for(int n=1;tops.containsValue(mapped);n++)mapped=top+" ("+n+")";tops.put(top,mapped);}
             return slash<0?mapped:mapped+folder.substring(slash);}}
     @SuppressWarnings("unchecked")
     private void receive(SSLSocket s,Map<String,Object> offer,String peerId,String peerName,boolean trusted,Set<String> senderFeatures)throws Exception{
@@ -384,6 +443,7 @@ public final class Peer implements AutoCloseable {
         List<Offered> files=readOffered(s,offer,count);long sum=0;for(Offered f:files){if(f.size<0){sum=-1;break;}sum+=f.size;}
         if(total>=0&&sum!=total){error(s,"protocol_error","Invalid total size");return;}
         String transferId=Json.str(offer,"transferId");boolean canResume=senderFeatures.contains("resume");String key=peerId+"/"+transferId;
+        boolean merge=senderFeatures.contains("merge")&&Boolean.TRUE.equals(offer.get("merge"));
         // The same transfer coming back after a dropped connection: skip what's saved, continue the half-received file.
         Interrupted earlier=interrupted.remove(key);if(earlier!=null){if(earlier.expiry!=null)earlier.expiry.cancel(false);trusted=earlier.trusted;}
         if(earlier==null&&total>=0&&storage.freeBytes()<total+16777216L){error(s,"no_space","Not enough free space");return;}
@@ -410,7 +470,7 @@ public final class Peer implements AutoCloseable {
                 else begin=Protocol.message(s.getInputStream());if("cancel".equals(Json.str(begin,"type")))throw new IOException("cancelled: Sender cancelled");Protocol.expect(begin,"file");if(Json.num(begin,"i")!=i)throw new IOException("protocol_error: Wrong file index");
                 Object o=begin.get("offset");long offset=o instanceof Number?((Number)o).longValue():0;currentFile=file;
                 if(i==partialIndex&&earlier.partialOutput!=null&&offset>0&&offset==earlier.partialWritten){current=earlier.partialOutput;hash=earlier.partialHash;written=offset;earlier.partialOutput=null;earlier.partialHash=null;}
-                else{if(offset!=0)throw new IOException("protocol_error: Unexpected offset");if(i==partialIndex)earlier.dropPartial();current=storage.begin(targetFolder(file.folder,tops),file.name);hash=MessageDigest.getInstance("SHA-256");written=0;}
+                else{if(offset!=0)throw new IOException("protocol_error: Unexpected offset");if(i==partialIndex)earlier.dropPartial();current=storage.begin(targetFolder(file.folder,tops,merge),file.name);hash=MessageDigest.getInstance("SHA-256");written=0;}
                 while(true){if(reader.next()==2){int n=reader.length();if(file.size>=0&&written+n>file.size)throw new IOException("io_error: File exceeds offered size");
                         current.stream().write(reader.data(),0,n);hash.update(reader.data(),0,n);written+=n;done+=n;report(meter,false,transferId,true,peerName,file.name,saved.size()+1,offeredCount,done,total);continue;}
                     Map<String,Object> end=reader.message();if(Json.str(end,"type").equals("cancel"))throw new IOException("cancelled: Sender cancelled");Protocol.expect(end,"file_end");if(Json.num(end,"i")!=i)throw new IOException("protocol_error: Wrong file index");if(file.size>=0&&written!=file.size)throw new IOException("io_error: File size differs");
@@ -419,6 +479,8 @@ public final class Peer implements AutoCloseable {
             Protocol.expect(Protocol.message(s.getInputStream()),"done");Protocol.send(s.getOutputStream(),"type","done_ok","saved",saved.size());
             events.finished(new Result(transferId,true,peerName,saved,offeredCount,folder,null,done,(System.nanoTime()-started)/1000000));}
         catch(Exception e){
+            // The connection dropped again before the half-received file was taken over: carry it on (or clean it up) like any other.
+            if(earlier!=null&&earlier.partialOutput!=null&&current==null){current=earlier.partialOutput;currentFile=earlier.partial;hash=earlier.partialHash;written=earlier.partialWritten;earlier.partialOutput=null;earlier.partialHash=null;}
             if(canResume&&!cancelledSockets.contains(s)&&retryable(e)){
                 // The connection dropped: keep what arrived (and the open half-received file) for the sender to continue.
                 Interrupted kept=new Interrupted(transferId,peerName,folder,offeredCount,trusted,started,completedFiles,saved,tops,done);

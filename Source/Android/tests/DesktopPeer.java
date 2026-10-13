@@ -19,6 +19,8 @@ public final class DesktopPeer {
     /** The next outgoing connection drops after this many bytes (then resets to -1); bytes written are counted in {@link #written}. */
     public static volatile long dropNextAfter=-1;
     public static final java.util.concurrent.atomic.AtomicLong written=new java.util.concurrent.atomic.AtomicLong();
+    /** The last text a paired device sent, and whether it was marked as copied (clipboard sharing). */
+    public static volatile String lastText;public static volatile boolean lastClip;
     /** A socket whose writes stop after a limit, like a Wi-Fi link going away mid-transfer. */
     static final class DroppingSocket extends Socket {
         private final long limit;private long count;
@@ -35,8 +37,8 @@ public final class DesktopPeer {
         Peer.Book book=new Peer.Book(){
             private List<Peer.Device> read(){List<Peer.Device> out=new ArrayList<>();Path path=data.resolve("devices.json");if(!Files.exists(path))return out;
                 try{List<?> list=(List<?>)Json.parseObject(Files.readString(path)).get("devices");for(Object item:list){Map<String,Object> m=(Map<String,Object>)item;Peer.Device d=new Peer.Device(Json.str(m,"id"),Json.str(m,"name"),Json.str(m,"platform"),(int)Json.num(m,"port"),null);
-                    d.alias=(String)m.get("alias");d.trusted=Boolean.TRUE.equals(m.get("trusted"));d.pairedAt=Json.num(m,"pairedAt");d.lastSeen=Json.num(m,"lastSeen");for(Object a:(List<?>)m.get("addresses"))d.addresses.add((String)a);out.add(d);}}catch(Exception e){throw new IllegalStateException(e);}return out;}
-            private void save(List<Peer.Device> list){List<Object> json=new ArrayList<>();for(Peer.Device d:list)json.add(Json.obj("id",d.id,"name",d.name,"platform",d.platform,"alias",d.alias,"trusted",d.trusted,"port",d.port,"pairedAt",d.pairedAt,"lastSeen",d.lastSeen,"addresses",d.addresses));
+                    d.alias=(String)m.get("alias");d.trusted=Boolean.TRUE.equals(m.get("trusted"));d.linkSsid=(String)m.get("linkSsid");d.linkKey=(String)m.get("linkKey");d.linkIp=(String)m.get("linkIp");d.pairedAt=Json.num(m,"pairedAt");d.lastSeen=Json.num(m,"lastSeen");for(Object a:(List<?>)m.get("addresses"))d.addresses.add((String)a);out.add(d);}}catch(Exception e){throw new IllegalStateException(e);}return out;}
+            private void save(List<Peer.Device> list){List<Object> json=new ArrayList<>();for(Peer.Device d:list)json.add(Json.obj("id",d.id,"name",d.name,"platform",d.platform,"alias",d.alias,"trusted",d.trusted,"port",d.port,"pairedAt",d.pairedAt,"lastSeen",d.lastSeen,"addresses",d.addresses,"linkSsid",d.linkSsid,"linkKey",d.linkKey,"linkIp",d.linkIp));
                 try{Files.writeString(data.resolve("devices.json"),Json.string(Json.obj("devices",json)));}catch(Exception e){throw new IllegalStateException(e);}}
             public synchronized Peer.Device get(String id){for(Peer.Device d:read())if(d.id.equalsIgnoreCase(id))return d;return null;}
             public synchronized List<Peer.Device> all(){return read();}
@@ -55,7 +57,8 @@ public final class DesktopPeer {
             public void progress(Peer.Progress p){if(p.waiting)sawWaiting=true;if(p.reconnecting)sawReconnecting=true;}
             public boolean offer(Peer.Offer o){Boolean answer=answerOffers;if(answer==null)return false;System.out.println("OFFER "+o.peer+" "+o.files);new Thread(()->o.answer(answer)).start();return true;}
             public void finished(Peer.Result r){System.out.println((r.error==null?"TRANSFER_OK":"TRANSFER_FAIL")+" "+(r.incoming?"RECEIVE":"SEND")+" "+r.peer+" "+r.files+" "+r.folder+" "+r.error);}
-            public void paired(Peer.Device d){System.out.println("PAIRED "+d.id+" "+d.name);}};
+            public void paired(Peer.Device d){System.out.println("PAIRED "+d.id+" "+d.name);}
+            public void text(Peer.Device from,String text,boolean clip){lastClip=clip;lastText=text;}};
         return new Peer(key,cert,name,book,sockets,storage,events);
     }
     public static void main(String[] args)throws Exception{if(args.length<5)throw new IllegalArgumentException("data receive name port command [args]");Path data=Path.of(args[0]),receive=Path.of(args[1]);String name=args[2];int port=Integer.parseInt(args[3]);

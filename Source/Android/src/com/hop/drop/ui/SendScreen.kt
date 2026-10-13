@@ -41,6 +41,10 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.WifiTethering
+import androidx.compose.material.icons.rounded.MarkChatRead
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -65,8 +69,9 @@ fun SendScreen(state: HopUiState, actions: HopActions, padding: PaddingValues) {
     val now = rememberNow()
     var showAll by rememberSaveable { mutableStateOf(false) }
     var bluetoothAsk by remember { mutableStateOf(false) }
-    var writing by remember { mutableStateOf(false) }
+    var writing by remember { mutableStateOf<String?>(null) }
     val incoming = state.live.filter { it.incoming }
+    val picking = state.picking
     LazyColumn(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = padding.calculateTopPadding() + 8.dp,
             bottom = padding.calculateBottomPadding() + 24.dp),
@@ -74,11 +79,24 @@ fun SendScreen(state: HopUiState, actions: HopActions, padding: PaddingValues) {
     ) {
         items(incoming, key = { "live:" + it.key }) { LiveCard(it, actions::cancel, Modifier.animateItem()) }
         state.update?.let { update -> item(key = "update") { UpdateCard(update, actions, Modifier.animateItem()) } }
-        item(key = "selection") {
-            if (state.nothingSelected) ChooseCard(actions) { writing = true }
-            else SelectedCard(state, actions, showAll, onText = { writing = true }) { showAll = !showAll }
+        state.directTo?.let { id ->
+            val device = state.devices.firstOrNull { it.id == id }
+            if (device != null) item(key = "direct") { DirectCard(device, actions, Modifier.animateItem()) }
         }
-        item(key = "send-to") { SectionHeader("Send to") }
+        item(key = "selection") {
+            if (state.nothingSelected) ChooseCard(actions) { writing = actions.clipboardText() ?: "" }
+            else SelectedCard(state, actions, showAll, onText = { writing = actions.clipboardText() ?: "" }) { showAll = !showAll }
+        }
+        item(key = "send-to") {
+            SectionHeader("Send to") {
+                // Several devices at once: tick them, then one button sends to all of them side by side.
+                if (state.devices.size >= 2 && !state.nothingSelected) {
+                    TextButton(onClick = { state.picking = if (picking == null) emptySet() else null }) {
+                        Text(if (picking == null) "Select several" else "Cancel")
+                    }
+                }
+            }
+        }
         if (state.devices.isEmpty()) {
             item(key = "no-devices") {
                 HopCard {
@@ -89,8 +107,23 @@ fun SendScreen(state: HopUiState, actions: HopActions, padding: PaddingValues) {
             }
         } else {
             items(state.devices, key = { "device:" + it.id }) { device ->
-                DeviceSendRow(device, ready = !state.nothingSelected, now = now, onSend = { actions.send(device) },
-                    onCancel = { actions.cancel(false) }, modifier = Modifier.animateItem())
+                DeviceSendRow(
+                    device, ready = !state.nothingSelected, now = now, onSend = { actions.send(device) },
+                    onCancel = { actions.cancelSend(device) }, modifier = Modifier.animateItem(),
+                    picked = picking?.contains(device.id),
+                    onPick = { on -> state.picking = (picking ?: emptySet()).let { if (on) it + device.id else it - device.id } },
+                )
+            }
+            if (picking != null) item(key = "send-many") {
+                Button(
+                    onClick = { actions.sendToMany(state.devices.filter { it.id in picking }) },
+                    enabled = picking.isNotEmpty(),
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp).heightIn(min = 52.dp),
+                ) {
+                    Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text(if (picking.isEmpty()) "Tick the devices to send to" else "Send to " + if (picking.size == 1) "1 device" else "${picking.size} devices")
+                }
             }
         }
         item(key = "bluetooth") {
@@ -98,21 +131,39 @@ fun SendScreen(state: HopUiState, actions: HopActions, padding: PaddingValues) {
                 TextButton(onClick = { bluetoothAsk = true }) {
                     Icon(Icons.Rounded.Bluetooth, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("No Wi-Fi? Use Bluetooth")
+                    Text("Other ways: Bluetooth")
                 }
             }
         }
     }
-    if (writing) TextNoteDialog(onDismiss = { writing = false }, onAdd = { writing = false; actions.addText(it) })
+    writing?.let { initial -> TextNoteDialog(initial, onDismiss = { writing = null }, onAdd = { writing = null; actions.addText(it) }) }
     if (bluetoothAsk) {
         AlertDialog(
             onDismissRequest = { bluetoothAsk = false },
             icon = { Icon(Icons.Rounded.Bluetooth, contentDescription = null) },
             title = { Text("Send with Bluetooth") },
-            text = { Text("Much slower than Wi-Fi. On the PC, click Receive via Bluetooth first, then pick the PC in the list.") },
+            text = { Text("Much slower than Wi-Fi, and rarely needed: HopDrop reaches your PC directly even without a shared Wi-Fi. " +
+                "On the PC, click Receive via Bluetooth first, then pick the PC in the list.") },
             confirmButton = { TextButton(onClick = { bluetoothAsk = false; actions.bluetooth() }) { Text("Continue") } },
             dismissButton = { TextButton(onClick = { bluetoothAsk = false }) { Text("Cancel") } },
         )
+    }
+}
+
+/** The phone is on a PC's direct link (its own Wi-Fi): files go both ways without a shared network. */
+@Composable
+private fun DirectCard(device: DeviceUi, actions: HopActions, modifier: Modifier) {
+    HopCard(modifier, color = MaterialTheme.colorScheme.secondaryContainer) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Rounded.WifiTethering, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+            Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
+                Text("Connected directly to ${device.name}", style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer)
+                Text("Your usual Wi-Fi comes back when you tap Done.", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer)
+            }
+            TextButton(onClick = actions::disconnectDirect) { Text("Done") }
+        }
     }
 }
 
@@ -261,18 +312,33 @@ private fun SelectedRow(icon: @Composable () -> Unit, name: String, detail: Stri
     }
 }
 
+/** [picked]: null when not choosing several devices, else whether this one is ticked. */
 @Composable
-private fun DeviceSendRow(device: DeviceUi, ready: Boolean, now: Long, onSend: () -> Unit, onCancel: () -> Unit, modifier: Modifier) {
+private fun DeviceSendRow(
+    device: DeviceUi, ready: Boolean, now: Long, onSend: () -> Unit, onCancel: () -> Unit, modifier: Modifier,
+    picked: Boolean? = null, onPick: (Boolean) -> Unit = {},
+) {
     val out = device.outgoing
-    HopCard(modifier, padding = PaddingValues(start = 14.dp, top = 12.dp, end = 12.dp, bottom = 12.dp)) {
+    HopCard(modifier, onClick = if (picked != null) ({ onPick(!picked) }) else null,
+        padding = PaddingValues(start = 14.dp, top = 12.dp, end = 12.dp, bottom = 12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             DeviceAvatar(device.platform, device.online)
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                 Text(device.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(presence(device.online, device.lastSeen, now), style = MaterialTheme.typography.bodySmall,
-                    color = if (device.online) OnlineGreen else MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    when {
+                        device.direct -> "Connected directly"
+                        device.online -> presence(true, device.lastSeen, now)
+                        device.hasLink -> presence(false, device.lastSeen, now) + "  ·  connects directly"
+                        else -> presence(false, device.lastSeen, now)
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (device.online) OnlineGreen else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             when {
+                picked != null -> Checkbox(checked = picked, onCheckedChange = onPick)
+                device.waiting > 0 && (out == null || !out.active) -> TextButton(onClick = onCancel) { Text("Cancel") }
                 out != null && out.active -> IconButton(onClick = onCancel) { Icon(Icons.Rounded.Close, contentDescription = "Cancel sending") }
                 ready -> Button(onClick = onSend, contentPadding = PaddingValues(horizontal = 18.dp)) {
                     Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -287,8 +353,14 @@ private fun DeviceSendRow(device: DeviceUi, ready: Boolean, now: Long, onSend: (
                 ) { Text("Send") }
             }
         }
-        AnimatedVisibility(out != null, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
-            if (out != null) OutgoingStatus(out)
+        AnimatedVisibility(out != null || device.waiting > 0, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+            when {
+                out != null && (out.active || device.waiting == 0) -> OutgoingStatus(out)
+                device.waiting > 0 -> Column(Modifier.padding(top = 12.dp)) {
+                    StatusLine(Icons.Rounded.Schedule, MaterialTheme.colorScheme.onSurfaceVariant,
+                        (if (device.waiting == 1) "1 send is" else "${device.waiting} sends are") + " waiting. They go when ${device.name} is back.")
+                }
+            }
         }
     }
 }
@@ -301,6 +373,8 @@ private fun OutgoingStatus(out: LiveUi) {
             is LiveState.Done -> StatusLine(Icons.Rounded.CheckCircle, scheme.primary,
                 "Sent " + Format.files(s.count) + "  ·  " + Format.size(s.bytes))
             is LiveState.Stopped -> StatusLine(Icons.Rounded.ErrorOutline, scheme.error, s.reason)
+            LiveState.TextSent -> StatusLine(Icons.Rounded.MarkChatRead, scheme.primary, "Text sent")
+            LiveState.Queued -> StatusLine(Icons.Rounded.Schedule, scheme.onSurfaceVariant, "Can't reach it now. Sends when it's back.")
             is LiveState.Moving -> {
                 ProgressBar(s.fraction)
                 Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
@@ -315,6 +389,7 @@ private fun OutgoingStatus(out: LiveUi) {
                     when (s) {
                         is LiveState.Waiting -> "Waiting for them to accept"
                         LiveState.Reconnecting -> "Connection dropped, reconnecting…"
+                        LiveState.ConnectingDirectly -> "Not on the same Wi-Fi. Connecting directly…"
                         else -> "Connecting…"
                     },
                     style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp),

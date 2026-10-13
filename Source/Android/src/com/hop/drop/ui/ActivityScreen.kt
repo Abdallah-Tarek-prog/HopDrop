@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Notes
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Download
@@ -102,6 +103,7 @@ fun ActivityScreen(state: HopUiState, actions: HopActions, padding: PaddingValue
         history.filter { e ->
             (filter == Filter.All || (filter == Filter.Received) == e.incoming) &&
                 (q.isEmpty() || e.peer.lowercase(Locale.getDefault()).contains(q) ||
+                    e.text?.lowercase(Locale.getDefault())?.contains(q) == true ||
                     e.files.any { it.name.lowercase(Locale.getDefault()).contains(q) })
         }
     }
@@ -133,7 +135,11 @@ fun ActivityScreen(state: HopUiState, actions: HopActions, padding: PaddingValue
                     )
                 }
                 items(entries, key = { it.key }) { entry ->
-                    HistoryCard(
+                    if (entry.text != null) TextCard(
+                        entry, expanded = entry.key in expanded,
+                        onToggle = { expanded = if (entry.key in expanded) expanded - entry.key else expanded + entry.key },
+                        onLongPress = { menuFor = entry }, actions = actions, modifier = Modifier.animateItem(),
+                    ) else HistoryCard(
                         entry = entry,
                         expanded = entry.key in expanded,
                         onToggle = { expanded = if (entry.key in expanded) expanded - entry.key else expanded + entry.key },
@@ -209,6 +215,40 @@ private fun HistoryCard(
         }
         AnimatedVisibility(expanded, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
             HistoryDetails(entry, actions, onShowAll)
+        }
+    }
+}
+
+/** The whole text when it is one web link, else null. */
+private fun singleLink(text: String): String? = text.trim().takeIf { Regex("(?i)^https?://\\S+$").matches(it) }
+
+/** A text message: who, the text itself (three lines, all of it when opened), and Copy / Open link / Share. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun TextCard(entry: HistoryUi, expanded: Boolean, onToggle: () -> Unit, onLongPress: () -> Unit, actions: HopActions, modifier: Modifier) {
+    val scheme = MaterialTheme.colorScheme
+    val text = entry.text ?: return
+    HopCard(modifier, onClick = onToggle, onLongClick = onLongPress, padding = PaddingValues(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 8.dp)) {
+        Row(verticalAlignment = Alignment.Top) {
+            Box(Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(if (entry.incoming) scheme.primaryContainer else scheme.secondaryContainer),
+                contentAlignment = Alignment.Center) {
+                Icon(Icons.AutoMirrored.Rounded.Notes, contentDescription = null,
+                    tint = if (entry.incoming) scheme.onPrimaryContainer else scheme.onSecondaryContainer, modifier = Modifier.size(24.dp))
+            }
+            Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                Text((if (entry.incoming) "Text from " else "Text to ") + entry.peer, style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (expanded) androidx.compose.foundation.text.selection.SelectionContainer {
+                    Text(text, style = MaterialTheme.typography.bodyMedium)
+                } else Text(text, style = MaterialTheme.typography.bodyMedium, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            }
+            Text(DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(entry.at)), style = MaterialTheme.typography.labelMedium,
+                color = scheme.onSurfaceVariant)
+        }
+        Row(Modifier.padding(start = 56.dp, top = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            TextButton(onClick = { actions.copy("Text", text) }) { Text("Copy") }
+            singleLink(text)?.let { link -> TextButton(onClick = { actions.openLink(link) }) { Text("Open link") } }
+            TextButton(onClick = { actions.shareText(text) }) { Text("Share") }
         }
     }
 }

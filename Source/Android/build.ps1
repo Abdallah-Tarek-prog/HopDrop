@@ -31,7 +31,8 @@ New-Item -ItemType Directory -Force $out | Out-Null
 if($Test -or $Interop){
     Push-Location $root
     try{
-        $classes=Join-Path $out ('jvm-classes-'+[guid]::NewGuid().ToString('N'));New-Item -ItemType Directory -Force $classes | Out-Null
+        # One reused folder per kind of run (cleared first), so repeated test runs don't pile up on disk.
+        $classes=Join-Path $out 'jvm-classes';if(Test-Path $classes){Remove-Item -Recurse -Force $classes};New-Item -ItemType Directory -Force $classes | Out-Null
         $classesRel='Source/Android/out/'+(Split-Path $classes -Leaf)
         $core=Get-ChildItem (Join-Path $android 'src/com/hop/drop/core') -Filter '*.java' | ForEach-Object FullName
         $tests=Get-ChildItem (Join-Path $android 'tests') -Filter '*.java' | ForEach-Object FullName
@@ -41,7 +42,7 @@ if($Test -or $Interop){
         if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
         if($Test){
             & $java -cp $classes com.hop.drop.tests.CoreTests;if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
-            $testRun=Join-Path $out ("jvm/run-"+[guid]::NewGuid().ToString('N'))
+            $testRun=Join-Path $out 'jvm/run';if(Test-Path $testRun){Remove-Item -Recurse -Force $testRun}
             foreach($n in @('a','b')){
                 $dir=Join-Path $testRun $n;New-Item -ItemType Directory -Force $dir | Out-Null
                 $identity=Join-Path $dir 'identity.p12'

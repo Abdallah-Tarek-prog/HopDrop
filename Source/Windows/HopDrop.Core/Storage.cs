@@ -31,7 +31,8 @@ public sealed record AppSettings(string Name, string ReceiveDirectory, bool AskB
 /// <param name="Trusted">The user trusts this device: its files arrive without asking and without Windows' "downloaded file" mark.</param>
 public sealed record PairedDevice(string Id, string Name, string Platform, DateTimeOffset PairedAt, List<string> LastAddresses, DateTimeOffset LastSeen, string? Alias = null, int Port = 7410, bool Trusted = false);
 /// <param name="Count">How many files the transfer had when <paramref name="Files"/> keeps only the first ones; null when it lists them all.</param>
-public sealed record HistoryEntry(DateTimeOffset At, string PeerId, string Direction, string Result, List<string> Files, string? Folder, int? Count = null)
+/// <param name="Text">A text message (no files) sent or received, e.g. a link or a copied clipboard.</param>
+public sealed record HistoryEntry(DateTimeOffset At, string PeerId, string Direction, string Result, List<string> Files, string? Folder, int? Count = null, string? Text = null)
 {
     public int FileCount => Count ?? Files.Count;
 }

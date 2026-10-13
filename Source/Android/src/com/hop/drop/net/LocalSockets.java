@@ -39,6 +39,15 @@ public final class LocalSockets implements Peer.Sockets {
     public boolean localServerAddress(InetAddress address){if(BuildConfig.DEBUG&&address.isLoopbackAddress())return true;if(!privateIp(address))return false;
         try{Enumeration<NetworkInterface> all=NetworkInterface.getNetworkInterfaces();while(all.hasMoreElements()){NetworkInterface ni=all.nextElement();if(!ni.isUp()||ni.isLoopback()||ni.getName().matches("(?i).*(rmnet|ccmni|pdp|tun|tap|vpn).*"))continue;
             for(Enumeration<InetAddress> ips=ni.getInetAddresses();ips.hasMoreElements();)if(address.equals(ips.nextElement()))return true;}}catch(Exception ignored){}return false;}
+    /** Whether one of {@code addresses} is inside a network this phone is on right now (Wi-Fi, hotspot, USB, Ethernet), so trying it makes sense. */
+    public static boolean sameNetwork(Context context,List<String> addresses){ConnectivityManager manager=context.getSystemService(ConnectivityManager.class);
+        try{for(String address:addresses){if(!com.hop.drop.core.PairUri.validIpv4(address))continue;InetAddress target=InetAddress.getByName(address);
+            for(Network n:manager.getAllNetworks()){NetworkCapabilities caps=manager.getNetworkCapabilities(n);LinkProperties props=manager.getLinkProperties(n);
+                if(caps==null||props==null||caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)||caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN))continue;
+                for(LinkAddress local:props.getLinkAddresses())if(local.getAddress() instanceof Inet4Address&&subnet(target,local.getAddress(),local.getPrefixLength()))return true;}
+            Enumeration<NetworkInterface> all=NetworkInterface.getNetworkInterfaces();while(all.hasMoreElements()){NetworkInterface ni=all.nextElement();if(!ni.isUp()||ni.isLoopback()||ni.getName().matches("(?i).*(rmnet|ccmni|pdp|tun|tap|vpn).*"))continue;
+                for(java.net.InterfaceAddress ia:ni.getInterfaceAddresses())if(ia.getAddress() instanceof Inet4Address&&subnet(target,ia.getAddress(),ia.getNetworkPrefixLength()))return true;}}}catch(Exception ignored){}
+        return false;}
     /** One of this phone's local addresses, with the kind of network it belongs to. */
     public static final class Address { public final String ip,kind; Address(String ip,String kind){this.ip=ip;this.kind=kind;} }
     /** This phone's local IPv4 addresses, labelled "Wi-Fi", "Hotspot", "USB tethering", "Ethernet" or "Local network". */

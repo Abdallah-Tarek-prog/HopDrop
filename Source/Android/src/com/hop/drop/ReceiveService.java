@@ -20,6 +20,19 @@ public final class ReceiveService extends Service {
     private volatile boolean stopWhenIdle;
     private BroadcastReceiver networkChanges;
     private final android.os.Handler main = new android.os.Handler(android.os.Looper.getMainLooper());
+    /**
+     * Every 30 s while receiving: sends waiting for a device that is on the network again are tried (discovery only
+     * reports devices that are new or changed), and auto-backup looks for new files (at most every 10 minutes).
+     */
+    private final Runnable recheck = new Runnable() {
+        @Override
+        public void run() {
+            HopApp app = (HopApp) getApplication();
+            if (!Sends.queued(app).isEmpty()) app.nearbyChanged();
+            Backup.check(app, false);
+            main.postDelayed(this, 30000);
+        }
+    };
 
     /** "Receive in the background": on unless the user turned it off, so files and their notifications arrive any time. */
     static boolean background(Context context) {
@@ -93,7 +106,7 @@ public final class ReceiveService extends Service {
                     + "Close HopDrop and open it again.");
         }
         if (discovery == null) {
-            discovery = new Discovery(this, app.peer(), app::changed);
+            discovery = new Discovery(this, app.peer(), app::nearbyChanged);
             discovery.setForeground(app.isVisible());
             discovery.setHidden(app.hidden());
             activeDiscovery = discovery;
@@ -116,10 +129,13 @@ public final class ReceiveService extends Service {
         }
         app.notices().showReady();
         app.changed();
+        main.removeCallbacks(recheck);
+        main.postDelayed(recheck, 30000);
     }
 
     @Override
     public void onDestroy() {
+        main.removeCallbacks(recheck);
         running = false;
         activeDiscovery = null;
         if (networkChanges != null) unregisterReceiver(networkChanges);

@@ -17,6 +17,9 @@ try
     bool showQr = Flag("--show-qr");
     string? qrAddress = Take("--qr-address");
     string? ask = Take("--ask");
+    // Testing aid: a direct link to announce to paired devices and put in QR codes, "ssid,key,ip".
+    string? link = Take("--link");
+    bool merge = Flag("--merge");
     // Testing aid: the first connection of a send drops after this many bytes, like a lost Wi-Fi link.
     long dropAfter = Take("--drop-after") is string drop ? long.Parse(drop) : -1;
     if (ask is not (null or "accept" or "decline")) throw new ArgumentException("--ask takes accept or decline");
@@ -51,6 +54,13 @@ try
         ? $"{(result.Incoming ? "Received" : "Sent")} {result.SavedPaths.Count} {(result.SavedPaths.Count == 1 ? "file" : "files")}; folder {result.ReceiveFolderDisplayName}; paths {string.Join(", ", result.SavedPaths)}"
         : $"Transfer failed: {result.ErrorCode}");
     peer.Error += message => Console.Error.WriteLine($"Error: {message}");
+    peer.TextReceived += message => Console.WriteLine($"Text from {message.PeerName}{(message.Clipboard ? " (clipboard)" : "")}: {message.Text}");
+    if (link is not null)
+    {
+        var parts = link.Split(',');
+        if (parts.Length != 3 || new DirectLinkInfo(parts[0], parts[1], parts[2]) is not { Valid: true } info) throw new ArgumentException("--link takes ssid,key,ip");
+        peer.DirectLink = info;
+    }
     switch (command)
     {
         case "serve":
@@ -87,8 +97,12 @@ try
             Console.WriteLine($"Paired by number match: {code[..3]} {code[3..]}"); break;
         case "send":
             if (arguments.Count < 2) throw new ArgumentException("send <deviceId|ip[:port]> <files...>");
-            var sent = await peer.SendAsync(arguments[0], SendItem.From(arguments.Skip(1)));
+            var sent = await peer.SendAsync(arguments[0], SendItem.From(arguments.Skip(1)), default, merge);
             Console.WriteLine($"Saved in {sent.ReceiveFolderDisplayName}: {string.Join(", ", sent.SavedPaths)}"); break;
+        case "text":
+            bool clip = Flag("--clip");
+            if (arguments.Count != 2) throw new ArgumentException("text <deviceId> <text> [--clip]");
+            await peer.SendTextAsync(arguments[0], arguments[1], clip); Console.WriteLine("Text sent"); break;
         case "devices":
             foreach (var device in await peer.DevicesAsync()) Console.WriteLine($"{device.Id} {device.Name} {device.Platform} {string.Join(',', device.LastAddresses)}:{device.Port}");
             break;

@@ -127,19 +127,20 @@ public sealed partial class HopDropPeer
     public Task<TransferResult> SendAsync(string target, IReadOnlyList<string> paths, CancellationToken ct = default) =>
         SendAsync(target, paths.Select(p => new SendItem(p)).ToList(), ct);
     /// <summary>Sends files and folders. A very large selection to a device that can't take it in one transfer goes in several.</summary>
-    public async Task<TransferResult> SendAsync(string target, IReadOnlyList<SendItem> items, CancellationToken ct = default)
+    /// <param name="merge">Sent folders go into the receiver's existing folders of the same name instead of new "Photos (1)" ones (backups).</param>
+    public async Task<TransferResult> SendAsync(string target, IReadOnlyList<SendItem> items, CancellationToken ct = default, bool merge = false)
     {
         if (items.Count == 0) throw new ArgumentException("At least one file required", nameof(items));
         var saved = new List<string>();
         TransferResult? last = null;
         for (int start = 0; start < items.Count;)
         {
-            var (result, taken) = await SendBatchAsync(target, items, start, ct);
+            var (result, taken) = await SendBatchAsync(target, items, start, ct, merge);
             saved.AddRange(result.SavedPaths); start += taken; last = result;
         }
         return items.Count == last!.Offered ? last : last with { SavedPaths = saved, Offered = items.Count };
     }
-    private async Task<(TransferResult Result, int Taken)> SendBatchAsync(string target, IReadOnlyList<SendItem> items, int start, CancellationToken ct)
+    private async Task<(TransferResult Result, int Taken)> SendBatchAsync(string target, IReadOnlyList<SendItem> items, int start, CancellationToken ct, bool merge = false)
     {
         string? alias = null;
         PairedDevice? device = null;
@@ -194,7 +195,7 @@ public sealed partial class HopDropPeer
                 try
                 {
                     connection ??= await ConnectTargetAsync(transferStop.Token);
-                    await SendFilesAsync(connection, id, files, paths, state, peerName, total, meter, clock, transferStop.Token);
+                    await SendFilesAsync(connection, id, files, paths, state, peerName, total, meter, clock, transferStop.Token, merge);
                     break;
                 }
                 catch (Exception e) when (resume && attempt < Reconnects && !transferStop.IsCancellationRequested && Retryable(e))
@@ -242,12 +243,12 @@ public sealed partial class HopDropPeer
     /// from where the receiver says it stopped, and records each confirmed file in <paramref name="state"/>.
     /// </summary>
     private async Task SendFilesAsync(Connection connection, Guid id, List<OfferedFile> files, List<string> paths, Outgoing state, string peerName, long total,
-        TransferMeter meter, Stopwatch clock, CancellationToken ct)
+        TransferMeter meter, Stopwatch clock, CancellationToken ct, bool merge = false)
     {
         var pending = Enumerable.Range(0, files.Count).Where(i => state.SavedAs[i] is null).ToArray();
         var offered = pending.Select((original, j) => files[original] with { Index = j }).ToArray();
         long offeredTotal = offered.Any(f => f.Size < 0) ? -1 : offered.Sum(f => f.Size);
-        await WriteOfferAsync(connection, id, offered, offeredTotal, ct);
+        await WriteOfferAsync(connection, id, offered, offeredTotal, ct, merge && connection.Features.Contains("merge"));
         // A receiver that asks its user first says "pending" (only to senders that list "consent") and may take up to two minutes.
         bool consent = connection.Features.Contains("consent");
         var skip = new HashSet<int>(); int partialIndex = -1; long partialOffset = 0;
@@ -301,6 +302,17 @@ public sealed partial class HopDropPeer
         }, CancellationToken.None);
         // File data is read straight into the frame (after its 5-byte header), so each chunk is copied once and sent in one write.
         byte[] frame = ArrayPool<byte>.Shared.Rent(5 + Framing.MaxData);
+        // "pipeline": the next file starts right after file_end instead of after the receiver's file_ok (one round trip per
+        // file saved, which adds up over thousands of small files). Confirmations are matched as they arrive, in order.
+        bool pipeline = connection.Features.Contains("pipeline");
+        var unconfirmed = new Queue<int>();
+        void Confirm(JsonElement reply)
+        {
+            ThrowReply(reply, "file_ok");
+            if (!unconfirmed.TryDequeue(out int expected) || Messages.Long(reply, "i") != expected) throw new HopDropException("protocol_error", "Wrong file index");
+            state.SavedAs[pending[expected]] = Messages.String(reply, "savedAs");
+        }
+        async Task ConfirmNextAsync() => Confirm(await replies.Reader.ReadAsync(ct).AsTask().WaitAsync(TimeSpan.FromSeconds(30), ct));
         try
         {
             for (int j = 0; j < offered.Length; j++)
@@ -324,17 +336,18 @@ public sealed partial class HopDropPeer
                 {
                     int count = await input.ReadAsync(frame.AsMemory(5, Framing.MaxData), ct);
                     if (count == 0) break;
-                    if (replies.Reader.TryRead(out var early)) ThrowReply(early, "file_ok");
+                    while (replies.Reader.TryRead(out var early)) Confirm(early);
                     hash.AppendData(frame, 5, count);
                     await Framing.WriteDataAsync(connection.Stream, frame, count, ct);
                     state.Done += count;
                     ReportProgress(meter, false, id, connection.Id, peerName, false, file.Name, pending[j] + 1, files.Count, state.Done, total, clock);
                 }
                 await Messages.WriteAsync(connection.Stream, new { type = "file_end", i = j, sha256 = Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant() }, ct);
-                var reply = await replies.Reader.ReadAsync(ct).AsTask().WaitAsync(TimeSpan.FromSeconds(30), ct); ThrowReply(reply, "file_ok");
-                if (Messages.Long(reply, "i") != j) throw new HopDropException("protocol_error", "Wrong file index");
-                state.SavedAs[pending[j]] = Messages.String(reply, "savedAs");
+                unconfirmed.Enqueue(j);
+                // At most 64 files ahead of the receiver, so a slow disk on its side can't pile up unbounded work.
+                while (unconfirmed.Count > (pipeline ? 64 : 0)) await ConfirmNextAsync();
             }
+            while (unconfirmed.Count > 0) await ConfirmNextAsync();
             await Messages.WriteAsync(connection.Stream, new { type = "done" }, ct);
             var final = await replies.Reader.ReadAsync(ct).AsTask().WaitAsync(TimeSpan.FromSeconds(30), ct); ThrowReply(final, "done_ok");
             ReportProgress(meter, true, id, connection.Id, peerName, false, files[^1].Name, files.Count, files.Count, state.Done, total, clock);
@@ -346,7 +359,7 @@ public sealed partial class HopDropPeer
         }
     }
     /// <summary>Sends the offer, split over "offer_more" messages when the list doesn't fit in one (receivers that list "pages").</summary>
-    private static async Task WriteOfferAsync(Connection connection, Guid id, OfferedFile[] offered, long total, CancellationToken ct)
+    private static async Task WriteOfferAsync(Connection connection, Guid id, OfferedFile[] offered, long total, CancellationToken ct, bool merge = false)
     {
         var pages = new List<List<Dictionary<string, object>>> { new() };
         int size = 0;
@@ -356,7 +369,10 @@ public sealed partial class HopDropPeer
             if (size + entry > OfferBudget && pages[^1].Count > 0) { pages.Add([]); size = 0; }
             pages[^1].Add(Entry(file)); size += entry;
         }
-        await Messages.WriteAsync(connection.Stream, new { type = "offer", transferId = id, count = offered.Length, totalBytes = total, files = pages[0], more = pages.Count > 1 }, ct);
+        object offer = merge
+            ? new { type = "offer", transferId = id, count = offered.Length, totalBytes = total, files = pages[0], more = pages.Count > 1, merge = true }
+            : new { type = "offer", transferId = id, count = offered.Length, totalBytes = total, files = pages[0], more = pages.Count > 1 };
+        await Messages.WriteAsync(connection.Stream, offer, ct);
         for (int p = 1; p < pages.Count; p++)
             await Messages.WriteAsync(connection.Stream, new { type = "offer_more", files = pages[p], more = p < pages.Count - 1 }, ct);
     }
@@ -430,13 +446,15 @@ public sealed partial class HopDropPeer
         return files;
     }
     /// <summary>The folder a received file goes into: its sent folder, recreated under the receive folder. A top folder that already exists gets a new name ("Photos (1)").</summary>
-    private static string TargetFolder(string dir, string? folder, Dictionary<string, string> tops)
+    /// <param name="merge">Backups: the sent folder goes into an existing folder of the same name.</param>
+    private static string TargetFolder(string dir, string? folder, Dictionary<string, string> tops, bool merge = false)
     {
         if (folder is null) return dir;
         string[] parts = folder.Split('/');
         if (!tops.TryGetValue(parts[0], out var top))
         {
-            top = FileNames.Unique(parts[0], n => Directory.Exists(Path.Combine(dir, n)) || File.Exists(Path.Combine(dir, n)) || tops.ContainsValue(n));
+            top = merge && !File.Exists(Path.Combine(dir, parts[0])) ? parts[0]
+                : FileNames.Unique(parts[0], n => Directory.Exists(Path.Combine(dir, n)) || File.Exists(Path.Combine(dir, n)) || tops.ContainsValue(n));
             tops[parts[0]] = top;
         }
         string target = Path.Combine([dir, top, .. parts[1..]]);
@@ -453,6 +471,7 @@ public sealed partial class HopDropPeer
         if (total >= 0 && files.Any(f => f.Size < 0)) throw new HopDropException("protocol_error", "Invalid total size");
         if (total >= 0 && files.Sum(f => f.Size) != total) throw new HopDropException("protocol_error", "Invalid total size");
         bool canResume = senderFeatures.Contains("resume");
+        bool merge = senderFeatures.Contains("merge") && offer.TryGetProperty("merge", out var m) && m.ValueKind == JsonValueKind.True;
         // The same transfer coming back after a dropped connection: skip what's saved, continue the half-received file.
         _interrupted.TryRemove((peerId, id), out var earlier);
         if (earlier is not null) { earlier.Expiry.Cancel(); trusted = earlier.Trusted; }
@@ -533,7 +552,7 @@ public sealed partial class HopDropPeer
                     if (i == partialIndex) earlier!.DropPartial();
                     string target;
                     await _namingGate.WaitAsync(transferStop.Token);
-                    try { target = TargetFolder(dir, file.Folder, tops); } finally { _namingGate.Release(); }
+                    try { target = TargetFolder(dir, file.Folder, tops, merge); } finally { _namingGate.Release(); }
                     temp = Path.Combine(target, ".hopdrop-" + Guid.NewGuid().ToString("N") + ".part");
                     output = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None, 0, FileOptions.Asynchronous);
                     hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
@@ -638,14 +657,44 @@ public sealed partial class HopDropPeer
         TransferFinished?.Invoke(result);
         try { await AddHistoryAsync(key.Peer, "received", "disconnected", result.SavedPaths.ToList(), kept.Folder); } catch { }
     }
-    private async Task AddHistoryAsync(string peer, string direction, string? result, IEnumerable<string> files, string folder)
+    /// <summary>
+    /// Sends text (a link, a note, a copied clipboard) to a paired device, which shows it with Copy / Open instead of saving a file.
+    /// Devices without "text", and text too long for one message, get it as a .txt file named after its first line, as before.
+    /// </summary>
+    /// <param name="clipboard">It was copied on this device: the receiver may put it straight onto its clipboard.</param>
+    public async Task SendTextAsync(string deviceId, string text, bool clipboard = false, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(text)) throw new ArgumentException("Text required", nameof(text));
+        var device = (await DevicesAsync(ct)).FirstOrDefault(d => d.Id == deviceId) ?? throw new HopDropException("not_paired", "Device is not paired");
+        if (text.Length <= MaxText && JsonSerializer.SerializeToUtf8Bytes(new { type = "text", text, clip = clipboard }).Length <= 60_000)
+        {
+            using var connection = await ConnectKnownAsync(device, ct);
+            if (connection.Features.Contains("text"))
+            {
+                await Messages.WriteAsync(connection.Stream, new { type = "text", text, clip = clipboard }, ct);
+                using var reply = await ReadControlAsync(connection.Stream, ct); Messages.ThrowIfError(reply.RootElement);
+                if (Messages.Type(reply.RootElement) != "ok") throw new HopDropException("protocol_error", "Expected ok");
+                try { await AddHistoryAsync(device.Id, "sent", null, [], "", text); } catch (Exception e) { Error?.Invoke("Activity: " + e.Message); }
+                return;
+            }
+            // An older HopDrop: end this connection politely (it expects a request), then send a file instead.
+            try { await Messages.WriteAsync(connection.Stream, new { type = "ping" }, ct); using var pong = await ReadControlAsync(connection.Stream, ct); }
+            catch (Exception e) when (e is IOException or HopDropException) { }
+        }
+        string folder = Path.Combine(Path.GetTempPath(), "HopDrop text", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        string path = Path.Combine(folder, FileNames.ForText(text));
+        await File.WriteAllTextAsync(path, text, new System.Text.UTF8Encoding(false), ct);
+        await SendAsync(device.Id, [path], ct);
+    }
+    private async Task AddHistoryAsync(string peer, string direction, string? result, IEnumerable<string> files, string folder, string? text = null)
     {
         // A folder can hold thousands of files: keep the first ones and the real count, so Activity stays small and quick.
         var all = files.ToList();
         var list = all.Count > HistoryFiles ? all.GetRange(0, HistoryFiles) : all;
         await _history.UpdateAsync(old =>
         {
-            old.Add(new HistoryEntry(DateTimeOffset.UtcNow, peer, direction, result ?? "ok", list, folder, all.Count > HistoryFiles ? all.Count : null));
+            old.Add(new HistoryEntry(DateTimeOffset.UtcNow, peer, direction, result ?? "ok", list, text is null ? folder : null, all.Count > HistoryFiles ? all.Count : null, text));
             if (old.Count > HistoryLimit) old.RemoveRange(0, old.Count - HistoryLimit);
             return old;
         });

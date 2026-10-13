@@ -16,6 +16,7 @@ import android.provider.DocumentsContract;
 import android.provider.MediaStore;
 import com.hop.drop.core.Json;
 import com.hop.drop.core.Peer;
+import com.hop.drop.net.DirectLink;
 import com.hop.drop.net.Discovery;
 import com.hop.drop.net.LocalSockets;
 import com.hop.drop.store.DeviceBook;
@@ -59,6 +60,11 @@ public final class HopApp extends Application {
     private DeviceBook book;
     private Notices notices;
     private Live live;
+    private DirectLink link;
+    /** Held while files move: with the screen off, Android otherwise slows Wi-Fi down to save power (several times slower). */
+    private android.net.wifi.WifiManager.WifiLock wifiLock;
+    private android.os.PowerManager.WakeLock wakeLock;
+    private final Runnable releaseLocks = this::releaseLocksIfIdle;
     private volatile MainActivity visible;
     private volatile Prompt prompt;
     private volatile long lastUiRefresh;
@@ -86,6 +92,11 @@ public final class HopApp extends Application {
 
     Live live() {
         return live;
+    }
+
+    /** Joins a PC's own Wi-Fi when the phone isn't on the same network as it. */
+    public DirectLink directLink() {
+        return link;
     }
 
     public void visible(MainActivity activity) {
@@ -124,6 +135,20 @@ public final class HopApp extends Application {
         if (offer != null) offer.answer(accept);
     }
 
+    /**
+     * Discovery's list changed: a device that has sends waiting for it, or the backup's device, may be back. Only devices
+     * on the same network are tried here; joining a direct link waits until HopDrop is on screen.
+     */
+    void nearbyChanged() {
+        changed();
+        Discovery discovery = ReceiveService.activeDiscovery;
+        if (discovery == null) return;
+        for (Discovery.Nearby n : discovery.list()) {
+            if (Sends.waitingFor(this, n.id) > 0) Sends.retry(this, n.id, false);
+            Backup.deviceSeen(this, n.id);
+        }
+    }
+
     /** Redraws the visible screen soon, at most about four times a second. */
     void changed() {
         synchronized (main) {
@@ -156,9 +181,24 @@ public final class HopApp extends Application {
                 NotificationManager.IMPORTANCE_HIGH));
         manager.createNotificationChannel(new NotificationChannel("requests", "Requests to send you files",
                 NotificationManager.IMPORTANCE_HIGH));
+        // Text a paired device copied and HopDrop put on this phone's clipboard: a quiet note, no pop-up.
+        manager.createNotificationChannel(new NotificationChannel("clipboard", "Copied from your devices",
+                NotificationManager.IMPORTANCE_LOW));
         book = new DeviceBook(this);
         notices = new Notices(this);
         live = new Live(this::changed);
+        link = new DirectLink(this);
+        try {
+            @SuppressWarnings("deprecation")
+            int mode = android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF;
+            wifiLock = getSystemService(android.net.wifi.WifiManager.class).createWifiLock(mode, "HopDrop:transfer");
+            wifiLock.setReferenceCounted(false);
+            wakeLock = getSystemService(android.os.PowerManager.class).newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "HopDrop:transfer");
+            wakeLock.setReferenceCounted(false);
+        } catch (RuntimeException e) {
+            android.util.Log.w("HopDrop", "Transfer locks unavailable", e);
+        }
+        link.onChange(this::changed);
         try {
             Identity identity = Identity.load();
             SharedPreferences settings = getSharedPreferences("settings_v2", MODE_PRIVATE);
@@ -194,12 +234,16 @@ public final class HopApp extends Application {
 
         @Override
         public void progress(Peer.Progress p) {
+            link.touch();
+            holdLocks();
             live.progress(p);
             notices.progress(p);
         }
 
         @Override
         public void finished(Peer.Result r) {
+            main.removeCallbacks(releaseLocks);
+            main.postDelayed(releaseLocks, 3000);
             live.finished(r);
             notices.result(r);
             saveHistory(r);
@@ -234,6 +278,22 @@ public final class HopApp extends Application {
         }
 
         @Override
+        public void text(Peer.Device from, String text, boolean clip) {
+            String name = from == null ? "A paired device" : from.label();
+            boolean copied = clip && getSharedPreferences("settings_v2", MODE_PRIVATE).getBoolean("clip_auto", true) && copyText(text);
+            notices.text(name, text, copied);
+            saveText(true, name, text);
+            MainActivity activity = visible;
+            if (activity != null) activity.runOnUiThread(activity::refresh);
+        }
+
+        @Override
+        public void contacted(Peer.Device d) {
+            if (Sends.waitingFor(HopApp.this, d.id) > 0) Sends.retry(HopApp.this, d.id, false);
+            Backup.deviceSeen(HopApp.this, d.id);
+        }
+
+        @Override
         public void pairingEnded(String reason) {
             Prompt current = prompt;
             if (current == null || !current.isPending()) return;
@@ -253,6 +313,70 @@ public final class HopApp extends Application {
         if (percent >= 0) b.setProgress(100, percent, false);
         else if (ongoing && channel.equals("transfers") && !title.startsWith("Ready")) b.setProgress(0, 0, true);
         return b;
+    }
+
+    /** A transfer is moving: full-speed Wi-Fi and an awake processor until shortly after the last one ends (at most an hour). */
+    private void holdLocks() {
+        try {
+            if (wifiLock != null && !wifiLock.isHeld()) wifiLock.acquire();
+            if (wakeLock != null && !wakeLock.isHeld()) wakeLock.acquire(60 * 60 * 1000L);
+        } catch (RuntimeException ignored) {
+        }
+    }
+
+    private void releaseLocksIfIdle() {
+        if (live.busy()) {
+            main.postDelayed(releaseLocks, 3000);
+            return;
+        }
+        try {
+            if (wifiLock != null && wifiLock.isHeld()) wifiLock.release();
+            if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
+        } catch (RuntimeException ignored) {
+        }
+    }
+
+    /** Puts text on the clipboard (on the main thread). False when Android didn't allow it. */
+    boolean copyText(String text) {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            try {
+                getSystemService(android.content.ClipboardManager.class).setPrimaryClip(android.content.ClipData.newPlainText("HopDrop", text));
+                return true;
+            } catch (RuntimeException e) {
+                return false;
+            }
+        }
+        CountDownLatch done = new CountDownLatch(1);
+        boolean[] ok = {false};
+        main.post(() -> {
+            try {
+                getSystemService(android.content.ClipboardManager.class).setPrimaryClip(android.content.ClipData.newPlainText("HopDrop", text));
+                ok[0] = true;
+            } catch (RuntimeException ignored) {
+            } finally {
+                done.countDown();
+            }
+        });
+        try {
+            done.await(2, TimeUnit.SECONDS);
+        } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
+        }
+        return ok[0];
+    }
+
+    /** Records a text message in Activity. */
+    @SuppressWarnings("unchecked")
+    synchronized void saveText(boolean incoming, String peer, String text) {
+        SharedPreferences p = getSharedPreferences("history_v2", MODE_PRIVATE);
+        try {
+            List<Object> list = (List<Object>) Json.parseObject(p.getString("data", "{\"items\":[]}")).get("items");
+            list.add(0, Json.obj("at", System.currentTimeMillis(), "incoming", incoming, "peer", peer, "files", new ArrayList<>(),
+                    "count", 0, "text", text, "bytes", (long) text.length(), "offered", 0, "millis", 0));
+            while (list.size() > 100) list.remove(list.size() - 1);
+            p.edit().putString("data", Json.string(Json.obj("items", list))).apply();
+        } catch (Exception ignored) {
+        }
     }
 
     /** Where a received file ended up ("name" or "Photos/2024/name"), so notifications and Activity can open it. */

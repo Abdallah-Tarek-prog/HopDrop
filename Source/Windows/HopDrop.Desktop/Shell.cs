@@ -16,6 +16,7 @@ public partial class App
     private BluetoothWizard? _bluetooth;
     private readonly Dictionary<Guid, TransferProgress> _active = [];
     private readonly Dictionary<Guid, IncomingOffer> _offers = [];
+    private List<PairedDevice> _pairedDevices = [];
     private DispatcherTimer? _release;
     private static readonly TimeSpan ReleaseAfter = TimeSpan.FromSeconds(60);
     internal static App Instance => (App)Current;
@@ -36,8 +37,10 @@ public partial class App
             message => Dispatcher.InvokeAsync(() => Platform.Notify("Bluetooth", message)));
         peer.IncomingPairing += request => Dispatcher.InvokeAsync(async () => (await EnsureWindowAsync()).OnIncomingPairing(request));
         peer.OfferReceived += offer => Dispatcher.InvokeAsync(() => OnOffer(offer));
-        peer.PairedDevicesChanged += list => Dispatcher.InvokeAsync(() => WindowInstance?.OnPairedChanged(list));
-        peer.NearbyDevicesChanged += _ => Dispatcher.InvokeAsync(() => WindowInstance?.OnNearbyChanged());
+        peer.PairedDevicesChanged += list => Dispatcher.InvokeAsync(() => { _pairedDevices = list.ToList(); Link.SetPairedPhones(list); WindowInstance?.OnPairedChanged(list); });
+        peer.NearbyDevicesChanged += _ => Dispatcher.InvokeAsync(() => { Queue.RetryNearby(); WindowInstance?.OnNearbyChanged(); });
+        peer.DeviceContacted += id => Dispatcher.InvokeAsync(() => Queue.Retry(id));
+        peer.TextReceived += message => Dispatcher.InvokeAsync(() => OnTextReceived(message));
         peer.Progress += p => Dispatcher.InvokeAsync(() => OnProgress(p));
         peer.TransferFinished += r => Dispatcher.InvokeAsync(() => OnFinished(r));
         peer.Error += message => Debug.WriteLine(message);
@@ -54,11 +57,26 @@ public partial class App
     }
     private void OnFinished(TransferResult r)
     {
+        if (Queue.TakeSuppressed(r.TransferId))
+        { _active.Remove(r.TransferId); UpdateTrayText(); WindowInstance?.OnQueueTransferStopped(r.TransferId); return; }
         _active.Remove(r.TransferId);
         Updates.Activity();
         UpdateTrayText();
         if (WindowInstance is not null) WindowInstance.OnTransferFinished(r);
         else Platform.TransferToast(r, r.PeerName.Length > 0 ? r.PeerName : "a device", _peer?.ReceiveDirectory);
+    }
+    private async void OnTextReceived(TextMessage message)
+    {
+        bool copied = message.Clipboard && Preferences.PutReceivedTextOnClipboard && PutClipboardText(message.Text);
+        Platform.TextToast(message.PeerName, message.Text, copied);
+        await Task.Delay(150); // Core records Activity just after raising TextReceived.
+        WindowInstance?.OnHistoryChanged();
+    }
+    internal bool PutClipboardText(string text)
+    {
+        if (_clipboardShare is not null) return _clipboardShare.PutText(text);
+        try { System.Windows.Clipboard.SetText(text); return true; }
+        catch (System.Runtime.InteropServices.ExternalException e) { Debug.WriteLine(e); return false; }
     }
 
     // ---- Ask before receiving ----
@@ -98,6 +116,8 @@ public partial class App
         else if (argument.StartsWith("folder:")) Platform.OpenFolder(argument[7..]);
         else if (argument.StartsWith("select:")) Platform.ShowInFolder(argument[7..]);
         else if (argument.StartsWith("file:")) Platform.OpenFile(argument[5..]);
+        else if (argument.StartsWith("textcopy:")) { if (Platform.ToastText(argument[9..]) is { } value) PutClipboardText(value); }
+        else if (argument.StartsWith("textopen:")) { if (Platform.ToastText(argument[9..]) is { } value) Platform.OpenLink(value); }
         else _ = OpenAsync([]);
     }
 
@@ -123,6 +143,7 @@ public partial class App
             new("Open HopDrop", SymbolRegular.Open24, () => _ = OpenAsync([])),
             new("Send files…", SymbolRegular.Send24, () => _ = OpenAsync(["--page", "send", "--browse"])),
             new("Pair a phone", SymbolRegular.QrCode24, () => _ = OpenAsync(["--page", "devices"])),
+            ClipboardTrayItem(),
             new("", default, () => { }, Separator: true),
             new("Receive via Bluetooth", SymbolRegular.Bluetooth24, ReceiveBluetooth),
             new("Send via Bluetooth", SymbolRegular.BluetoothConnected24, BluetoothWizard.Send),
@@ -131,6 +152,17 @@ public partial class App
         if (keepsReceiving) items.Add(new("Close HopDrop (keep receiving)", SymbolRegular.Dismiss24, () => Quit(true)));
         items.Add(new(keepsReceiving ? "Quit and stop receiving" : "Quit HopDrop", SymbolRegular.Power24, () => Quit(false)));
         return items;
+    }
+    private TrayMenu.Item ClipboardTrayItem()
+    {
+        var device = _pairedDevices.FirstOrDefault(d => d.Id == Preferences.LastDevice) ?? _pairedDevices.FirstOrDefault();
+        return new(device is null ? "Send clipboard" : "Send clipboard to " + (device.Alias ?? device.Name), SymbolRegular.Copy24, async () =>
+        {
+            string? text = ClipboardShare.ReadText();
+            if (string.IsNullOrEmpty(text)) { Platform.Notify("Clipboard is empty", "Copy some text and try again."); return; }
+            if (device is null) { Platform.Notify("No paired devices", "Pair a device first."); return; }
+            try { await Queue.SendTextAsync(device.Id, text, true); } catch (Exception ex) { Debug.WriteLine(ex); }
+        });
     }
     private void HideTray()
     {
@@ -208,6 +240,8 @@ public partial class App
             return;
         }
         app._bluetooth?.Stop();
+        if (app.Link is not null) app.Link.Dispose();
+        if (app.Queue is not null) app.Queue.Dispose();
         foreach (var offer in app._offers.Values.ToList()) offer.Decline();
         if (app._peer is not null) await app._peer.DisposeAsync();
         app.Shutdown();

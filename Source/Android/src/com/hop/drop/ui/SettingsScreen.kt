@@ -25,7 +25,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.BatteryAlert
+import androidx.compose.material.icons.rounded.Dashboard
+import androidx.compose.material.icons.rounded.Devices
+import androidx.compose.material.icons.rounded.School
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Folder
@@ -78,6 +82,7 @@ fun SettingsScreen(state: HopUiState, actions: HopActions, snackbar: SnackbarHos
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
     var renaming by remember { mutableStateOf(false) }
     var licences by remember { mutableStateOf(false) }
+    var backupDevice by remember { mutableStateOf(false) }
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
         topBar = {
@@ -96,28 +101,6 @@ fun SettingsScreen(state: HopUiState, actions: HopActions, snackbar: SnackbarHos
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = padding.calculateTopPadding(),
                 bottom = padding.calculateBottomPadding() + 32.dp),
         ) {
-            item(key = "appearance") {
-                Group("Appearance") {
-                    Text("Theme", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 16.dp, top = 14.dp, bottom = 10.dp))
-                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                        ThemeMode.entries.forEachIndexed { i, mode ->
-                            SegmentedButton(
-                                selected = s.theme == mode,
-                                onClick = { actions.setTheme(mode) },
-                                shape = SegmentedButtonDefaults.itemShape(i, ThemeMode.entries.size),
-                                label = { Text(mode.label) },
-                            )
-                        }
-                    }
-                    Text("Colour", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 16.dp, top = 18.dp, bottom = 10.dp))
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                    ) {
-                        for (p in Palette.available) Swatch(p, selected = s.palette == p) { actions.setPalette(p) }
-                    }
-                }
-            }
             item(key = "phone") {
                 Group("This phone") {
                     SettingRow(clickable = { renaming = true }, icon = Icons.Rounded.PhoneAndroid, title = "Name", detail = state.phone.name)
@@ -141,6 +124,32 @@ fun SettingsScreen(state: HopUiState, actions: HopActions, snackbar: SnackbarHos
                     SwitchRow("Ask before receiving", "Trusted devices skip this", s.ask, actions::setAsk)
                 }
             }
+            item(key = "clipboard") {
+                Group("Clipboard and quick send") {
+                    SwitchRow("Copy text from my devices", "When a PC shares what it copied, it lands on this phone's clipboard", s.clipAuto, actions::setClipAuto)
+                    SettingRow(clickable = actions::addTile, icon = Icons.Rounded.Dashboard, title = "Add the quick send tile",
+                        detail = "Send your clipboard or latest photo from the quick settings")
+                }
+            }
+            item(key = "backup") {
+                val b = s.backup
+                Group("Auto-backup") {
+                    SwitchRow("Back up a folder", if (b.on) "New files go to ${b.device ?: "your device"} on their own" else "For example your camera's photos, to your PC",
+                        b.on, actions::setBackup)
+                    if (b.on) {
+                        SettingRow(clickable = actions::chooseBackupFolder, icon = Icons.Rounded.Folder, title = "Folder", detail = b.folder ?: "Pick a folder")
+                        SettingRow(clickable = { backupDevice = true }, icon = Icons.Rounded.Devices, title = "Send to", detail = b.device ?: "Pick a device")
+                        SwitchRow("Only while charging", "Saves battery on big backups", b.charging, actions::setBackupCharging)
+                        SettingRow(clickable = actions::backupNow, icon = Icons.Rounded.Backup, title = "Back up now",
+                            detail = listOfNotNull(b.status, b.lastRun.takeIf { it > 0 }?.let {
+                                "last " + java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT).format(java.util.Date(it))
+                            }).joinToString("  ·  ").ifEmpty { "Look for new files now" })
+                        Text("Works whenever both are on the same Wi-Fi, also with HopDrop closed (with Receive in the background on). Files arrive in one ${b.folder ?: ""} folder.",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp))
+                    }
+                }
+            }
             item(key = "privacy") {
                 Group("Privacy") {
                     Text("Who can see this phone", style = MaterialTheme.typography.titleSmall,
@@ -156,6 +165,28 @@ fun SettingsScreen(state: HopUiState, actions: HopActions, snackbar: SnackbarHos
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
                     )
+                }
+            }
+            item(key = "appearance") {
+                Group("Appearance") {
+                    Text("Theme", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 16.dp, top = 14.dp, bottom = 10.dp))
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                        ThemeMode.entries.forEachIndexed { i, mode ->
+                            SegmentedButton(
+                                selected = s.theme == mode,
+                                onClick = { actions.setTheme(mode) },
+                                shape = SegmentedButtonDefaults.itemShape(i, ThemeMode.entries.size),
+                                label = { Text(mode.label) },
+                            )
+                        }
+                    }
+                    Text("Colour", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 16.dp, top = 18.dp, bottom = 10.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                    ) {
+                        for (p in Palette.available) Swatch(p, selected = s.palette == p) { actions.setPalette(p) }
+                    }
                 }
             }
             item(key = "about") {
@@ -178,6 +209,7 @@ fun SettingsScreen(state: HopUiState, actions: HopActions, snackbar: SnackbarHos
                             },
                         )
                     }
+                    SettingRow(clickable = actions::showTour, icon = Icons.Rounded.School, title = "Show the tour again", detail = "What each part of HopDrop does")
                     SettingRow(clickable = { actions.openLink("https://github.com/Abdallah-Tarek-prog/HopDrop") }, icon = Icons.Rounded.Code,
                         title = "Source code", detail = "github.com/Abdallah-Tarek-prog/HopDrop")
                     SettingRow(clickable = { actions.openLink("https://github.com/Abdallah-Tarek-prog/HopDrop/blob/main/PRIVACY.md") },
@@ -197,6 +229,24 @@ fun SettingsScreen(state: HopUiState, actions: HopActions, snackbar: SnackbarHos
             help = "Other devices see this name.",
             onDismiss = { renaming = false },
             onSave = { name -> actions.setPhoneName(name).also { if (it == null) renaming = false } },
+        )
+    }
+    if (backupDevice) {
+        AlertDialog(
+            onDismissRequest = { backupDevice = false },
+            title = { Text("Back up to") },
+            text = {
+                Column {
+                    for (d in state.devices) {
+                        Row(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).clickable { backupDevice = false; actions.setBackupDevice(d.id) }.padding(vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            DeviceAvatar(d.platform, d.online, size = 32.dp)
+                            Text(d.name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 12.dp))
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { backupDevice = false }) { Text("Cancel") } },
         )
     }
     if (licences) {

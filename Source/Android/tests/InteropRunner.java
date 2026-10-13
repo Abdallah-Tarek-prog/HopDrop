@@ -16,8 +16,10 @@ public final class InteropRunner {
     private void result(String name,boolean ok,String detail){String line=(ok?"PASS ":"FAIL ")+name+(detail==null?"":": "+detail.replaceAll("hopdrop://[^ ]+","[QR URI hidden]"));results.add(line);System.out.println(line);}
     private List<String> base(){return new ArrayList<>(Arrays.asList("dotnet",dll.toString(),"--data",winData.toString(),"--receive-dir",winReceive.toString(),"--auto-confirm-sas"));}
     private static void check(boolean ok,String message){if(!ok)throw new AssertionError(message);}
-    private void startServer(String... extra)throws Exception{List<String> cmd=base();cmd.addAll(Arrays.asList(extra));cmd.addAll(Arrays.asList("--port","17410","--qr-address","127.0.0.1","qr"));server=new ProcessBuilder(cmd).redirectErrorStream(true).start();
-        new Thread(()->{try(BufferedReader in=new BufferedReader(new InputStreamReader(server.getInputStream()))){String line;while((line=in.readLine())!=null){if(line.startsWith("Pairing URI: "))lines.offer(line.substring(13));else if(line.startsWith("Listening"))lines.offer("READY");else serverErrors.append(line).append(' ');}}catch(IOException ignored){}},"Windows CLI output").start();}
+    /** What the .NET peer printed that isn't a QR or listening line (text messages arrive here). */
+    private final List<String> serverLines=Collections.synchronizedList(new ArrayList<>());
+    private void startServer(String... extra)throws Exception{List<String> cmd=base();cmd.addAll(Arrays.asList(extra));cmd.addAll(Arrays.asList("--link","DIRECT-HopDrop-TEST,interop-pass-123,192.168.137.1"));cmd.addAll(Arrays.asList("--port","17410","--qr-address","127.0.0.1","qr"));server=new ProcessBuilder(cmd).redirectErrorStream(true).start();
+        new Thread(()->{try(BufferedReader in=new BufferedReader(new InputStreamReader(server.getInputStream()))){String line;while((line=in.readLine())!=null){if(line.startsWith("Pairing URI: "))lines.offer(line.substring(13));else if(line.startsWith("Listening"))lines.offer("READY");else{serverErrors.append(line).append(' ');serverLines.add(line);}}}catch(IOException ignored){}},"Windows CLI output").start();}
     private String qr()throws Exception{long end=System.currentTimeMillis()+10000;while(System.currentTimeMillis()<end){String line=lines.poll(500,TimeUnit.MILLISECONDS);if(line!=null&&line.startsWith("hopdrop://"))return line;if(server!=null&&!server.isAlive())break;}throw new IOException("Windows CLI did not publish a QR URI: "+serverErrors);}
     private String runWindows(String... args)throws Exception{List<String> cmd=base();cmd.addAll(Arrays.asList(args));Process p=new ProcessBuilder(cmd).redirectErrorStream(true).start();
         CompletableFuture<String> output=CompletableFuture.supplyAsync(()->{try{return new String(p.getInputStream().readAllBytes());}catch(IOException e){return e.toString();}});
@@ -36,6 +38,8 @@ public final class InteropRunner {
         List<Path> samples=samples();Peer java=DesktopPeer.open(javaData,javaReceive,"Java Android Peer");String javaId=java.id();boolean qrOk=false,sasOut=false,sasIn=false,javaSend=false,winSend=false;
         try{java.start(17411);startServer();String uri=null;
             try{uri=qr();java.pairQr(uri);qrOk=true;result("QR pairing, Java scans .NET URI",true,"both peers paired");}catch(Exception e){result("QR pairing, Java scans .NET URI",false,e.getMessage());}
+            try{Peer.Device w=java.pairingDevice(readWindowsId());check(w!=null&&"DIRECT-HopDrop-TEST".equals(w.linkSsid)&&"interop-pass-123".equals(w.linkKey)&&"192.168.137.1".equals(w.linkIp),"direct link from the QR: "+(w==null?null:w.linkSsid));
+                result("direct link details travel in the QR code",true,null);}catch(Throwable e){result("direct link details travel in the QR code",false,e.getMessage());}
             try{java.pairSas("127.0.0.1",17410);sasOut=true;result("number match, Java initiates",true,null);}catch(Exception e){result("number match, Java initiates",false,e.getMessage());}
             try{runWindows("pair-sas","127.0.0.1:17411");sasIn=true;result("number match, .NET initiates",true,null);}catch(Exception e){result("number match, .NET initiates",false,e.getMessage());}
             if(qrOk||sasOut){try{Peer.Device d=java.pairingDevice(readWindowsId());java.send(d,files(samples));verify(winReceive,samples,1);javaSend=true;result("Java->.NET send and SHA-256",true,"50 MB, zero, duplicate, Unicode");}catch(Exception e){result("Java->.NET send and SHA-256",false,e.getMessage());}}
@@ -70,6 +74,19 @@ public final class InteropRunner {
                     check(hash(big2).equals(hash(javaReceive.resolve("resume2.bin"))),"resumed on Java side: "+out);check(!Files.exists(javaReceive.resolve("resume2 (1).bin")),"no duplicate on Java side");
                     result("dropped connection resumes, both directions",true,null);}
                 catch(Exception e){result("dropped connection resumes, both directions",false,e.getMessage());}}
+            if(javaSend&&winSend){
+                try{Peer.Device d=java.pairingDevice(readWindowsId());check(java.sendText(d,"From Java ✓ https://example.com",true),"Java text went as text");
+                    long end=System.currentTimeMillis()+5000;boolean seen=false;while(!seen&&System.currentTimeMillis()<end){synchronized(serverLines){for(String l:serverLines)if(l.contains("Text from")&&l.contains("(clipboard)")&&l.contains("From Java"))seen=true;}if(!seen)Thread.sleep(100);}
+                    check(seen,".NET printed the text: "+serverLines);
+                    DesktopPeer.lastText=null;runWindows("text",javaId,"From Windows ✓","--clip");check("From Windows ✓".equals(DesktopPeer.lastText)&&DesktopPeer.lastClip,"Java got the text: "+DesktopPeer.lastText);
+                    result("text messages, both directions",true,null);}
+                catch(Throwable e){result("text messages, both directions",false,e.getMessage());}
+                try{Path camera=source.resolve("Camera");Files.createDirectories(camera);Files.writeString(camera.resolve("a.jpg"),"a");Files.writeString(camera.resolve("b.jpg"),"b");Peer.Device d=java.pairingDevice(readWindowsId());
+                    java.send(d,Collections.singletonList(new Peer.FileItem("a.jpg",1,()->Files.newInputStream(camera.resolve("a.jpg")),"Camera")),true);
+                    java.send(d,Collections.singletonList(new Peer.FileItem("b.jpg",1,()->Files.newInputStream(camera.resolve("b.jpg")),"Camera")),true);
+                    check(Files.exists(winReceive.resolve("Camera").resolve("a.jpg"))&&Files.exists(winReceive.resolve("Camera").resolve("b.jpg"))&&!Files.exists(winReceive.resolve("Camera (1)")),"backup merged on .NET side");
+                    result("backups merge into the existing folder on .NET",true,null);}
+                catch(Throwable e){result("backups merge into the existing folder on .NET",false,e.getMessage());}}
             if(javaSend){Path note=source.resolve("ask-note-2.txt");Files.writeString(note,"ask on windows");
                 try{Peer.Device d=java.pairingDevice(readWindowsId());String outcome;
                     if(server!=null){server.destroy();server.waitFor(5,TimeUnit.SECONDS);}startServer("--ask","decline");qr();

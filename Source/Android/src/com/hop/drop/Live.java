@@ -21,23 +21,30 @@ final class Live {
         final Peer.Result result;
         final String failure;
         final long updatedAt;
+        /** Before any file moves: "direct" (joining the device's direct link), "queued" (offline, sends when it's back), "text" (text sent). */
+        final String note;
 
         Item(String key, boolean incoming, String peer, Peer.Progress progress, Peer.Result result, String failure) {
+            this(key, incoming, peer, progress, result, failure, null);
+        }
+
+        Item(String key, boolean incoming, String peer, Peer.Progress progress, Peer.Result result, String failure, String note) {
             this.key = key;
             this.incoming = incoming;
             this.peer = peer;
             this.progress = progress;
             this.result = result;
             this.failure = failure;
+            this.note = note;
             updatedAt = System.currentTimeMillis();
         }
 
         boolean connecting() {
-            return progress == null && result == null && failure == null;
+            return progress == null && result == null && failure == null && note == null;
         }
 
         boolean finished() {
-            return result != null || failure != null;
+            return result != null || failure != null || "queued".equals(note) || "text".equals(note);
         }
     }
 
@@ -52,6 +59,30 @@ final class Live {
     void connecting(String peer) {
         synchronized (this) {
             items.put(pendingKey(peer), new Item(pendingKey(peer), false, peer, null, null, null));
+        }
+        changed.run();
+    }
+
+    /** Not on the same network: joining the device's direct link (Android may ask "Connect to …?" the first time). */
+    void connectingDirectly(String peer) { note(peer, "direct"); }
+
+    /** The device couldn't be reached: the send waits and goes when it's back. */
+    void queued(String peer) { note(peer, "queued"); }
+
+    /** Text went out (there's no transfer to follow). */
+    void textSent(String peer) { note(peer, "text"); }
+
+    private void note(String peer, String note) {
+        synchronized (this) {
+            items.put(pendingKey(peer), new Item(pendingKey(peer), false, peer, null, null, null, note));
+        }
+        changed.run();
+    }
+
+    /** Forgets what was shown for {@code peer} before a transfer started. */
+    void clear(String peer) {
+        synchronized (this) {
+            items.remove(pendingKey(peer));
         }
         changed.run();
     }

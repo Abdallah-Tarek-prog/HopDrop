@@ -53,13 +53,14 @@ public sealed class InputDialog : FluentWindow
 /// <summary>The pairing QR code at a large size, for phones whose camera can't read the small one. Click or Esc closes it.</summary>
 public sealed class QrZoomWindow : FluentWindow
 {
-    public QrZoomWindow(System.Windows.Controls.Image code)
+    public QrZoomWindow(System.Windows.Controls.Image code, bool directLink = false)
     {
         Title = "Pairing code"; Width = 560; Height = 640; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         var body = new StackPanel { Margin = new Thickness(24, 12, 24, 24), HorizontalAlignment = HorizontalAlignment.Center };
         code.Width = 460; code.Height = 460;
         body.Children.Add(new Border { Child = code, Background = Brushes.White, CornerRadius = new CornerRadius(16), Padding = new Thickness(6) });
-        body.Children.Add(new TextBlock { Text = "On the phone: Devices → Pair device → Scan a QR code", FontSize = 17, FontWeight = FontWeights.SemiBold, TextAlignment = TextAlignment.Center, Margin = new Thickness(0, 18, 0, 4) });
+        body.Children.Add(new TextBlock { Text = "On your phone: HopDrop → Pair → Scan", FontSize = 17, FontWeight = FontWeights.SemiBold, TextAlignment = TextAlignment.Center, Margin = new Thickness(0, 18, 0, 4) });
+        if (directLink) body.Children.Add(new TextBlock { Text = "Your phone doesn't need to be on the same Wi-Fi.", FontSize = 13, TextAlignment = TextAlignment.Center, Margin = new Thickness(0, 0, 0, 4) });
         body.Children.Add(new TextBlock { Text = "Click anywhere or press Esc to close.", FontSize = 13, Opacity = 0.7, TextAlignment = TextAlignment.Center });
         Content = body;
         MouseLeftButtonUp += (_, _) => Close();
@@ -68,26 +69,37 @@ public sealed class QrZoomWindow : FluentWindow
     }
 }
 
-/// <summary>Type or paste text to send; it arrives as a .txt file named after its first line.</summary>
+/// <summary>Send a note or link directly to a paired device.</summary>
 public sealed class TextNoteDialog : FluentWindow
 {
     private readonly TextBox _value;
     public string Text => _value.Text;
-    public TextNoteDialog()
+    public string? DeviceId { get; private set; }
+    public TextNoteDialog(IReadOnlyList<PairedDevice>? devices = null, string? initial = null)
     {
-        Title = "Send text"; Width = 520; Height = 400; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Title = "Send text"; Width = 520; Height = 430; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         var body = new DockPanel { Margin = new Thickness(24) };
-        var help = new TextBlock { Text = "Type or paste text. It arrives as a .txt file.", FontSize = 15, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) };
+        var help = new TextBlock { Text = initial is { Length: > 0 } ? "From your clipboard. You can edit it." : "Type or paste text to send.", FontSize = 15, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) };
         DockPanel.SetDock(help, Dock.Top); body.Children.Add(help);
+        if (devices is { Count: > 0 })
+        {
+            var choices = devices.OrderBy(d => d.Alias ?? d.Name).ToList();
+            var picker = new System.Windows.Controls.ComboBox { ItemsSource = choices.Select(d => d.Alias ?? d.Name).ToList(), Margin = new Thickness(0, 0, 0, 12), MinHeight = 34 };
+            picker.SelectedIndex = Math.Max(0, choices.FindIndex(d => d.Id == Preferences.LastDevice));
+            DeviceId = choices[picker.SelectedIndex].Id;
+            picker.SelectionChanged += (_, _) => DeviceId = choices[picker.SelectedIndex].Id;
+            DockPanel.SetDock(picker, Dock.Top); body.Children.Add(picker);
+        }
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 16, 0, 0) };
-        var add = new Button { Content = "Add", Appearance = ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), Padding = new Thickness(18, 8, 18, 8), IsEnabled = false };
+        var add = new Button { Content = "Send", Appearance = ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), Padding = new Thickness(18, 8, 18, 8), IsEnabled = false };
         add.Click += (_, _) => DialogResult = true;
         var cancel = new Button { Content = "Cancel", Padding = new Thickness(18, 8, 18, 8) }; cancel.Click += (_, _) => DialogResult = false;
         buttons.Children.Add(add); buttons.Children.Add(cancel);
         DockPanel.SetDock(buttons, Dock.Bottom); body.Children.Add(buttons);
         _value = new TextBox { AcceptsReturn = true, AcceptsTab = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            VerticalContentAlignment = VerticalAlignment.Top, PlaceholderText = "Type or paste text" };
+            VerticalContentAlignment = VerticalAlignment.Top, PlaceholderText = "Type or paste text", Text = initial ?? "" };
         _value.TextChanged += (_, _) => add.IsEnabled = _value.Text.Trim().Length > 0;
+        add.IsEnabled = _value.Text.Trim().Length > 0 && (devices is null || devices.Count > 0);
         body.Children.Add(_value);
         Content = body;
         Loaded += (_, _) => _value.Focus();

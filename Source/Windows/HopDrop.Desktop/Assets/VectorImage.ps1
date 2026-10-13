@@ -1,6 +1,6 @@
 # Draws an Android vector drawable (paths with solid or linear-gradient fills, and round-capped strokes) as a PNG with WPF.
 # Dot-source it, then: $png = ConvertTo-VectorPng -Path <vector.xml> -Size 64   (returns the PNG bytes).
-# -Tile '#FFFFFF' draws the logo on a rounded tile of that colour (the Windows app icon's white tile): the logo is
+# -Tile '#121212' draws the logo on a rounded tile of that colour (the Windows app icon's black tile, as on the phone): the logo is
 # scaled to fill most of the tile and drawn bolder (thicker still at tray sizes), so it reads from a distance.
 Add-Type -AssemblyName PresentationCore, WindowsBase
 
@@ -14,8 +14,10 @@ function ConvertTo-VectorPng([string]$Path, [int]$Size, [string]$Tile) {
     $context = $drawing.RenderOpen()
     $scale = $Size / $viewport
     if ($Tile) {
-        # A rounded tile with a hairline edge (so white still reads on white), the logo at 80 % in its middle.
-        $edge = [System.Windows.Media.Pen]::new($colours.ConvertFromString('#FFDDE1E7'), [math]::Max(1, $Size / 64))
+        # A rounded tile with a hairline edge (so a black tile still reads on a dark taskbar, a white one on white).
+        $tileColour = $colours.ConvertFromString($Tile).Color
+        $dark = ($tileColour.R + $tileColour.G + $tileColour.B) -lt 384
+        $edge = [System.Windows.Media.Pen]::new($colours.ConvertFromString($(if ($dark) { '#FF3A3A3A' } else { '#FFDDE1E7' })), [math]::Max(1, $Size / 64))
         $inset = $edge.Thickness / 2
         $context.DrawRoundedRectangle($colours.ConvertFromString($Tile), $(if ($Size -ge 24) { $edge } else { $null }),
             [System.Windows.Rect]::new($inset, $inset, $Size - 2 * $inset, $Size - 2 * $inset), $Size * 0.22, $Size * 0.22)
