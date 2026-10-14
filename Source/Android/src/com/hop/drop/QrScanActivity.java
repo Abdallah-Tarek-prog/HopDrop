@@ -46,6 +46,10 @@ import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
 import android.view.WindowManager;
+import androidx.core.graphics.Insets;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.ViewCompat;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -109,7 +113,12 @@ public final class QrScanActivity extends Activity implements TextureView.Surfac
     @Override
     public void onCreate(Bundle state) {
         super.onCreate(state);
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        getWindow().setStatusBarColor(Color.BLACK);
+        getWindow().setNavigationBarColor(Color.BLACK);
+        WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView()).setAppearanceLightStatusBars(false);
+        WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView()).setAppearanceLightNavigationBars(false);
         Map<DecodeHintType, Object> hints = new EnumMap<>(DecodeHintType.class);
         hints.put(DecodeHintType.POSSIBLE_FORMATS, Collections.singletonList(BarcodeFormat.QR_CODE));
         decoder.setHints(hints);
@@ -127,6 +136,12 @@ public final class QrScanActivity extends Activity implements TextureView.Surfac
         root.addView(preview, new FrameLayout.LayoutParams(-1, -1));
         overlay = new Overlay(this);
         root.addView(overlay, new FrameLayout.LayoutParams(-1, -1));
+        View statusBar = new View(this);
+        statusBar.setBackgroundColor(Color.BLACK);
+        root.addView(statusBar, new FrameLayout.LayoutParams(-1, 0, Gravity.TOP));
+        View navigationBar = new View(this);
+        navigationBar.setBackgroundColor(Color.BLACK);
+        root.addView(navigationBar, new FrameLayout.LayoutParams(-1, 0, Gravity.BOTTOM));
 
         LinearLayout top = new LinearLayout(this);
         top.setGravity(Gravity.CENTER_VERTICAL);
@@ -170,11 +185,18 @@ public final class QrScanActivity extends Activity implements TextureView.Surfac
         panelParams.leftMargin = panelParams.rightMargin = dp(24);
         root.addView(permissionPanel, panelParams);
 
-        root.setOnApplyWindowInsetsListener((view, insets) -> {
-            top.setPadding(dp(12) + insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop() + dp(8),
-                    dp(16) + insets.getSystemWindowInsetRight(), dp(8));
-            bottom.setPadding(dp(24) + insets.getSystemWindowInsetLeft(), dp(16),
-                    dp(24) + insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom() + dp(16));
+        ViewCompat.setOnApplyWindowInsetsListener(root, (view, insets) -> {
+            Insets topSafe = insets.getInsets(WindowInsetsCompat.Type.statusBars() | WindowInsetsCompat.Type.displayCutout());
+            Insets bottomSafe = insets.getInsets(WindowInsetsCompat.Type.navigationBars() | WindowInsetsCompat.Type.mandatorySystemGestures());
+            FrameLayout.LayoutParams statusParams = (FrameLayout.LayoutParams) statusBar.getLayoutParams();
+            statusParams.height = topSafe.top;
+            statusBar.setLayoutParams(statusParams);
+            FrameLayout.LayoutParams navigationParams = (FrameLayout.LayoutParams) navigationBar.getLayoutParams();
+            navigationParams.height = bottomSafe.bottom;
+            navigationBar.setLayoutParams(navigationParams);
+            top.setPadding(dp(12) + topSafe.left, topSafe.top + dp(8), dp(16) + topSafe.right, dp(8));
+            bottom.setPadding(dp(24) + bottomSafe.left, dp(16), dp(24) + bottomSafe.right,
+                    bottomSafe.bottom + dp(24));
             return insets;
         });
         setContentView(root);

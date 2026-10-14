@@ -12,8 +12,7 @@ import androidx.core.graphics.drawable.IconCompat
 import com.hop.drop.core.Peer
 
 /**
- * Paired devices as shortcuts: in Android's share sheet (Direct Share: share from any app → tap "LOQ Laptop" → it's
- * sent, no HopDrop screen in between) and in the menu of HopDrop's launcher icon. Most recently seen devices first.
+ * Paired devices as share and launcher shortcuts. The launcher also offers Send clipboard after pairing.
  */
 object Shortcuts {
     private const val SHARE_TARGET = "com.hop.drop.category.SHARE_TARGET"
@@ -26,20 +25,27 @@ object Shortcuts {
     fun update(context: Context, devices: List<Peer.Device>) {
         try {
             val max = ShortcutManagerCompat.getMaxShortcutCountPerActivity(context).coerceIn(1, 5)
-            val sorted = devices.sortedByDescending { it.lastSeen }.take(max)
-            val shortcuts = sorted.mapIndexed { rank, d ->
+            val sorted = devices.sortedByDescending { it.lastSeen }.take((max - 1).coerceAtLeast(0))
+            val shortcuts = mutableListOf<ShortcutInfoCompat>()
+            if (devices.isNotEmpty()) shortcuts += ShortcutInfoCompat.Builder(context, "clipboard")
+                .setShortLabel("Send clipboard")
+                .setIcon(icon(context, R.drawable.ic_glyph_clipboard))
+                .setIntent(Intent(context, QuickSendActivity::class.java).setAction(Intent.ACTION_VIEW).putExtra("clipboard", true))
+                .setRank(0)
+                .build()
+            shortcuts += sorted.mapIndexed { rank, d ->
                 ShortcutInfoCompat.Builder(context, PREFIX + d.id)
                     .setShortLabel(d.label())
                     .setLongLabel("Send to " + d.label())
-                    .setIcon(icon(context, d.platform == "windows"))
+                    .setIcon(icon(context, if (d.platform == "windows") R.drawable.ic_glyph_laptop else R.drawable.ic_glyph_phone))
                     .setIntent(Intent(context, MainActivity::class.java).setAction(Intent.ACTION_VIEW).putExtra("device", d.id))
                     .setCategories(setOf(SHARE_TARGET))
                     .setLongLived(true)
-                    .setRank(rank)
+                    .setRank(rank + 1)
                     .build()
             }
-            ShortcutManagerCompat.removeAllDynamicShortcuts(context)
-            if (shortcuts.isNotEmpty()) ShortcutManagerCompat.addDynamicShortcuts(context, shortcuts)
+            // One call replaces the whole list: a launcher that refuses (rate limit) leaves the old shortcuts instead of none.
+            ShortcutManagerCompat.setDynamicShortcuts(context, shortcuts)
         } catch (e: RuntimeException) {
             // Launchers may refuse (rate limits, work profiles); sharing through HopDrop's own screen still works.
             android.util.Log.w("HopDrop", "Couldn't publish share shortcuts", e)
@@ -53,13 +59,13 @@ object Shortcuts {
     }
 
     /** The device's glyph in white on the brand orange, as an adaptive icon (the launcher crops it to its shape). */
-    private fun icon(context: Context, laptop: Boolean): IconCompat {
+    private fun icon(context: Context, glyphId: Int): IconCompat {
         val density = context.resources.displayMetrics.density
         val side = (108 * density).toInt()
         val bitmap = Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         canvas.drawColor(ContextCompat.getColor(context, R.color.brand))
-        val glyph = ContextCompat.getDrawable(context, if (laptop) R.drawable.ic_glyph_laptop else R.drawable.ic_glyph_phone)!!.mutate()
+        val glyph = ContextCompat.getDrawable(context, glyphId)!!.mutate()
         glyph.setTint(Color.WHITE)
         val size = (side * 0.40f).toInt()
         val left = (side - size) / 2

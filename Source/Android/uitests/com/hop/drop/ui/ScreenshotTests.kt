@@ -1,6 +1,16 @@
 package com.hop.drop.ui
 
 import android.app.Application
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -60,6 +70,15 @@ class ScreenshotTests {
     @Test fun tour6Dark() = tour(5, ThemeMode.Dark)
     @Test fun tour7Returning() = tour(6, devices = true, name = "tour-7-returning-light")
     @Test @Config(qualifiers = "w320dp-h568dp-xxhdpi") fun tour4Small() = tour(3, name = "tour-4-small-light")
+    @Test @Config(qualifiers = "w411dp-h852dp-xxhdpi") fun tour4Phone() = tour(3, name = "tour-4-411-light")
+    @Test @Config(qualifiers = "w411dp-h852dp-xxhdpi") fun tour4LargeText() {
+        RuntimeEnvironment.setFontScale(1.5f)
+        tour(3, name = "tour-4-411-large-text-light")
+    }
+    @Test @Config(qualifiers = "w320dp-h568dp-xxhdpi") fun tour4SmallLargeText() {
+        RuntimeEnvironment.setFontScale(1.5f)
+        tour(3, name = "tour-4-small-large-text-light")
+    }
     @Test fun tour6LargeText() {
         RuntimeEnvironment.setFontScale(1.5f)
         tour(5, name = "tour-6-large-text-light")
@@ -69,6 +88,44 @@ class ScreenshotTests {
         compose.mainClock.advanceTimeBy(250)
         screen("modal-whats-new-light")
     }
+    @Test fun whatsNewDark() {
+        show(state().apply { whatsNewVersion = 2 }, ThemeMode.Dark)
+        compose.mainClock.advanceTimeBy(250)
+        screen("modal-whats-new-dark")
+    }
+
+    private fun quickSendCard(mode: ThemeMode, width: Int, largeText: Boolean = false) {
+        if (largeText) RuntimeEnvironment.setFontScale(1.5f)
+        val devices = listOf(QuickSendDevice("pc", "LOQ Laptop", Platform.Windows),
+            QuickSendDevice("tablet", "Galaxy Tab S9", Platform.Android))
+        compose.setContent {
+            HopDropTheme(mode, Palette.Ember) {
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)), contentAlignment = Alignment.BottomCenter) {
+                    QuickSendCard(
+                        devices = devices, selected = "pc", clipboardDetail = "A note copied from the browser", clipboardAvailable = true,
+                        photoDetail = "Allow photos", photoAvailable = true, photoPreview = null,
+                        onSelect = {}, onClipboard = {}, onPhoto = {}, onFiles = {},
+                        modifier = Modifier.padding(16.dp).widthIn(max = 400.dp).fillMaxWidth(),
+                    )
+                }
+            }
+        }
+        compose.waitForIdle()
+        shot("quick-send-card-$width-${if (mode == ThemeMode.Dark) "dark" else "light"}${if (largeText) "-large-text" else ""}")
+    }
+
+    @Test @Config(qualifiers = "w411dp-h852dp-xxhdpi") fun quickSend411Light() = quickSendCard(ThemeMode.Light, 411)
+    @Test @Config(qualifiers = "w411dp-h852dp-xxhdpi") fun quickSend411Dark() = quickSendCard(ThemeMode.Dark, 411)
+    @Test @Config(qualifiers = "w360dp-h800dp-xxhdpi") fun quickSend360Light() = quickSendCard(ThemeMode.Light, 360)
+    @Test @Config(qualifiers = "w360dp-h800dp-xxhdpi") fun quickSend360Dark() = quickSendCard(ThemeMode.Dark, 360)
+    @Test @Config(qualifiers = "w320dp-h568dp-xxhdpi") fun quickSend320Light() = quickSendCard(ThemeMode.Light, 320)
+    @Test @Config(qualifiers = "w320dp-h568dp-xxhdpi") fun quickSend320Dark() = quickSendCard(ThemeMode.Dark, 320)
+    @Test @Config(qualifiers = "w411dp-h852dp-xxhdpi") fun quickSend411LargeTextLight() = quickSendCard(ThemeMode.Light, 411, true)
+    @Test @Config(qualifiers = "w411dp-h852dp-xxhdpi") fun quickSend411LargeTextDark() = quickSendCard(ThemeMode.Dark, 411, true)
+    @Test @Config(qualifiers = "w360dp-h800dp-xxhdpi") fun quickSend360LargeTextLight() = quickSendCard(ThemeMode.Light, 360, true)
+    @Test @Config(qualifiers = "w360dp-h800dp-xxhdpi") fun quickSend360LargeTextDark() = quickSendCard(ThemeMode.Dark, 360, true)
+    @Test @Config(qualifiers = "w320dp-h568dp-xxhdpi") fun quickSend320LargeTextLight() = quickSendCard(ThemeMode.Light, 320, true)
+    @Test @Config(qualifiers = "w320dp-h568dp-xxhdpi") fun quickSend320LargeTextDark() = quickSendCard(ThemeMode.Dark, 320, true)
 
     @Test fun sendEmptyLight() { show(state()); shot("send-empty-light") }
     @Test fun sendEmptyDark() { show(state(), ThemeMode.Dark); shot("send-empty-dark") }
@@ -141,6 +198,7 @@ class ScreenshotTests {
     @Test fun updateDownloading() { show(state().apply { update = UpdateUi("1.1.1", 1_900_000, downloading = true, fraction = 0.4f) }, ThemeMode.Dark); shot("send-update-dark") }
 
     @Test fun pairCode() { show(state().apply { prompt = PromptUi("LOQ Laptop", "482913") }); screen("dialog-pair-code-light") }
+    @Test fun pairCodeDark() { show(state().apply { prompt = PromptUi("LOQ Laptop", "482913") }, ThemeMode.Dark); screen("modal-pair-code-dark") }
     @Test fun pairingDirect() { show(state().apply { pairing = PairingUi("LOQ Laptop", direct = true) }); screen("dialog-pairing-direct-light") }
     @Test fun offer() {
         show(state().apply { offers.add(OfferUi("o1", "LOQ Laptop", listOf("Quarterly report.pdf", "Budget 2026.xlsx", "Photos/a.jpg", "Photos/b.jpg"), 18_400_000)) })

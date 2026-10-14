@@ -218,6 +218,9 @@ final class Notices {
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE)).build());
     }
 
+    /** Removes a waiting-send notice when its job is cancelled. */
+    void clearQueued(String peer) { manager.cancel(4000 + (peer.hashCode() & 0xfff)); }
+
     /** Who cancelled: this phone ("You cancelled the transfer" / "Transfer cancelled") or the other device. */
     static String cancelReason(Peer.Result r) {
         return r.error.contains("Peer cancelled") || r.error.contains("Sender cancelled")

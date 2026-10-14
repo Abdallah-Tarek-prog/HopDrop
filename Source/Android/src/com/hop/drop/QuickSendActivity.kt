@@ -25,32 +25,12 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.InsertDriveFile
-import androidx.compose.material.icons.rounded.ContentPaste
-import androidx.compose.material.icons.rounded.Image
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -59,21 +39,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import com.hop.drop.core.Format
 import com.hop.drop.core.Peer
-import com.hop.drop.ui.DeviceAvatar
 import com.hop.drop.ui.HopDropTheme
-import com.hop.drop.ui.LogoMark
 import com.hop.drop.ui.Palette
 import com.hop.drop.ui.Platform
 import com.hop.drop.ui.ThemeMode
-import com.hop.drop.ui.Thumbnail
+import com.hop.drop.ui.QuickSendCard
+import com.hop.drop.ui.QuickSendDevice
 
 /**
  * The Quick Settings tile's floating card: pick the device (the last one used is already picked) and tap what to send — the
@@ -194,72 +170,29 @@ class QuickSendActivity : ComponentActivity() {
         ) {
             AnimatedVisibility(shown, enter = fadeIn(tween(if (motion) 200 else 0)) + scaleIn(tween(if (motion) 200 else 0), initialScale = 0.92f),
                 exit = fadeOut(tween(if (motion) 120 else 0)) + scaleOut(tween(if (motion) 120 else 0), targetScale = 0.92f)) {
-                Surface(
-                    shape = RoundedCornerShape(28.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                val clip = clipText
+                QuickSendCard(
+                    devices = devices.map { QuickSendDevice(it.id, it.label(), if (it.platform == "windows") Platform.Windows else Platform.Android) },
+                    selected = target,
+                    clipboardDetail = clip?.lineSequence()?.firstOrNull()?.take(60) ?: if (clipUri != null) "A copied file" else "Nothing copied",
+                    clipboardAvailable = clip != null || clipUri != null,
+                    photoDetail = if (photosAllowed) (if (latest != null) "Tap to send" else "No photos") else "Allow photos",
+                    photoAvailable = !photosAllowed || latest != null,
+                    photoPreview = latest,
+                    onSelect = { target = it },
+                    onClipboard = {
+                        val uri = clipUri
+                        if (clip != null) send { it.texts.add(clip); it.clip = true } else if (uri != null) send { it.files.add(uri) }
+                    },
+                    onPhoto = {
+                        val uri = latest
+                        if (!photosAllowed) askPhotos.launch(photoPermission) else if (uri != null) send { it.files.add(uri) }
+                    },
+                    onFiles = { pickFiles.launch(arrayOf("*/*")) },
                     modifier = Modifier.padding(horizontal = 16.dp).navigationBarsPadding().padding(bottom = 16.dp)
                         .widthIn(max = 400.dp).fillMaxWidth()
                         .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { },
-                ) {
-                    Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 20.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            LogoMark(26.dp)
-                            Spacer(Modifier.width(10.dp))
-                            Text("Quick send", style = MaterialTheme.typography.titleLarge)
-                        }
-                        Text("Send to", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 16.dp, bottom = 6.dp))
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(devices, key = { it.id }) { d ->
-                                FilterChip(
-                                    selected = target == d.id, onClick = { target = d.id },
-                                    label = { Text(d.label(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                    leadingIcon = { DeviceAvatar(if (d.platform == "windows") Platform.Windows else Platform.Android, false, size = 22.dp) },
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(16.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            val clip = clipText
-                            Option(Icons.Rounded.ContentPaste, "Clipboard",
-                                clip?.lineSequence()?.firstOrNull()?.take(60) ?: if (clipUri != null) "A copied file" else "Nothing copied",
-                                enabled = clip != null || clipUri != null, modifier = Modifier.weight(1f)) {
-                                val uri = clipUri
-                                if (clip != null) send { it.texts.add(clip); it.clip = true } else if (uri != null) send { it.files.add(uri) }
-                            }
-                            Option(Icons.Rounded.Image, "Latest photo", if (photosAllowed) (if (latest != null) "Tap to send" else "No photos") else "Allow photos",
-                                enabled = !photosAllowed || latest != null, modifier = Modifier.weight(1f), preview = latest) {
-                                val uri = latest
-                                if (!photosAllowed) askPhotos.launch(photoPermission) else if (uri != null) send { it.files.add(uri) }
-                            }
-                            Option(Icons.AutoMirrored.Rounded.InsertDriveFile, "Files", "Choose…", modifier = Modifier.weight(1f)) {
-                                pickFiles.launch(arrayOf("*/*"))
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    @Composable
-    private fun Option(icon: ImageVector, title: String, detail: String, modifier: Modifier, enabled: Boolean = true, preview: Uri? = null, onClick: () -> Unit) {
-        val scheme = MaterialTheme.colorScheme
-        Surface(
-            onClick = onClick, enabled = enabled, shape = RoundedCornerShape(20.dp), color = scheme.surfaceContainerHighest,
-            modifier = modifier,
-        ) {
-            Column(Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(Modifier.fillMaxWidth().aspectRatio(1.25f).clip(RoundedCornerShape(14.dp)).background(scheme.primaryContainer),
-                    contentAlignment = Alignment.Center) {
-                    val placeholder = @Composable {
-                        Icon(icon, contentDescription = null, tint = if (enabled) scheme.onPrimaryContainer else scheme.outline, modifier = Modifier.size(30.dp))
-                    }
-                    if (preview != null) Thumbnail(preview, Modifier.fillMaxSize(), placeholder) else placeholder()
-                }
-                Text(title, style = MaterialTheme.typography.titleSmall, maxLines = 1, modifier = Modifier.padding(top = 8.dp),
-                    color = if (enabled) scheme.onSurface else scheme.outline)
-                Text(detail, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                )
             }
         }
     }

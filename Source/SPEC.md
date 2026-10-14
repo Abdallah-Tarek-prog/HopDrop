@@ -252,7 +252,7 @@ receive folder. The first part (the sent folder) gets a new name when it already
 
 ### 3.8 Discovery (UDP 7410)
 - Message (UTF-8 JSON, ≤ 1200 bytes):
-  `{"hopdrop":2,"type":"announce"|"query","id":"<64 hex>","name":"…","pl":"android|windows","p":7410,"rx":true}`
+  `{"hopdrop":2,"type":"announce"|"query"|"bye","id":"<64 hex>","name":"…","pl":"android|windows","p":7410,"rx":true|false}`
   (`rx` = currently able to receive).
 - Send `announce` at start, on every network change, and periodically: every **5 s while HopDrop is on screen**, otherwise every
   **15 s (Windows)** or **20 s (Android)**. Send to multicast `239.255.74.10:7410` (TTL 1) on each local interface, plus
@@ -261,7 +261,9 @@ receive folder. The first part (the sent folder) gets a new name when it already
 - **Hidden name:** a device set to "Only my paired devices" sends `"name":""` (except while its pairing screen is open). Paired
   devices recognise it by id; others don't list it. Older versions ignore such announcements.
 - On `announce` or `query` from another id: update `nearby[id] = {name, pl, p, address = UDP source IPv4, lastSeen}`. Reply with a unicast `announce` to a `query`, and to the first `announce` seen from a new id.
-- Send `query` when a device list opens. Entries expire **45 s** after `lastSeen`. Ignore your own id.
+- On normal stop, send `bye` twice about 100 ms apart to the same destinations as `announce`, as the last discovery act. Its `name` is empty and `rx` is false. A receiver removes `nearby[id]` at once, updates the UI if the list changed, and never replies. No source-address check is needed: discovery is only a hint. A forged `bye` can hide a device only until its next announcement.
+- Send `query` when a device list opens. Entries still expire **45 s** after `lastSeen` if no goodbye arrives, including after a crash or lost network. Ignore your own id for every message type.
+- Older versions ignore `bye`: Android skips unknown types, and Windows drops the parse error. They keep the 45 s expiry. This needs no hello feature flag or protocol-version change.
 - Discovery is only a hint. Every connection still verifies certificates; paired devices are pinned by id.
 - Connecting to a paired device: try its discovered address and its stored `lastAddresses` in parallel; first certificate match wins; update `lastAddresses`.
 - Android holds a `WifiManager.MulticastLock` only while HopDrop is on screen (the lock makes the Wi-Fi chip wake the phone for
@@ -459,8 +461,10 @@ Questions that require an answer keep focus until answered; Back chooses the neg
 - While anything moves, HopDrop holds a full-speed Wi-Fi lock and a processor wake lock, released 3 s after the last transfer ends.
 - **Share targets:** `ShareActivity` takes `SEND`/`SEND_MULTIPLE`. Through a device's Direct Share target (dynamic long-lived shortcuts,
   most recently seen first, also in the launcher icon's menu) it sends at once and closes ("Sending to …"); as "HopDrop" it opens Send.
+  Some share sheets show only apps; there the user taps HopDrop, then Send. With a paired device, the launcher menu also has
+  **Send clipboard** first. It opens `QuickSendActivity` with `clipboard = true` and has no share-target category.
 - **Quick Settings tile** (`QuickTile`): opens a floating rounded card near the bottom over the current screen: the device (last used preselected) and
-  **Clipboard** (sent as clipboard text), **Latest photo** (asks for photo access once), **Files**; one tap sends and closes.
+  full-width **Clipboard** (sent as clipboard text), **Latest photo** (asks for photo access once), **Files** options; one tap sends and closes.
 
 **Receive storage**
 - Default: `Download/HopDrop` — MediaStore Downloads with `RELATIVE_PATH` and `IS_PENDING` on API 29+; on API 26–28 the public Downloads folder via `WRITE_EXTERNAL_STORAGE` (maxSdkVersion 28), requested when first needed.

@@ -119,7 +119,7 @@ fun HopModal(
                 if (!required) close()
             } }.systemBarsPadding().imePadding(), contentAlignment = Alignment.Center) {
             Surface(
-                shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp).widthIn(max = 400.dp).fillMaxWidth()
                     .graphicsLayer { this.alpha = alpha; scaleX = scale; scaleY = scale }
                     .pointerInput(Unit) { detectTapGestures {} }

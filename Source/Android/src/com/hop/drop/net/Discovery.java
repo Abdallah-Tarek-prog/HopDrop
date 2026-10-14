@@ -19,6 +19,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 /**
  * UDP discovery (spec 3.8). Every send is attempted on its own: one interface that refuses a packet
@@ -52,20 +54,31 @@ public final class Discovery implements AutoCloseable {
         }
     }
 
-    private final Peer peer;
+    private final String id;
+    private final Supplier<String> name;
     private final WifiManager.MulticastLock lock;
     private final Map<String, Nearby> nearby = new ConcurrentHashMap<>();
     private final Set<String> reported = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Runnable changed;
     private final Object wake = new Object();
+    private final AtomicBoolean closing = new AtomicBoolean(), cleaned = new AtomicBoolean();
     private volatile boolean active, foreground, hidden;
     private volatile List<NetworkInterface> interfaces;
     private volatile long interfacesAt;
-    private MulticastSocket socket;
+    private volatile MulticastSocket socket;
 
     /** {@code changed} runs on a background thread whenever the nearby list changes. */
     public Discovery(Context context, Peer peer, Runnable changed) {
-        this.peer = peer;
+        this(context, peer.id(), peer::name, changed);
+    }
+
+    Discovery(Context context, String id, Runnable changed) {
+        this(context, id, () -> "", changed);
+    }
+
+    private Discovery(Context context, String id, Supplier<String> name, Runnable changed) {
+        this.id = id;
+        this.name = name;
         this.changed = changed;
         WifiManager wifi = context.getApplicationContext().getSystemService(WifiManager.class);
         lock = wifi.createMulticastLock("HopDrop discovery");
@@ -82,6 +95,7 @@ public final class Discovery implements AutoCloseable {
     }
 
     public void start() throws Exception {
+        if (closing.get()) throw new IllegalStateException("Discovery is closed");
         if (active) return;
         MulticastSocket created = new MulticastSocket(7410);
         try {
@@ -150,24 +164,30 @@ public final class Discovery implements AutoCloseable {
                 DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
                 socket.receive(packet);
                 if (packet.getLength() > 1200) continue;
-                Map<String, Object> m = Json.parseObject(new String(packet.getData(), packet.getOffset(),
-                        packet.getLength(), java.nio.charset.StandardCharsets.UTF_8));
-                if (Json.num(m, "hopdrop") != 2) continue;
-                String id = Json.str(m, "id");
-                if (id.equalsIgnoreCase(peer.id())) continue;
-                String type = Json.str(m, "type");
-                if (!type.equals("query") && !type.equals("announce")) continue;
-                String address = packet.getAddress().getHostAddress();
-                Nearby next = new Nearby(id, Json.str(m, "name"), Json.str(m, "pl"), address, (int) Json.num(m, "p"));
-                Nearby prior = nearby.put(id, next);
-                if (type.equals("query") || prior == null) sendTo("announce", packet.getAddress());
-                if (prior == null || !prior.name.equals(next.name) || !prior.address.equals(next.address)) {
-                    changed.run();
-                }
+                handle(new String(packet.getData(), packet.getOffset(), packet.getLength(),
+                        java.nio.charset.StandardCharsets.UTF_8), packet.getAddress());
             } catch (Exception error) {
                 if (!active) return;
             }
         }
+    }
+
+    void handle(String json, InetAddress from) {
+        Map<String, Object> m = Json.parseObject(json);
+        if (Json.num(m, "hopdrop") != 2) return;
+        String id = Json.str(m, "id");
+        if (id.equalsIgnoreCase(this.id)) return;
+        String type = Json.str(m, "type");
+        if (type.equals("bye")) {
+            if (nearby.remove(id) != null) changed.run();
+            return;
+        }
+        if (!type.equals("query") && !type.equals("announce")) return;
+        String address = from.getHostAddress();
+        Nearby next = new Nearby(id, Json.str(m, "name"), Json.str(m, "pl"), address, (int) Json.num(m, "p"));
+        Nearby prior = nearby.put(id, next);
+        if (socket != null && (type.equals("query") || prior == null)) sendTo("announce", from);
+        if (prior == null || !prior.name.equals(next.name) || !prior.address.equals(next.address)) changed.run();
     }
 
     /** Runs on its own thread: Android forbids network calls on the main thread, where start() is called. */
@@ -224,14 +244,16 @@ public final class Discovery implements AutoCloseable {
     }
 
     private byte[] message(String type) {
-        return Json.string(Json.obj("hopdrop", 2, "type", type, "id", peer.id(), "name", hidden ? "" : peer.name(),
-                "pl", "android", "p", 7410, "rx", true)).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        return Json.string(Json.obj("hopdrop", 2, "type", type, "id", id, "name", type.equals("bye") || hidden ? "" : name.get(),
+                "pl", "android", "p", 7410, "rx", !type.equals("bye"))).getBytes(java.nio.charset.StandardCharsets.UTF_8);
     }
 
     private void sendTo(String type, InetAddress destination) {
         try {
+            MulticastSocket current = socket;
+            if (current == null) return;
             byte[] data = message(type);
-            if (data.length <= 1200) socket.send(new DatagramPacket(data, data.length, destination, 7410));
+            if (data.length <= 1200) current.send(new DatagramPacket(data, data.length, destination, 7410));
         } catch (Exception error) {
             warn("send " + type + " to " + destination.getHostAddress(), error);
         }
@@ -270,9 +292,38 @@ public final class Discovery implements AutoCloseable {
 
     @Override
     public void close() {
+        if (!closing.compareAndSet(false, true)) return;
         active = false;
         wakeAnnouncer();
-        if (socket != null) socket.close();
+        MulticastSocket current = socket;
+        Thread goodbye = new Thread(() -> {
+            try {
+                if (current != null) {
+                    broadcast("bye");
+                    Thread.sleep(100);
+                    broadcast("bye");
+                }
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            } finally {
+                finishClose(current);
+            }
+        }, "HopDrop discovery goodbye");
+        goodbye.setDaemon(true);
+        goodbye.start();
+        Thread deadline = new Thread(() -> {
+            try { Thread.sleep(300); }
+            catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+            finishClose(current);
+        }, "HopDrop discovery close");
+        deadline.setDaemon(true);
+        deadline.start();
+    }
+
+    private void finishClose(MulticastSocket current) {
+        if (!cleaned.compareAndSet(false, true)) return;
+        socket = null;
+        if (current != null) current.close();
         if (lock.isHeld()) lock.release();
     }
 }

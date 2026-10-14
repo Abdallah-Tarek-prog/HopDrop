@@ -157,6 +157,49 @@ public final class AndroidFixesTest {
         }
     }
 
+    @Test public void cancelledWaitingRetryDoesNotRequeueUnreachableDevice() {
+        Peer.Device device = new Peer.Device("cancelled-retry", "Cancelled retry PC", "windows", 7410, null);
+        app.book().put(device);
+        Sends.Job job = new Sends.Job(device.id, "1 file");
+        Sends.queue(app, job);
+        Sends.cancelQueued(app, device.id);
+
+        // No saved address means reach() stops before opening a socket.
+        Sends.run(app, job, false, true);
+
+        assertFalse(Sends.queued(app, job.id));
+        assertNull(app.live().outgoing(device.label()));
+        assertFalse(active(4000 + (device.label().hashCode() & 0xfff)));
+    }
+
+    @Test public void firstSendStillQueuesAndAnnouncesUnreachableDevice() {
+        Peer.Device device = new Peer.Device("first-send-away", "First send PC", "windows", 7410, null);
+        app.book().put(device);
+        Sends.Job job = new Sends.Job(device.id, "1 file");
+
+        // No saved address means reach() stops before opening a socket.
+        Sends.run(app, job, false);
+
+        assertTrue(Sends.queued(app, job.id));
+        assertEquals("queued", app.live().outgoing(device.label()).note);
+        assertTrue(active(4000 + (device.label().hashCode() & 0xfff)));
+    }
+
+    @Test public void waitingRetryRemainsQueuedWhenDeviceIsStillAway() {
+        Peer.Device device = new Peer.Device("retry-away", "Waiting PC", "windows", 7410, null);
+        app.book().put(device);
+        Sends.Job job = new Sends.Job(device.id, "1 file");
+        Sends.queue(app, job);
+
+        Sends.run(app, job, false, true);
+
+        assertTrue(Sends.queued(app, job.id));
+        assertEquals("queued", app.live().outgoing(device.label()).note);
+        assertFalse(active(4000 + (device.label().hashCode() & 0xfff)));
+        Sends.cancelQueued(app, device.id);
+        assertNull(app.live().outgoing(device.label()));
+    }
+
     @Test public void outgoingProgressAndCleanupStayPerDevice() {
         Peer.Progress one = new Peer.Progress("transfer-one", false, "First PC", "a.txt", 1, 1, 1, 5, 0, -1, false, false, "device-one");
         Peer.Progress two = new Peer.Progress("transfer-two", false, "Second PC", "b.txt", 1, 1, 1, 5, 0, -1, false, false, "device-two");

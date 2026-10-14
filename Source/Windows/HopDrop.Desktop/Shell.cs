@@ -243,7 +243,9 @@ public partial class App
         if (app.Link is not null) app.Link.Dispose();
         if (app.Queue is not null) app.Queue.Dispose();
         foreach (var offer in app._offers.Values.ToList()) offer.Decline();
-        if (app._peer is not null) await app._peer.DisposeAsync();
+        var peer = app._peer;
+        app._peer = null;
+        if (peer is not null) await peer.DisposeAsync();
         app.Shutdown();
     }
 }

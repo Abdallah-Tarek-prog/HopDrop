@@ -183,7 +183,10 @@ final class Sends {
      * Sends one job, blocking. A device that can't be reached gets the job queued (it goes when the device is back);
      * everything else ends as a result in Live, Activity and a notification, as before.
      */
-    static void run(HopApp app, Job job, boolean direct) {
+    static void run(HopApp app, Job job, boolean direct) { run(app, job, direct, false); }
+
+    /** {@code waiting}: a retry of a waiting send; it stops if the user cancels it while the device is being reached. */
+    static void run(HopApp app, Job job, boolean direct, boolean waiting) {
         Peer.Device d = app.book().get(job.deviceId);
         if (d == null) {
             dequeue(app, job.id);
@@ -201,15 +204,23 @@ final class Sends {
                 app.live().clear(label);
                 Backup.waiting(app, job, label);
             } else if (unreachable(e)) {
-                boolean fresh = !queued(app, job.id);
-                queue(app, job);
-                app.live().queued(label);
-                if (fresh) app.notices().queued(d.id, label, job.textOnly() ? "Your text" : job.summary);
+                waitForDevice(app, job, d, label, waiting);
             } else {
-                app.live().failedToStart(label, ErrorText.forDevice(e, label));
-                app.notices().couldNotSend(label, ErrorText.forDevice(e, label));
-                dequeue(app, job.id);
+                synchronized (Sends.class) {
+                    if (waiting && !queued(app, job.id)) app.live().clear(label);
+                    else {
+                        app.live().failedToStart(label, ErrorText.forDevice(e, label));
+                        app.notices().couldNotSend(label, ErrorText.forDevice(e, label));
+                        dequeue(app, job.id);
+                    }
+                }
             }
+            return;
+        }
+        if (waiting && !queued(app, job.id)) {
+            // Cancelled while the device was being reached.
+            app.live().clear(label);
+            if (reached.viaLink) app.directLink().done();
             return;
         }
         try {
@@ -233,10 +244,7 @@ final class Sends {
             Live.Item item = app.live().outgoing(label);
             // It was announced a moment ago but has just gone (asleep, out of range): wait for it like any other away device.
             if (unreachable(e) && !job.backup && (item == null || item.connecting())) {
-                boolean fresh = !queued(app, job.id);
-                queue(app, job);
-                app.live().queued(label);
-                if (fresh) app.notices().queued(d.id, label, job.textOnly() ? "Your text" : job.summary);
+                waitForDevice(app, job, d, label, waiting);
                 return;
             }
             String reason = e.getMessage() != null && e.getMessage().startsWith("cancelled") ? "You cancelled it." : ErrorText.forDevice(e, label);
@@ -311,6 +319,19 @@ final class Sends {
 
     // ---- The queue: sends waiting for their device ----
 
+    /** A retry is already saved. Keep the check and notice together with Cancel. */
+    private static synchronized void waitForDevice(HopApp app, Job job, Peer.Device device, String label, boolean waiting) {
+        if (waiting) {
+            if (queued(app, job.id)) app.live().queued(label);
+            else app.live().clear(label);
+        } else {
+            boolean fresh = !queued(app, job.id);
+            queue(app, job);
+            app.live().queued(label);
+            if (fresh) app.notices().queued(device.id, label, job.textOnly() ? "Your text" : job.summary);
+        }
+    }
+
     private static SharedPreferences store(Context c) { return c.getSharedPreferences("queue_v1", Context.MODE_PRIVATE); }
 
     @SuppressWarnings("unchecked")
@@ -359,6 +380,11 @@ final class Sends {
         for (Job j : jobs) if (j.deviceId.equalsIgnoreCase(deviceId)) deleteCopies(app, j.id);
         if (jobs.removeIf(j -> j.deviceId.equalsIgnoreCase(deviceId))) {
             save(app, jobs);
+            Peer.Device device = app.book().get(deviceId);
+            if (device != null) {
+                app.live().clear(device.label());
+                app.notices().clearQueued(device.label());
+            }
             app.changed();
         }
     }
@@ -439,7 +465,7 @@ final class Sends {
             submit(job.deviceId, () -> {
                 try {
                     // Cancelled while it waited its turn: drop it.
-                    if (queued(app, job.id)) run(app, job, direct);
+                    if (queued(app, job.id)) run(app, job, direct, true);
                 } finally {
                     running.remove(job.id);
                 }

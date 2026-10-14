@@ -93,7 +93,7 @@ public sealed record DiscoveryMessage(int Hopdrop, string Type, string Id, strin
             using var doc = JsonDocument.Parse(bytes.ToArray()); var o = doc.RootElement;
             var message = new DiscoveryMessage(checked((int)Messages.Long(o, "hopdrop")), Messages.Type(o), Messages.String(o, "id"),
                 Messages.String(o, "name"), Messages.String(o, "pl"), checked((int)Messages.Long(o, "p")), Messages.Bool(o, "rx"));
-            if (message.Hopdrop != 2 || message.Type is not ("announce" or "query") || !Identity.IsId(message.Id)
+            if (message.Hopdrop != 2 || message.Type is not ("announce" or "query" or "bye") || !Identity.IsId(message.Id)
                 || message.Name.Length > 40 || message.Platform is not ("windows" or "android") || message.Port is < 1 or > 65535)
                 throw new HopDropException("protocol_error", "Invalid discovery message");
             return message;
@@ -122,6 +122,10 @@ public sealed class NearbyTable(TimeProvider? clock = null)
             _items[message.Id] = new(message.Id, message.Name, message.Platform, message.Port, address, _clock.GetUtcNow(), message.Receive);
             return changed;
         }
+    }
+    public bool Remove(string id)
+    {
+        lock (_items) return _items.Remove(id);
     }
     public bool Expire()
     {
@@ -196,7 +200,7 @@ public sealed class DiscoveryService(string id, Func<string> name, Func<int> por
     }
     private async Task BroadcastAsync(string type, CancellationToken ct)
     {
-        byte[] bytes = new DiscoveryMessage(2, type, id, name(), "windows", port(), true).Encode();
+        byte[] bytes = new DiscoveryMessage(2, type, id, type == "bye" ? "" : name(), "windows", port(), type != "bye").Encode();
         await _sendGate.WaitAsync(ct);
         try
         {
@@ -207,10 +211,10 @@ public sealed class DiscoveryService(string id, Func<string> name, Func<int> por
                     _udp!.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastInterface, address.GetAddressBytes());
                     await _udp.SendAsync(bytes, new IPEndPoint(Multicast, 7410), ct);
                 }
-                catch (SocketException e) { Error?.Invoke(e.Message); }
+                catch (SocketException e) { if (type != "bye") Error?.Invoke(e.Message); }
             }
             foreach (var target in new[] { IPAddress.Broadcast }.Concat(NetworkAddresses.DirectedBroadcasts()).Distinct())
-            { try { await _udp!.SendAsync(bytes, new IPEndPoint(target, 7410), ct); } catch (SocketException e) { Error?.Invoke(e.Message); } }
+            { try { await _udp!.SendAsync(bytes, new IPEndPoint(target, 7410), ct); } catch (SocketException e) { if (type != "bye") Error?.Invoke(e.Message); } }
         }
         finally { _sendGate.Release(); }
     }
@@ -222,9 +226,14 @@ public sealed class DiscoveryService(string id, Func<string> name, Func<int> por
             {
                 var packet = await _udp!.ReceiveAsync(ct);
                 var message = DiscoveryMessage.Parse(packet.Buffer);
+                if (message.Id == id) continue;
+                if (message.Type == "bye")
+                {
+                    if (_table.Remove(message.Id)) NearbyChanged?.Invoke(_table.Items);
+                    continue;
+                }
                 bool first = !_table.Items.Any(item => item.Id == message.Id);
                 bool changed = _table.Update(message, packet.RemoteEndPoint.Address, id);
-                if (message.Id == id) continue;
                 if (changed) NearbyChanged?.Invoke(_table.Items);
                 if (message.Type == "query" || first)
                 {
@@ -240,10 +249,23 @@ public sealed class DiscoveryService(string id, Func<string> name, Func<int> por
     }
     public async ValueTask DisposeAsync()
     {
-        _stop?.Cancel(); _udp?.Dispose();
+        _stop?.Cancel();
         NetworkChange.NetworkAddressChanged -= OnNetworkChanged;
         if (_receive is not null) await _receive;
         if (_announce is not null) await _announce;
+        if (_udp is not null)
+        {
+            // Keep the socket open long enough for both goodbye rounds.
+            using var timeout = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
+            try
+            {
+                await BroadcastAsync("bye", timeout.Token);
+                await Task.Delay(100, timeout.Token);
+                await BroadcastAsync("bye", timeout.Token);
+            }
+            catch (Exception) { }
+            _udp.Dispose();
+        }
         _stop?.Dispose();
         _sendGate.Dispose();
         _wake.Dispose();

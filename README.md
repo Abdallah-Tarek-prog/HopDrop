@@ -28,8 +28,9 @@ From the [Releases page](https://github.com/Abdallah-Tarek-prog/HopDrop/releases
 ## Sending and receiving
 
 - **Phone:** tap **Files**, **Photos**, **Folder** or **Text**, then **Send** next to a device. **Select several** sends to more than one device at once.
-- **From any app (phone):** tap **Share** and pick your PC in the top row of the share sheet: it's sent at once, HopDrop doesn't even open.
+- **From any app (phone):** tap **Share**. If your PC appears as a round target, tap it to send at once. If the sheet shows only apps, tap **HopDrop**, then **Send**.
 - **Quick Settings tile (phone):** pull down, tap **HopDrop**, then **Clipboard**, **Latest photo** or **Files**.
+- **Launcher shortcut (phone):** long-press the HopDrop icon and tap **Send clipboard**. It appears after pairing a device.
 - **PC:** drop files or folders on the **Send** page, then click **Send** next to a device (tick several devices to send to all of them).
   Or right-click files → **Send to → HopDrop** (turn it on in Settings), or **Share → HopDrop** with the Store version.
 - **Not on the same Wi-Fi?** The phone connects to the PC directly, by itself, and goes back to your usual Wi-Fi when it's done. The PC

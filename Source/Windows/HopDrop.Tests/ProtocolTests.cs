@@ -129,6 +129,26 @@ public class ProtocolTests
         Assert.True(table.Expire()); Assert.Empty(table.Items);
     }
     [Fact]
+    public void DiscoveryGoodbyeRemovesUntilNextAnnouncement()
+    {
+        string id = new('a', 64);
+        var announce = new DiscoveryMessage(2, "announce", id, "Laptop", "windows", 7410, true);
+        var query = announce with { Type = "query" };
+        var bye = announce with { Type = "bye", Name = "", Receive = false };
+        Assert.Equal(announce, DiscoveryMessage.Parse(announce.Encode()));
+        Assert.Equal(query, DiscoveryMessage.Parse(query.Encode()));
+        Assert.Equal(bye, DiscoveryMessage.Parse(bye.Encode()));
+        var table = new NearbyTable();
+        Assert.True(table.Update(announce, IPAddress.Loopback, new string('b', 64)));
+        Assert.True(table.Remove(id));
+        Assert.False(table.Remove(id));
+        Assert.Empty(table.Items);
+        Assert.True(table.Update(announce, IPAddress.Loopback, new string('b', 64)));
+        Assert.Single(table.Items);
+        Assert.Equal("protocol_error", Assert.Throws<HopDropException>(() =>
+            DiscoveryMessage.Parse((bye with { Id = "bad" }).Encode())).Code);
+    }
+    [Fact]
     public async Task JsonStoreSerializesConcurrentAtomicUpdates()
     {
         string root = Scratch.NewFolder();

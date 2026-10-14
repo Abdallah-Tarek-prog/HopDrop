@@ -242,6 +242,14 @@ public partial class App : System.Windows.Application
     }
     protected override void OnExit(ExitEventArgs e)
     {
+        if (_peer is not null)
+        {
+            var peer = _peer;
+            _peer = null;
+            // Session shutdown gives the peer one second to announce its exit.
+            try { Task.Run(async () => await peer.DisposeAsync()).Wait(TimeSpan.FromSeconds(1)); }
+            catch (Exception) { }
+        }
         _clipboardShare?.Dispose();
         if (Link is not null) Link.Dispose();
         if (Queue is not null) Queue.Dispose();

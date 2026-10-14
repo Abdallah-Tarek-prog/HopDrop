@@ -547,8 +547,8 @@ public sealed partial class HopDropPeer : IAsyncDisposable
         _serverStop?.Cancel(); _listener?.Stop();
         if (_acceptTask is not null) { try { await _acceptTask; } catch (OperationCanceledException) { } }
         foreach (var c in _transfers.Values) c.Cancel();
-        await Task.WhenAll(_handlers.Keys.ToArray());
         if (_discovery is not null) await _discovery.DisposeAsync();
+        await Task.WhenAll(_handlers.Keys.ToArray());
         _serverStop?.Dispose(); _sasGate.Dispose(); _namingGate.Dispose(); Identity.Dispose();
     }
 }

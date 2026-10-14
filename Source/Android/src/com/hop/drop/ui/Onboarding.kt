@@ -210,8 +210,8 @@ private fun tourPages(firstTime: Boolean): List<TourPage> = listOf(
     TourPage(
         "Share from any app",
         listOf(TourBullet(Icons.Rounded.Image, "In your gallery, tap Share.", ""),
-            TourBullet(Icons.Rounded.Laptop, "Tap your PC", ": the round icon with the small HopDrop badge."),
-            TourBullet(Icons.Rounded.CheckCircle, "It's sent.", " HopDrop doesn't even open.")),
+            TourBullet(Icons.Rounded.Laptop, "Tap your PC icon.", " No icon? Tap HopDrop, then Send."),
+            TourBullet(Icons.Rounded.CheckCircle, "It's sent.", " The PC icon sends without opening HopDrop.")),
     ) { active, height -> ShareSheetIllustration(active, height) },
     TourPage(
         "The Quick Settings tile",
@@ -315,14 +315,17 @@ private fun PhoneMock(height: Dp, state: HopUiState, spotlight: Spot?, active: B
     val bezel = 7.dp
     val scale = (height - bezel * 2) / MockHeight
     val width = MockWidth * scale + bezel * 2
+    // The screen and its corner must shrink together, so the status bar stays inside the curve.
+    val screenCorner = 30.dp * scale
+    val frameCorner = screenCorner + bezel
     val pulse = rememberInfiniteTransition(label = "spot")
     val ring by pulse.animateFloat(0f, 1f, infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Restart), label = "ring")
     Box(
-        Modifier.size(width, height).shadow(20.dp, RoundedCornerShape(36.dp)).clip(RoundedCornerShape(36.dp))
-            .background(Color(0xFF16171B)).border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(36.dp)).padding(bezel)
+        Modifier.size(width, height).shadow(20.dp, RoundedCornerShape(frameCorner)).clip(RoundedCornerShape(frameCorner))
+            .background(Color(0xFF16171B)).border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(frameCorner)).padding(bezel)
             .clearAndSetSemantics { contentDescription = "Picture of HopDrop" },
     ) {
-        Box(Modifier.fillMaxSize().clip(RoundedCornerShape(30.dp)).background(MaterialTheme.colorScheme.surface)) {
+        Box(Modifier.fillMaxSize().clip(RoundedCornerShape(screenCorner)).background(MaterialTheme.colorScheme.surface)) {
             Box(Modifier.wrapContentSize(unbounded = true, align = Alignment.TopStart)
                 .graphicsLayer { scaleX = scale; scaleY = scale; transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f) }
                 .requiredSize(MockWidth, MockHeight)) {
@@ -470,7 +473,7 @@ private fun ScaledPicture(height: Dp, baseHeight: Dp, content: @Composable () ->
     }
 }
 
-/** Android's share sheet with the paired PC in its top row, highlighted. */
+/** Both share-sheet paths: a paired PC target, or HopDrop in the apps row. */
 @Composable
 private fun ShareSheetIllustration(active: Boolean, height: Dp) {
     val scheme = MaterialTheme.colorScheme
@@ -498,7 +501,8 @@ private fun ShareSheetIllustration(active: Boolean, height: Dp) {
                     Box(Modifier.fillMaxWidth().height(1.dp).background(scheme.outlineVariant))
                     Row(Modifier.padding(top = 14.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         for ((name, color) in listOf("Drive" to Color(0xFFF2C14E), "HopDrop" to Color(0xFF121212), "Notes" to Color(0xFF8E7CC3), "Copy" to Color(0xFF9AA0A6))) {
-                            ShareTarget(name, null, color, logo = name == "HopDrop")
+                            ShareTarget(name, null, color, highlight = name == "HopDrop", ring = if (active && name == "HopDrop") ring else -1f,
+                                logo = name == "HopDrop")
                         }
                     }
                 }
@@ -573,8 +577,9 @@ private fun QuickTileIllustration(active: Boolean, height: Dp) {
 private fun ShareTarget(name: String, icon: ImageVector?, color: Color = Color.Unspecified, highlight: Boolean = false, ring: Float = -1f, logo: Boolean = false) {
     val scheme = MaterialTheme.colorScheme
     Column(Modifier.width(68.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(contentAlignment = Alignment.Center) {
-            if (ring >= 0f) Box(Modifier.size(52.dp + 14.dp * ring).clip(CircleShape).background(scheme.primary.copy(alpha = 0.35f * (1f - ring))))
+        // A fixed size: the pulsing ring grows past it without pushing the picture's other rows down (they'd get cut off).
+        Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) {
+            if (ring >= 0f) Box(Modifier.requiredSize(52.dp + 14.dp * ring).clip(CircleShape).background(scheme.primary.copy(alpha = 0.35f * (1f - ring))))
             Box(Modifier.size(52.dp).clip(CircleShape).background(if (icon != null) scheme.primary else color)
                 .then(if (highlight) Modifier.border(3.dp, scheme.primaryContainer, CircleShape) else Modifier), contentAlignment = Alignment.Center) {
                 when {
