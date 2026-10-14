@@ -1,6 +1,5 @@
 package com.hop.drop.core;
 
-import java.net.URI;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.ArrayList;
@@ -24,10 +23,12 @@ public final class PairUri {
     public static String token() { return Base64.getUrlEncoder().withoutPadding().encodeToString(Protocol.random(16)); }
     public static PairUri parse(String text) {
         try {
-            URI uri = URI.create(text);
-            if (!"hopdrop".equals(uri.getScheme()) || !"pair".equals(uri.getHost())) throw new IllegalArgumentException("Invalid pair URI");
+            int query = text.indexOf('?');
+            if (query < 0 || !"hopdrop://pair".equals(text.substring(0, query)) || text.indexOf('#') >= 0)
+                throw new IllegalArgumentException("Invalid pair URI");
+            for (int i = 0; i < text.length(); i++) if (text.charAt(i) <= ' ') throw new IllegalArgumentException("Invalid pair URI");
             Map<String,String> q = new LinkedHashMap<>();
-            for (String field : uri.getRawQuery().split("&")) { String[] kv = field.split("=",2); if (kv.length != 2 || q.put(kv[0],kv[1]) != null) throw new IllegalArgumentException("Invalid query"); }
+            for (String field : text.substring(query + 1).split("&")) { String[] kv = field.split("=",2); if (kv.length != 2 || q.put(kv[0],kv[1]) != null) throw new IllegalArgumentException("Invalid query"); }
             String id = q.get("id"), name = URLDecoder.decode(q.get("n"), "UTF-8"), pl = q.get("pl"), token = q.get("t");
             int port = Integer.parseInt(q.get("p")); List<String> addresses = new ArrayList<>();
             for (String address : q.get("a").split(",")) { if (!address.matches("[0-9.]+") || !validIpv4(address)) throw new IllegalArgumentException("Invalid address"); addresses.add(address); }

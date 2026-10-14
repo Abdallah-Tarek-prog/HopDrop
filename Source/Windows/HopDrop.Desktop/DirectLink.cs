@@ -21,6 +21,7 @@ internal sealed class DirectLink : IDisposable
     private string _ssid = "", _key = "";
     private const string CannotCreate = "This PC's Wi-Fi can't create a direct link";
     private System.Windows.Threading.DispatcherTimer? _retry;
+    private int _failures;
     public DirectLinkState State { get; private set; } = DirectLinkState.Waiting;
     public string Reason { get; private set; } = "";
     public string LastError { get; private set; } = "";
@@ -57,7 +58,7 @@ internal sealed class DirectLink : IDisposable
             {
                 var next = Preferences.DirectLink ? DirectLinkState.Waiting : DirectLinkState.Off;
                 if (State == next && _publisher is null && _peer.DirectLink is null) return;
-                Stop(); Set(next); return;
+                Stop(); _failures = 0; Set(next); return;
             }
             if (State is DirectLinkState.On or DirectLinkState.Starting) return;
             _retry?.Stop(); Start();
@@ -117,7 +118,16 @@ internal sealed class DirectLink : IDisposable
             if (args.Status == WiFiDirectAdvertisementPublisherStatus.Started && _pollGeneration != _generation)
             { _pollGeneration = _generation; _ = FindAddressAsync(_generation); }
             else if (args.Status == WiFiDirectAdvertisementPublisherStatus.Aborted)
-            { LastError = args.Error.ToString(); Fail(args.Error == WiFiDirectError.RadioNotAvailable ? "Wi-Fi is off" : CannotCreate); }
+            {
+                LastError = args.Error.ToString();
+                // Windows' Mobile hotspot takes Wi-Fi Direct for itself; phones can join that hotspot instead.
+                Fail(args.Error switch
+                {
+                    WiFiDirectError.RadioNotAvailable => "Wi-Fi is off",
+                    WiFiDirectError.ResourceInUse => "Mobile hotspot (or another app) is using this PC's Wi-Fi Direct",
+                    _ => CannotCreate,
+                });
+            }
             else if (args.Status == WiFiDirectAdvertisementPublisherStatus.Stopped) Fail(CannotCreate);
         });
     }
@@ -129,7 +139,8 @@ internal sealed class DirectLink : IDisposable
     private void Fail(string reason)
     {
         Stop(); Reason = reason; Set(DirectLinkState.Unavailable);
-        _retry ??= new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
+        _retry ??= new System.Windows.Threading.DispatcherTimer();
+        _retry.Interval = TimeSpan.FromSeconds(Math.Min(600, 30 * (1 << Math.Min(_failures++, 5))));
         _retry.Tick -= Retry;
         _retry.Tick += Retry;
         _retry.Start();
@@ -159,6 +170,7 @@ internal sealed class DirectLink : IDisposable
     private void NetworkAddressChanged(object? sender, EventArgs e) => Post(RetryNow);
     private void RetryNow()
     {
+        _failures = 0;
         if (State == DirectLinkState.On && !DirectAddresses().Any(a => a.Address.ToString() == Address)) { Fail(CannotCreate); return; }
         if (State == DirectLinkState.Unavailable) { _retry?.Stop(); Refresh(); }
     }

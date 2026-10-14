@@ -1,12 +1,12 @@
 package com.hop.drop;
 
+import android.app.Notification;
 import android.app.Service;
 import android.content.Intent;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import com.hop.drop.core.Json;
-import com.hop.drop.core.Peer;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -41,25 +41,31 @@ public final class TransferService extends Service {
         } catch (Exception e) {
             return START_NOT_STICKY;
         }
-        Peer.Device queued = app.book().get(job.deviceId);
-        String label = queued == null ? "the device" : queued.label();
-        startForeground(Notices.OUTGOING, app.notification("transfers", "Connecting to " + label,
-                job.textOnly() ? "Getting ready to send your text" : "Getting ready to send " + job.summary, true, -1)
-                .setSmallIcon(R.drawable.ic_direction_out).setShowWhen(false).build());
-        pending.incrementAndGet();
+        int count = pending.incrementAndGet();
+        startForeground(Notices.OUTGOING, summary(app, count));
         Sends.submit(job.deviceId, () -> {
             try {
                 Sends.run(app, job, true);
             } finally {
+                app.notices().clearOutgoing(job.deviceId);
                 main.post(() -> {
-                    if (pending.decrementAndGet() == 0) {
+                    int left = pending.decrementAndGet();
+                    if (left == 0) {
                         stopForeground(STOP_FOREGROUND_REMOVE);
                         stopSelf(latestStart.get());
+                    } else {
+                        startForeground(Notices.OUTGOING, summary(app, left));
                     }
                 });
             }
         });
         return START_NOT_STICKY;
+    }
+
+    private Notification summary(HopApp app, int count) {
+        return app.notification("transfers", "Sending with HopDrop", count + (count == 1 ? " send" : " sends") + " in progress", true, -1)
+                .setSmallIcon(R.drawable.ic_direction_out).setGroup(Notices.OUTGOING_GROUP).setGroupSummary(true)
+                .setShowWhen(false).build();
     }
 
     /** Android 15 limits background data-sync work to six hours a day; stop cleanly instead of being killed. */

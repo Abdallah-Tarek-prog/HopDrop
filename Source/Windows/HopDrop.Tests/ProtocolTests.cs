@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using HopDrop.Core;
@@ -131,8 +131,7 @@ public class ProtocolTests
     [Fact]
     public async Task JsonStoreSerializesConcurrentAtomicUpdates()
     {
-        string root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../.test-scratch", Guid.NewGuid().ToString("N")));
-        Directory.CreateDirectory(root);
+        string root = Scratch.NewFolder();
         var store = new JsonStore<List<int>>(Path.Combine(root, "settings.json"), []);
         await Task.WhenAll(Enumerable.Range(0, 50).Select(i => store.UpdateAsync(old => { old.Add(i); return old; })));
         Assert.Equal(Enumerable.Range(0, 50), (await store.ReadAsync()).Order());
@@ -163,7 +162,7 @@ public class ProtocolTests
     [Fact]
     public void SendItemsKeepFolderStructureAndSkipHiddenFiles()
     {
-        string root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../.test-scratch", Guid.NewGuid().ToString("N")));
+        string root = Scratch.NewFolder();
         string photos = Path.Combine(root, "Photos"); Directory.CreateDirectory(Path.Combine(photos, "2024", "July"));
         File.WriteAllText(Path.Combine(photos, "cover.jpg"), "c"); File.WriteAllText(Path.Combine(photos, "2024", "July", "beach.jpg"), "b");
         string hidden = Path.Combine(photos, "Thumbs.db"); File.WriteAllText(hidden, "h"); File.SetAttributes(hidden, FileAttributes.Hidden);

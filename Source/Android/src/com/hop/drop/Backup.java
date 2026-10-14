@@ -6,199 +6,146 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.BatteryManager;
+import com.hop.drop.core.BackupRules;
 import com.hop.drop.core.Format;
+import com.hop.drop.core.Json;
 import com.hop.drop.core.Peer;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/**
- * Auto-backup (Settings → Auto-backup, off by default): new files in one folder the user picked (for example the
- * camera's) go to one paired device by themselves, whenever that device is on the same network. They arrive in one
- * folder of the same name there, filled up over time ("merge"). The files already sent are remembered by their id and
- * size, so nothing is sent twice. It runs while HopDrop runs: in the background when "Receive in the background" is on.
- */
+/** Independent phone backups. The receiver service checks them every 30 seconds while it runs. */
 final class Backup {
-    /** At most this many files per round; the rest go in the next one. */
     private static final int ROUND = 500;
-    /** Without a reason to look sooner (the device showing up), a folder is looked through at most this often. */
     private static final long EVERY_MS = 10 * 60 * 1000;
     private static final AtomicBoolean busy = new AtomicBoolean();
-    /** A round's files are being sent (or wait their turn): no new round until it ends, so nothing goes twice. */
-    private static final AtomicBoolean sending = new AtomicBoolean();
-    private static final AtomicBoolean again = new AtomicBoolean();
+    private static final AtomicBoolean recheckSoon = new AtomicBoolean();
+    private static final Set<String> manualPending = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private static final Set<String> sending = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private static final Set<String> again = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
-    /** What Settings shows. */
-    static final class State {
-        final boolean on, charging;
-        final String folder, deviceId, status;
-        final long lastRun;
-        State(boolean on, String folder, String deviceId, boolean charging, String status, long lastRun) {
-            this.on = on; this.folder = folder; this.deviceId = deviceId; this.charging = charging; this.status = status; this.lastRun = lastRun;
+    static final class Entry {
+        final String id, tree, folder, device, status;
+        final boolean on, charging, timed;
+        final int kinds, from, to;
+        final long lastRun, lastCheck;
+        Entry(Map<String,Object> m) {
+            id = str(m,"id"); tree = str(m,"tree"); folder = str(m,"folder"); device = str(m,"device"); status = str(m,"status");
+            on = bool(m,"on"); charging = bool(m,"charging"); timed = bool(m,"timed");
+            kinds = number(m,"kinds",BackupRules.ALL); from = number(m,"from",0); to = number(m,"to",0);
+            lastRun = longNumber(m,"lastRun"); lastCheck = longNumber(m,"lastCheck");
         }
     }
-
     private Backup() { }
+    private static String str(Map<String,Object> m,String key){Object v=m.get(key);return v instanceof String?(String)v:null;}
+    private static boolean bool(Map<String,Object> m,String key){return Boolean.TRUE.equals(m.get(key));}
+    private static int number(Map<String,Object> m,String key,int fallback){Object v=m.get(key);return v instanceof Number?((Number)v).intValue():fallback;}
+    private static long longNumber(Map<String,Object> m,String key){Object v=m.get(key);return v instanceof Number?((Number)v).longValue():0;}
+    private static SharedPreferences prefs(Context c){return c.getSharedPreferences("backup_v2",Context.MODE_PRIVATE);}
 
-    private static SharedPreferences prefs(Context c) { return c.getSharedPreferences("backup_v1", Context.MODE_PRIVATE); }
-
-    static State state(Context c) {
-        SharedPreferences p = prefs(c);
-        return new State(p.getBoolean("on", false), p.getString("folder_name", null), p.getString("device", null),
-                p.getBoolean("charging", false), p.getString("status", null), p.getLong("last_run", 0));
+    /** The first entry keeps the old sent-list file in place. Migration needs no spare storage. */
+    private static synchronized void migrate(Context c) {
+        SharedPreferences p=prefs(c);
+        if(p.getBoolean("migrated",false))return;
+        SharedPreferences old=c.getSharedPreferences("backup_v1",Context.MODE_PRIVATE);
+        String tree=old.getString("tree",null),device=old.getString("device",null);
+        if(tree==null||device==null){p.edit().putBoolean("migrated",true).commit();return;}
+        String id="legacy";
+        String folder=old.getString("folder_name",null);
+        Map<String,Object> entry=BackupRules.legacy(id,old.getBoolean("on",false),tree,folder==null?"Folder":folder,device,
+                old.getBoolean("charging",false),old.getString("status",null),old.getLong("last_run",0));
+        p.edit().putString("entries",Json.string(Json.obj("entries",java.util.Collections.singletonList(entry)))).putBoolean("migrated",true).commit();
     }
-
-    static Uri tree(Context c) {
-        String t = prefs(c).getString("tree", null);
-        return t == null ? null : Uri.parse(t);
+    @SuppressWarnings("unchecked")
+    private static synchronized List<Map<String,Object>> maps(Context c) {
+        migrate(c);
+        try {Object value=Json.parseObject(prefs(c).getString("entries","{\"entries\":[]}")).get("entries");
+            if(value instanceof List){List<Map<String,Object>> result=new ArrayList<>();for(Object item:(List<?>)value)result.add(new java.util.LinkedHashMap<>((Map<String,Object>)item));return result;}}
+        catch(Exception ignored){}
+        return new ArrayList<>();
     }
+    private static synchronized void save(Context c,List<Map<String,Object>> list){prefs(c).edit().putString("entries",Json.string(Json.obj("entries",list))).commit();}
+    static List<Entry> entries(Context c){List<Entry> result=new ArrayList<>();for(Map<String,Object> m:maps(c))result.add(new Entry(m));return result;}
+    static Entry get(Context c,String id){for(Entry e:entries(c))if(e.id.equals(id))return e;return null;}
+    private static synchronized void change(HopApp app,String id,String key,Object value){List<Map<String,Object>> list=maps(app);for(Map<String,Object> m:list)if(id.equals(m.get("id"))){m.put(key,value);break;}save(app,list);app.changed();}
 
-    /** Turns auto-backup on for {@code tree} to {@code deviceId}. {@code existing}: also send the files already there. */
-    static void start(HopApp app, Uri tree, String folderName, String deviceId, boolean existing) {
-        prefs(app).edit().putBoolean("on", true).putString("tree", tree.toString()).putString("folder_name", folderName)
-                .putString("device", deviceId).putString("status", existing ? null : "Looking at what's already there…")
-                .putLong("last_check", 0).apply();
-        new Thread(() -> {
-            // A new folder starts with nothing sent. "Only new ones": what's in it now counts as sent (a list of what's there,
-            // because some storage doesn't say when a file changed).
-            sentFile(app, deviceId).delete();
-            if (!existing) snapshot(app, tree, deviceId);
-            check(app, true);
-        }, "HopDrop backup start").start();
+    static synchronized String create(HopApp app,Uri tree,String folder,String device) {
+        String id=UUID.randomUUID().toString();Map<String,Object> entry=BackupRules.legacy(id,false,tree.toString(),folder,device,false,null,0);
+        List<Map<String,Object>> list=maps(app);list.add(entry);save(app,list);app.changed();
+        return id;
     }
+    static void activate(HopApp app,String id,boolean existing){Entry e=get(app,id);if(e==null)return;
+        new Thread(()->{if(!existing&&!snapshot(app,id,Uri.parse(e.tree),e.device,e.kinds)){
+            status(app,id,"Couldn't read the folder. Pick it again in Settings.");return;}setOn(app,id,true);},"HopDrop backup add").start();}
+    static void setOn(HopApp app,String id,boolean on){change(app,id,"on",on);if(on)check(app,true);}
+    static void setKinds(HopApp app,String id,int kinds){change(app,id,"kinds",kinds);check(app,true);}
+    static void setCharging(HopApp app,String id,boolean on){change(app,id,"charging",on);check(app,true);}
+    static synchronized void setWindow(HopApp app,String id,boolean timed,int from,int to){List<Map<String,Object>> list=maps(app);for(Map<String,Object> m:list)if(id.equals(m.get("id"))){m.put("timed",timed);m.put("from",from);m.put("to",to);break;}save(app,list);app.changed();check(app,true);}
+    static void setDevice(HopApp app,String id,String device){Entry before=get(app,id);if(before==null||device.equals(before.device))return;
+        change(app,id,"device",device);Entry e=get(app,id);if(e.on)new Thread(()->{
+            if(!sentFile(app,id,device).exists()&&!snapshot(app,id,Uri.parse(e.tree),device,e.kinds)){
+                setOn(app,id,false);status(app,id,"Couldn't read the folder. Pick it again in Settings.");return;}
+            check(app,true);},"HopDrop backup device").start();}
+    static synchronized void setFolder(HopApp app,String id,Uri tree,String folder,boolean existing){List<Map<String,Object>> list=maps(app);for(Map<String,Object> m:list)if(id.equals(m.get("id"))){m.put("tree",tree.toString());m.put("folder",folder);m.put("status",null);m.put("lastCheck",0);break;}save(app,list);app.changed();
+        if("legacy".equals(id)){for(Peer.Device device:app.book().all())sentFile(app,id,device.id).delete();}
+        else {File[] files=app.getFilesDir().listFiles((dir,name)->name.startsWith("backup-sent-"+id+"-"));if(files!=null)for(File f:files)f.delete();}
+        Entry e=get(app,id);if(e!=null)new Thread(()->{if(!existing)snapshot(app,id,tree,e.device,e.kinds);check(app,true);},"HopDrop backup folder").start();}
+    static synchronized void remove(HopApp app,String id){List<Map<String,Object>> list=maps(app);list.removeIf(m->id.equals(m.get("id")));save(app,list);app.changed();}
 
-    /** Marks everything in the folder right now as sent to {@code deviceId}. */
-    private static void snapshot(HopApp app, Uri tree, String deviceId) {
-        try (FileOutputStream out = new FileOutputStream(sentFile(app, deviceId), true)) {
-            for (FolderScan.Item f : FolderScan.files(app.getContentResolver(), tree)) out.write((key(f) + "\n").getBytes(StandardCharsets.UTF_8));
-        } catch (Exception ignored) {
-        }
+    static boolean snapshot(HopApp app,String id,Uri tree,String device,int kinds){try(FileOutputStream out=new FileOutputStream(sentFile(app,id,device),true)){
+        for(FolderScan.Item f:FolderScan.files(app.getContentResolver(),tree))if(BackupRules.kind(kinds,f.mime,f.name))out.write((key(f)+"\n").getBytes(StandardCharsets.UTF_8));}
+        catch(Exception ignored){return false;}return true;
     }
+    static void deviceSeen(HopApp app,String id){for(Entry e:entries(app))if(id.equalsIgnoreCase(e.device)&&e.on){check(app,true);break;}}
+    static void waiting(HopApp app,Sends.Job job,String label){status(app,job.backupId,"Waiting for "+label);}
+    private static void status(HopApp app,String id,String text){if(id!=null)change(app,id,"status",text);}
+    private static boolean plugged(Context c){Intent battery=c.registerReceiver(null,new IntentFilter(Intent.ACTION_BATTERY_CHANGED));return battery!=null&&battery.getIntExtra(BatteryManager.EXTRA_PLUGGED,0)!=0;}
 
-    static void stop(Context c) { prefs(c).edit().putBoolean("on", false).putString("status", null).apply(); }
-
-    /** Each device has its own list of what it got. A device that never got anything starts with "only new files from now". */
-    static void setDevice(HopApp app, String deviceId) {
-        prefs(app).edit().putString("device", deviceId).putString("status", null).apply();
-        Uri tree = tree(app);
-        new Thread(() -> {
-            if (tree != null && !sentFile(app, deviceId).exists()) snapshot(app, tree, deviceId);
-            check(app, true);
-        }, "HopDrop backup device").start();
-    }
-
-    static void setCharging(HopApp app, boolean on) {
-        prefs(app).edit().putBoolean("charging", on).apply();
-        check(app, true);
-    }
-
-    /** A device showed up (or connected to this phone): if it's the backup's device, look for new files now. */
-    static void deviceSeen(HopApp app, String id) {
-        String device = prefs(app).getString("device", null);
-        if (device != null && device.equalsIgnoreCase(id)) check(app, false);
-    }
-
-    private static void status(HopApp app, String text) {
-        prefs(app).edit().putString("status", text).apply();
-        app.changed();
-    }
-
-    /** The device wasn't reachable when a round started; the files wait for the next one. */
-    static void waiting(HopApp app, String label) { status(app, "Waiting for " + label); }
-
-    private static boolean charging(Context c) {
-        Intent battery = c.registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
-        int plugged = battery == null ? 0 : battery.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0);
-        return plugged != 0;
-    }
-
-    /**
-     * Sends the folder's new files, if any. {@code now}: the user asked (or a setting changed), so don't wait for the
-     * usual interval. Only devices on the same network are used; a backup never joins a direct link by itself.
-     */
-    static void check(HopApp app, boolean now) {
-        SharedPreferences p = prefs(app);
-        if (!p.getBoolean("on", false) || app.peer() == null) return;
-        long last = p.getLong("last_check", 0);
-        if (!now && System.currentTimeMillis() - last < EVERY_MS && p.getString("status", "").startsWith("Up to date")) return;
-        if (sending.get() || !busy.compareAndSet(false, true)) return;
-        new Thread(() -> {
-            try {
-                round(app);
-            } catch (Exception e) {
-                status(app, "Couldn't read the folder. Pick it again in Settings.");
-            } finally {
-                busy.set(false);
+    /** Regular checks obey every rule; a manual check ignores only the time window. */
+    static void check(HopApp app,boolean now){check(app,null,false,now);}
+    static void check(HopApp app,String id,boolean manual){check(app,id,manual,manual);}
+    private static void check(HopApp app,String id,boolean manual,boolean soon){if(app.peer()==null)return;
+        if(!busy.compareAndSet(false,true)){if(manual&&id!=null)manualPending.add(id);else if(soon)recheckSoon.set(true);return;}
+        new Thread(()->{try{for(Entry e:entries(app))if(id==null||id.equals(e.id))round(app,e,manual,soon);}
+            finally{busy.set(false);for(String pending:manualPending)if(manualPending.remove(pending))check(app,pending,true);
+                if(recheckSoon.getAndSet(false))check(app,true);}},"HopDrop backup check").start();}
+    private static void round(HopApp app,Entry e,boolean manual,boolean soon){
+        if(!e.on||sending.contains(e.id))return;
+        long now=System.currentTimeMillis();if(!soon&&now-e.lastCheck<EVERY_MS)return;
+        int minute=LocalTime.now().getHour()*60+LocalTime.now().getMinute();
+        boolean isPlugged=plugged(app);
+        if(!BackupRules.allowed(e.on,e.charging,isPlugged,e.timed&&!manual,minute,e.from,e.to)){
+            status(app,e.id,e.charging&&!isPlugged?"Waiting for the charger":"Waiting for the backup time");return;}
+        Peer.Device device=app.book().get(e.device);if(device==null){status(app,e.id,"Pick a device");return;}
+        if(e.tree==null){status(app,e.id,"Pick a folder");return;}
+        change(app,e.id,"lastCheck",now);
+        try{Set<String> sent=sent(app,e.id,e.device);List<String[]> picked=new ArrayList<>();
+            for(FolderScan.Item f:FolderScan.files(app.getContentResolver(),Uri.parse(e.tree))){
+                if(!BackupRules.kind(e.kinds,f.mime,f.name)||sent.contains(key(f)))continue;
+                if(picked.size()<ROUND)picked.add(new String[]{f.uri.toString(),f.name,f.folder,String.valueOf(f.size),key(f)});
             }
-        }, "HopDrop backup").start();
+            if(picked.isEmpty()){status(app,e.id,"Up to date");return;}
+            Sends.Job job=new Sends.Job(device.id,Format.files(picked.size())+" to back up");job.listed.addAll(picked);job.backup=true;job.merge=true;job.backupId=e.id;job.backupFolder=e.folder;
+            sending.add(e.id);status(app,e.id,"Backing up "+Format.files(picked.size())+" to "+device.label());
+            Sends.submit(device.id,()->Sends.run(app,job,false));
+        }catch(Exception ex){status(app,e.id,"Couldn't read the folder. Pick it again in Settings.");}
     }
-
-    private static void round(HopApp app) throws Exception {
-        SharedPreferences p = prefs(app);
-        p.edit().putLong("last_check", System.currentTimeMillis()).apply();
-        Uri tree = tree(app);
-        Peer.Device device = app.book().get(p.getString("device", ""));
-        if (tree == null) { status(app, "Pick a folder"); return; }
-        if (device == null) { status(app, "Pick a device"); return; }
-        if (p.getBoolean("charging", false) && !charging(app)) { status(app, "Waiting for the charger"); return; }
-        Set<String> sent = sent(app, device.id);
-        List<FolderScan.Item> files = FolderScan.files(app.getContentResolver(), tree);
-        List<String[]> picked = new ArrayList<>();
-        for (FolderScan.Item f : files) {
-            if (sent.contains(key(f))) continue;
-            if (picked.size() < ROUND) picked.add(new String[]{f.uri.toString(), f.name, f.folder, String.valueOf(f.size), key(f)});
-        }
-        if (picked.isEmpty()) {
-            status(app, "Up to date");
-            return;
-        }
-        Sends.Job job = new Sends.Job(device.id, Format.files(picked.size()) + " to back up");
-        job.listed.addAll(picked);
-        job.backup = true;
-        job.merge = true;
-        status(app, "Backing up " + Format.files(picked.size()) + " to " + device.label());
-        sending.set(true);
-        Sends.submit(device.id, () -> Sends.run(app, job, false));
+    static synchronized void sent(HopApp app,Sends.Job job){try(FileOutputStream out=new FileOutputStream(sentFile(app,job.backupId,job.deviceId),true)){
+        for(String[] item:job.listed)out.write((item[4]+"\n").getBytes(StandardCharsets.UTF_8));}catch(Exception error){
+            change(app,job.backupId,"on",false);status(app,job.backupId,"Couldn't save backup history");return;}
+        List<Map<String,Object>> list=maps(app);for(Map<String,Object> m:list)if(job.backupId.equals(m.get("id"))){m.put("lastRun",System.currentTimeMillis());m.put("status","Backed up "+Format.files(job.listed.size()));break;}save(app,list);app.changed();again.add(job.backupId);
     }
-
-    /** The round's files arrived: remember them, so they're never sent again. */
-    static synchronized void sent(HopApp app, Sends.Job job) {
-        try (FileOutputStream out = new FileOutputStream(sentFile(app, job.deviceId), true)) {
-            for (String[] item : job.listed) out.write((item[4] + "\n").getBytes(StandardCharsets.UTF_8));
-        } catch (Exception ignored) {
-        }
-        prefs(app).edit().putLong("last_run", System.currentTimeMillis()).putInt("last_count", job.listed.size())
-                .putString("status", "Backed up " + Format.files(job.listed.size())).apply();
-        app.changed();
-        // More may be waiting (big first backups go in rounds): the next round starts once this one has ended.
-        again.set(true);
-    }
-
-    /** The round's send ended (sent, failed or the device was away): another round may start, at once if this one worked. */
-    static void ended(HopApp app) {
-        sending.set(false);
-        if (again.getAndSet(false)) check(app, true);
-    }
-
-    private static File sentFile(Context c, String deviceId) {
-        return new File(c.getFilesDir(), "backup-sent-" + deviceId.substring(0, Math.min(16, deviceId.length())) + ".txt");
-    }
-
-    private static synchronized Set<String> sent(Context c, String deviceId) {
-        Set<String> keys = new HashSet<>();
-        try {
-            File f = sentFile(c, deviceId);
-            if (f.exists()) keys.addAll(Files.readAllLines(f.toPath(), StandardCharsets.UTF_8));
-        } catch (Exception ignored) {
-        }
-        return keys;
-    }
-
-    private static String key(FolderScan.Item f) { return f.documentId + "|" + f.size; }
+    static void ended(HopApp app,Sends.Job job){sending.remove(job.backupId);if(again.remove(job.backupId))check(app,true);}
+    private static File sentFile(Context c,String id,String device){return new File(c.getFilesDir(),BackupRules.sentFile(id,device));}
+    private static synchronized Set<String> sent(Context c,String id,String device){Set<String> keys=new HashSet<>();try{File f=sentFile(c,id,device);if(f.exists())keys.addAll(Files.readAllLines(f.toPath(),StandardCharsets.UTF_8));}catch(Exception ignored){}return keys;}
+    private static String key(FolderScan.Item f){return f.documentId+"|"+f.size;}
 }

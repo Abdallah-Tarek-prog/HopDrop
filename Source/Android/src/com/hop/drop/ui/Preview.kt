@@ -1,6 +1,10 @@
 package com.hop.drop.ui
 
 import android.net.Uri
+import android.graphics.Bitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.MultiFormatWriter
 import java.lang.reflect.Proxy
 
 /**
@@ -23,7 +27,7 @@ object Preview {
 
     fun state(
         tab: Tab = Tab.Send, selected: Boolean = false, sending: Boolean = false, devices: Boolean = true,
-        history: Boolean = true, settings: Boolean = false, text: Boolean = false,
+        history: Boolean = true, settings: Boolean = false, text: Boolean = false, qr: Boolean = false,
     ): HopUiState {
         val now = System.currentTimeMillis()
         val s = HopUiState()
@@ -31,6 +35,13 @@ object Preview {
         s.settingsOpen = settings
         s.phone = PhoneUi("Realme 6 Pro", true, listOf(AddressUi("Wi-Fi", "192.168.8.24"), AddressUi("Hotspot", "10.82.199.70")),
             "59eb3cb130074f7b1ddb99c8fe14f27e1dbca735bb3da82e1ff0305340a32419", "1.1.0")
+        if (qr) {
+            val matrix = MultiFormatWriter().encode("hopdrop://pair?preview=1", BarcodeFormat.QR_CODE, 41, 41)
+            val pixels = IntArray(matrix.width * matrix.height) { i ->
+                if (matrix.get(i % matrix.width, i / matrix.width)) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+            }
+            s.qr = QrUi(Bitmap.createBitmap(pixels, matrix.width, matrix.height, Bitmap.Config.ARGB_8888).asImageBitmap(), s.phone.addresses)
+        }
         val moving = LiveUi("t1", false, "LOQ Laptop", LiveState.Moving("IMG_2041.jpg", 37, 128, 152_000_000, 412_000_000, 31_400_000.0, 9))
         if (devices) {
             s.devices = listOf(

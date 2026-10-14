@@ -225,16 +225,21 @@ internal static class Platform
     {
         try
         {
-            string id = Guid.NewGuid().ToString("N");
-            Directory.CreateDirectory(App.DataDirectory);
-            // Toast actions can launch a fresh process, so keep their text outside the window.
-            File.WriteAllText(Path.Combine(App.DataDirectory, "toast-text-" + id + ".txt"), text);
-            foreach (var old in Directory.EnumerateFiles(App.DataDirectory, "toast-text-*.txt").Where(p => File.GetCreationTimeUtc(p) < DateTime.UtcNow.AddDays(-7)))
-                File.Delete(old);
+            bool link = IsWebLink(text);
+            bool actions = !copied || link;
+            string id = actions ? Guid.NewGuid().ToString("N") : "";
+            if (actions)
+            {
+                Directory.CreateDirectory(App.DataDirectory);
+                // Toast actions can launch a fresh process, so keep their text outside the window.
+                File.WriteAllText(Path.Combine(App.DataDirectory, "toast-text-" + id + ".txt"), text);
+                foreach (var old in Directory.EnumerateFiles(App.DataDirectory, "toast-text-*.txt").Where(p => File.GetCreationTimeUtc(p) < DateTime.UtcNow.AddDays(-7)))
+                    File.Delete(old);
+            }
             var toast = new ToastContentBuilder().AddText((copied ? "Copied from " : "Text from ") + name)
                 .AddText(text.Length > 200 ? text[..200] + "…" : text);
             if (!copied) toast.AddButton(new ToastButton().SetContent("Copy").AddArgument("action", "textcopy:" + id));
-            if (IsWebLink(text)) toast.AddButton(new ToastButton().SetContent("Open link").AddArgument("action", "textopen:" + id));
+            if (link) toast.AddButton(new ToastButton().SetContent("Open link").AddArgument("action", "textopen:" + id));
             toast.Show();
         }
         catch (Exception ex) { Debug.WriteLine(ex); }

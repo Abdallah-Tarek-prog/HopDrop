@@ -17,6 +17,7 @@ import android.provider.MediaStore;
 import com.hop.drop.core.Json;
 import com.hop.drop.core.Peer;
 import com.hop.drop.net.DirectLink;
+import java.io.File;
 import com.hop.drop.net.Discovery;
 import com.hop.drop.net.LocalSockets;
 import com.hop.drop.store.DeviceBook;
@@ -150,7 +151,7 @@ public final class HopApp extends Application {
     }
 
     /** Redraws the visible screen soon, at most about four times a second. */
-    void changed() {
+    public void changed() {
         synchronized (main) {
             if (uiRefreshQueued) return;
             uiRefreshQueued = true;
@@ -253,11 +254,19 @@ public final class HopApp extends Application {
 
         @Override
         public void paired(Peer.Device d) {
+            notices.showReady();
             getSystemService(NotificationManager.class).notify(Notices.PAIRING + 100, notification("results",
                     "Paired with " + d.name, "You can now send files both ways. No codes needed next time.",
                     false, -1).setAutoCancel(true).build());
             MainActivity activity = visible;
             if (activity != null) activity.runOnUiThread(activity::onPaired);
+        }
+
+        @Override
+        public void unpaired(String deviceId) {
+            notices.showReady();
+            MainActivity activity = visible;
+            if (activity != null) activity.runOnUiThread(activity::refresh);
         }
 
         @Override
@@ -381,10 +390,26 @@ public final class HopApp extends Application {
 
     /** Where a received file ended up ("name" or "Photos/2024/name"), so notifications and Activity can open it. */
     public Uri receivedUri(String path) {
+        SharedPreferences settings = getSharedPreferences("settings_v2", MODE_PRIVATE);
+        List<ReceiveStorage.BackupEntry> backups = ReceiveStorage.backups(this);
+        for (ReceiveStorage.BackupEntry entry : backups) {
+            String prefix = com.hop.drop.core.FileNames.sanitize(entry.device) + "/" + com.hop.drop.core.FileNames.sanitize(entry.folder) + "/";
+            if (!path.startsWith(prefix)) continue;
+            String saved = "default".equals(entry.location) ? null : entry.location;
+            Uri found = receivedUri(path, saved, "Download/HopDrop/Backups/", "received-backup");
+            if (found != null) return found;
+        }
+        Uri normal = receivedUri(path, settings.getString("folder", null), "Download/HopDrop/", "received");
+        if (normal != null) return normal;
+        Uri backup = receivedUri(path, settings.getString("backup_folder", null), "Download/HopDrop/Backups/", "received-backup");
+        if (backup != null) return backup;
+        return null;
+    }
+
+    private Uri receivedUri(String path, String saved, String defaultRoot, String legacyRoute) {
         try {
             int slash = path.lastIndexOf('/');
             String folder = slash < 0 ? null : path.substring(0, slash), name = path.substring(slash + 1);
-            String saved = getSharedPreferences("settings_v2", MODE_PRIVATE).getString("folder", null);
             if (saved != null) {
                 Uri tree = Uri.parse(saved);
                 String parent = DocumentsContract.getTreeDocumentId(tree);
@@ -411,7 +436,7 @@ public final class HopApp extends Application {
                 try (android.database.Cursor c = getContentResolver().query(MediaStore.Downloads.EXTERNAL_CONTENT_URI,
                         new String[]{MediaStore.MediaColumns._ID}, MediaStore.MediaColumns.RELATIVE_PATH + "=? AND "
                                 + MediaStore.MediaColumns.DISPLAY_NAME + "=?",
-                        new String[]{folder == null ? "Download/HopDrop/" : "Download/HopDrop/" + folder + "/", name},
+                        new String[]{folder == null ? defaultRoot : defaultRoot + folder + "/", name},
                         null)) {
                     if (c != null && c.moveToFirst()) {
                         return android.content.ContentUris.withAppendedId(MediaStore.Downloads.EXTERNAL_CONTENT_URI,
@@ -419,8 +444,11 @@ public final class HopApp extends Application {
                     }
                 }
             } else {
+                File target = new File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS),
+                        legacyRoute.equals("received-backup") ? "HopDrop/Backups" : "HopDrop");
+                if (!new File(target, path).isFile()) return null;
                 Uri.Builder legacy = new Uri.Builder().scheme("content").authority(getPackageName() + ".sharedtext")
-                        .appendPath("received");
+                        .appendPath(legacyRoute);
                 for (String segment : path.split("/")) legacy.appendPath(segment);
                 return legacy.build();
             }

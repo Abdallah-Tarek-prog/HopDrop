@@ -79,6 +79,7 @@ public sealed partial class HopDropPeer : IAsyncDisposable
     private readonly JsonStore<AppSettings> _settings;
     private readonly JsonStore<List<PairedDevice>> _devices;
     private readonly JsonStore<List<HistoryEntry>> _history;
+    private readonly JsonStore<List<ReceivedBackup>> _backups;
     private readonly OneTimeToken _token = new();
     private readonly SemaphoreSlim _sasGate = new(1, 1);
     private readonly SemaphoreSlim _namingGate = new(1, 1);
@@ -93,7 +94,7 @@ public sealed partial class HopDropPeer : IAsyncDisposable
     /// <summary>More simultaneous connections than this are dropped at once, so a flood from the network can't exhaust the receiver.</summary>
     private const int MaxConnections = 32;
     /// <summary>Protocol extensions this build understands; peers use one only when both list it in their hello (absent = baseline v2).</summary>
-    internal static readonly string[] Features = ["consent", "folders", "pages", "resume", "text", "pipeline", "merge"];
+    internal static readonly string[] Features = ["consent", "folders", "pages", "resume", "text", "pipeline", "merge", "backup"];
     public const string AppVersion = "1.1.0";
     /// <summary>This device's direct link (a PC's Wi-Fi Direct network), told to paired devices in hello and put in pairing QR codes. Null when off.</summary>
     public DirectLinkInfo? DirectLink { get; set; }
@@ -105,6 +106,10 @@ public sealed partial class HopDropPeer : IAsyncDisposable
     public int Port => ((IPEndPoint?)_listener?.LocalEndpoint)?.Port ?? _options.Port;
     public string Name => _current.Name;
     public string ReceiveDirectory => _current.ReceiveDirectory;
+    public string BackupDirectory => _current.BackupDirectory ?? _options.Paths.DefaultBackupDirectory;
+    public Task<List<ReceivedBackup>> BackupsAsync(CancellationToken ct = default) => _backups.ReadAsync(ct);
+    public Task ForgetBackupAsync(string deviceId, string folder, string? location = null, CancellationToken ct = default) =>
+        _backups.UpdateAsync(list => list.Where(b => b.DeviceId != deviceId || b.Folder != folder || (location is not null && b.Location != location)).ToList(), ct);
     public bool AskBeforeReceiving => _current.AskBeforeReceiving;
     /// <summary>"everyone" or "paired".</summary>
     public string Visibility => _current.Visibility;
@@ -128,6 +133,7 @@ public sealed partial class HopDropPeer : IAsyncDisposable
         _settings = new(options.Paths.SettingsPath, new AppSettings(options.Name ?? Environment.MachineName, options.Paths.DefaultReceiveDirectory));
         _devices = new(options.Paths.DevicesPath, []);
         _history = new(options.Paths.HistoryPath, []);
+        _backups = new(options.Paths.BackupsPath, []);
         _current = current;
     }
     public static async Task<HopDropPeer> OpenAsync(PeerOptions options, CancellationToken ct = default)
@@ -143,6 +149,8 @@ public sealed partial class HopDropPeer : IAsyncDisposable
     }
     public async Task SetReceiveDirectoryAsync(string path, CancellationToken ct = default)
     { _current = await _settings.UpdateAsync(s => s with { ReceiveDirectory = Path.GetFullPath(path) }, ct); }
+    public async Task SetBackupDirectoryAsync(string path, CancellationToken ct = default)
+    { _current = await _settings.UpdateAsync(s => s with { BackupDirectory = Path.GetFullPath(path) }, ct); }
     public async Task SetAskBeforeReceivingAsync(bool ask, CancellationToken ct = default)
     { _current = await _settings.UpdateAsync(s => s with { AskBeforeReceiving = ask }, ct); }
     public async Task SetVisibilityAsync(string visibility, CancellationToken ct = default)
@@ -233,7 +241,7 @@ public sealed partial class HopDropPeer : IAsyncDisposable
         catch (Exception e) when (e is SocketException or IOException or AuthenticationException or HopDropException or OperationCanceledException) { Error?.Invoke($"Unpair notification: {e.Message}"); }
         await RemoveDeviceAsync(id, ct);
     }
-    private async Task SaveDeviceAsync(string id, string name, string platform, IPAddress address, CancellationToken ct, int port = 7410)
+    private async Task SaveDeviceAsync(string id, string name, string platform, IPAddress address, CancellationToken ct, int port = 7410, DirectLinkInfo? link = null)
     {
         var list = await _devices.UpdateAsync(old =>
         {
@@ -241,7 +249,7 @@ public sealed partial class HopDropPeer : IAsyncDisposable
             old.RemoveAll(d => d.Id == id);
             var addresses = existing?.LastAddresses ?? [];
             addresses.Remove(address.ToString()); addresses.Insert(0, address.ToString());
-            old.Add(new PairedDevice(id, name, platform, existing?.PairedAt ?? DateTimeOffset.UtcNow, addresses, DateTimeOffset.UtcNow, existing?.Alias, port, existing?.Trusted ?? false));
+            old.Add(new PairedDevice(id, name, platform, existing?.PairedAt ?? DateTimeOffset.UtcNow, addresses, DateTimeOffset.UtcNow, existing?.Alias, port, existing?.Trusted ?? false, link ?? existing?.Link));
             return old;
         }, ct);
         PairedDevicesChanged?.Invoke(list);
@@ -285,6 +293,8 @@ public sealed partial class HopDropPeer : IAsyncDisposable
                     var h = ValidateHello(hello.RootElement, peerId, _options.Features ?? Features);
                     var known = (await DevicesAsync(stop)).FirstOrDefault(d => d.Id == peerId);
                     bool paired = known is not null;
+                    if (paired && HelloLink(hello.RootElement) is { } link)
+                        await SaveDeviceAsync(peerId, h.Name, h.Platform, ((IPEndPoint)client.Client.RemoteEndPoint!).Address, stop, known!.Port, link);
                     await SendHelloAsync(ssl, paired, stop);
                     using var request = await ReadControlAsync(ssl, stop);
                     string type = Messages.Type(request.RootElement);
@@ -303,7 +313,7 @@ public sealed partial class HopDropPeer : IAsyncDisposable
                             await Messages.WriteAsync(ssl, new { type = "pair_ok" }, stop); break;
                         case "pair_sas": await RespondSasAsync(ssl, peerId, h.Name, h.Platform, address, stop); break;
                         case "offer":
-                            await ReceiveAsync(ssl, request.RootElement, peerId, known?.Alias ?? h.Name, known?.Trusted == true, h.Features, stop); break;
+                            await ReceiveAsync(ssl, request.RootElement, peerId, known?.Alias ?? h.Name, h.Name, known?.Trusted == true, h.Features, stop); break;
                         default: throw new HopDropException("protocol_error", "Unknown request");
                     }
                 }
@@ -331,6 +341,16 @@ public sealed partial class HopDropPeer : IAsyncDisposable
             foreach (var item in list.EnumerateArray().Take(32))
                 if (item.ValueKind == JsonValueKind.String && supported.Contains(item.GetString())) features.Add(item.GetString()!);
         return (name, platform, features);
+    }
+    private static DirectLinkInfo? HelloLink(JsonElement hello)
+    {
+        if (!hello.TryGetProperty("paired", out var paired) || paired.ValueKind != JsonValueKind.True ||
+            !hello.TryGetProperty("link", out var value) || value.ValueKind != JsonValueKind.Object) return null;
+        if (!value.TryGetProperty("ssid", out var ssid) || !value.TryGetProperty("key", out var key) ||
+            !value.TryGetProperty("ip", out var ip) || ssid.ValueKind != JsonValueKind.String ||
+            key.ValueKind != JsonValueKind.String || ip.ValueKind != JsonValueKind.String) return null;
+        var link = new DirectLinkInfo(ssid.GetString()!, key.GetString()!, ip.GetString()!);
+        return link.Valid ? link : null;
     }
     /// <summary>Hello; to a paired device it also carries this device's direct link, so the other side can reach it later without a shared network.</summary>
     private Task SendHelloAsync(Stream stream, bool paired, CancellationToken ct)
@@ -389,10 +409,11 @@ public sealed partial class HopDropPeer : IAsyncDisposable
         public string Name { get; }
         public string Platform { get; }
         public IPAddress Address { get; }
+        public DirectLinkInfo? Link { get; }
         /// <summary>Extensions both sides support.</summary>
         public IReadOnlySet<string> Features { get; }
-        public Connection(TcpClient client, SslStream stream, string id, string name, string platform, IPAddress address, IReadOnlySet<string> features)
-        { _client = client; Stream = stream; Id = id; Name = name; Platform = platform; Address = address; Features = features; }
+        public Connection(TcpClient client, SslStream stream, string id, string name, string platform, IPAddress address, IReadOnlySet<string> features, DirectLinkInfo? link)
+        { _client = client; Stream = stream; Id = id; Name = name; Platform = platform; Address = address; Features = features; Link = link; }
         public void Dispose() { Stream.Dispose(); _client.Dispose(); }
     }
     private async Task<Connection> ConnectAsync(IPAddress address, int port, string? expectedId, CancellationToken ct)
@@ -419,7 +440,7 @@ public sealed partial class HopDropPeer : IAsyncDisposable
                     using var doc = await ReadControlAsync(ssl, ct);
                     var h = ValidateHello(doc.RootElement, id, _options.Features ?? Features);
                     if (expectedId is not null && id != expectedId) throw new HopDropException("identity_mismatch", "This isn't the device you paired with");
-                    return new(client, ssl, id, h.Name, h.Platform, address, h.Features);
+                    return new(client, ssl, id, h.Name, h.Platform, address, h.Features, paired ? HelloLink(doc.RootElement) : null);
                 }
             }
             catch { ssl.Dispose(); throw; }
@@ -450,7 +471,7 @@ public sealed partial class HopDropPeer : IAsyncDisposable
         IEnumerable<(IPAddress Address, int Port)> discovered = nearby is null ? [] : [(nearby.Address, nearby.Port)];
         var endpoints = discovered.Concat(device.LastAddresses.Select(address => (IPAddress.Parse(address), device.Port)));
         var connection = await ConnectAnyAsync(endpoints, device.Id, ct);
-        try { await SaveDeviceAsync(connection.Id, connection.Name, connection.Platform, connection.Address, ct, nearby?.Address.Equals(connection.Address) == true ? nearby.Port : device.Port); }
+        try { await SaveDeviceAsync(connection.Id, connection.Name, connection.Platform, connection.Address, ct, nearby?.Address.Equals(connection.Address) == true ? nearby.Port : device.Port, connection.Link); }
         catch { connection.Dispose(); throw; }
         return connection;
     }
@@ -461,7 +482,7 @@ public sealed partial class HopDropPeer : IAsyncDisposable
         await Messages.WriteAsync(connection.Stream, new { type = "pair_qr", token = TokenCodec.Encode(qr.Token) }, ct);
         using var doc = await ReadControlAsync(connection.Stream, ct); Messages.ThrowIfError(doc.RootElement);
         if (Messages.Type(doc.RootElement) != "pair_ok") throw new HopDropException("protocol_error", "Expected pair_ok");
-        await SaveDeviceAsync(connection.Id, connection.Name, connection.Platform, connection.Address, ct, qr.Port);
+        await SaveDeviceAsync(connection.Id, connection.Name, connection.Platform, connection.Address, ct, qr.Port, qr.Link);
     }
     private async Task<bool> ConfirmSasAsync(string name, string code, CancellationToken ct)
     {

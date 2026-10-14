@@ -68,6 +68,7 @@ android {
     sourceSets {
         getByName("test") {
             kotlin.directories.add("uitests")
+            java.directories.add("unittests")
         }
         getByName("main") {
             manifest.srcFile("AndroidManifest.xml")
@@ -105,4 +106,13 @@ dependencies {
 
 roborazzi {
     outputDir.set(file("screenshots"))
+}
+
+// Robolectric unpacks its runtime (about 200 MB) into the temp folder on every run and can't always remove it on Windows.
+// Keep it inside build/ (on the project's drive), cleared before each run, so test runs never pile up on the system drive.
+tasks.withType<Test>().configureEach {
+    val tmp = layout.buildDirectory.dir("tmp/test-jvm").get().asFile
+    systemProperty("java.io.tmpdir", tmp.absolutePath)
+    doFirst { tmp.deleteRecursively(); tmp.mkdirs() }
+    doLast { tmp.deleteRecursively() }
 }

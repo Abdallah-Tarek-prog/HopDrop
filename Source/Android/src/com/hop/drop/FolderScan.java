@@ -28,18 +28,24 @@ final class FolderScan {
         /** The provider's id for the file (stable while it exists), and when it last changed (ms, 0 when unknown). */
         final String documentId;
         final long modified;
+        final String mime;
 
         Item(Uri uri, String name, String folder, long size) {
-            this(uri, name, folder, size, uri.toString(), 0);
+            this(uri, name, folder, size, uri.toString(), 0, null);
         }
 
         Item(Uri uri, String name, String folder, long size, String documentId, long modified) {
+            this(uri, name, folder, size, documentId, modified, null);
+        }
+
+        Item(Uri uri, String name, String folder, long size, String documentId, long modified, String mime) {
             this.uri = uri;
             this.name = name;
             this.folder = folder;
             this.size = size;
             this.documentId = documentId;
             this.modified = modified;
+            this.mime = mime;
         }
     }
 
@@ -75,7 +81,7 @@ final class FolderScan {
                         pending.add(new String[]{c.getString(0), next[1] + "/" + name});
                     } else {
                         found.add(new Item(DocumentsContract.buildDocumentUriUsingTree(tree, c.getString(0)), name,
-                                next[1], c.isNull(3) ? -1 : c.getLong(3), c.getString(0), c.isNull(4) ? 0 : c.getLong(4)));
+                                next[1], c.isNull(3) ? -1 : c.getLong(3), c.getString(0), c.isNull(4) ? 0 : c.getLong(4), c.getString(2)));
                     }
                 }
             }

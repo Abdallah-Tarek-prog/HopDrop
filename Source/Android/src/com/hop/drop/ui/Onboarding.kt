@@ -1,5 +1,6 @@
 package com.hop.drop.ui
 
+import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
@@ -38,6 +39,8 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -47,13 +50,17 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Battery5Bar
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ContentPaste
+import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Laptop
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.QrCode2
 import androidx.compose.material.icons.rounded.SignalCellular4Bar
+import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material.icons.rounded.WifiTethering
+import androidx.compose.material.icons.automirrored.rounded.InsertDriveFile
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -87,8 +94,13 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -96,8 +108,8 @@ import androidx.compose.ui.unit.min
 import kotlinx.coroutines.launch
 
 /**
- * The first-start tour (also Settings → Show the tour again): six short pages, each with a picture of the real app (or
- * of what to do on the PC) and two lines of text. Swipe or tap Next; Skip ends it from any page. The last page leads
+ * The first-start tour (also Settings → Show the tour again): seven short pages with pictures and bullets.
+ * Swipe or tap Next; Skip ends it from any page. The last page leads
  * straight to pairing, so a new user goes from opening HopDrop to a paired PC in the fewest taps.
  */
 @Composable
@@ -145,55 +157,132 @@ fun Onboarding(state: HopUiState, actions: HopActions) {
     }
 }
 
-/** One page of the tour: a picture, a title and a short explanation. */
+/** One page of the tour: a picture, a title and short action bullets. */
 private class TourPage(
     val title: String,
-    val body: String,
+    val bullets: List<TourBullet>,
     val picture: @Composable (active: Boolean, height: Dp) -> Unit,
 )
 
+private class TourBullet(val icon: ImageVector, val lead: String, val rest: String)
+
+private val whatsNew = mapOf(2 to listOf(
+    TourBullet(Icons.Rounded.WifiTethering, "Connect directly", " without shared Wi-Fi."),
+    TourBullet(Icons.Rounded.ContentPaste, "Send text and clipboard", " both ways."),
+    TourBullet(Icons.Rounded.CheckCircle, "Sends wait", " until an away device returns."),
+    TourBullet(Icons.Rounded.TouchApp, "Share faster", " from any app or the Quick Settings tile."),
+))
+
+internal fun hasWhatsNew(version: Int): Boolean = whatsNew.containsKey(version)
+
+@Composable
+internal fun WhatsNew(state: HopUiState, actions: HopActions) {
+    val version = state.whatsNewVersion ?: return
+    val title = "What's new in " + state.phone.version.split('.').take(2).joinToString(".")
+    HopModal(
+        onDismissRequest = { actions.dismissWhatsNew(false) }, paneTitle = title,
+        title = { Text(title) },
+        text = { BulletList(whatsNew[version].orEmpty()) },
+        confirmButton = { Button(onClick = { actions.dismissWhatsNew(false) }) { Text("Got it") } },
+        dismissButton = { TextButton(onClick = { actions.dismissWhatsNew(true) }) { Text("Show the tour") } },
+    )
+}
+
 private fun tourPages(firstTime: Boolean): List<TourPage> = listOf(
     TourPage(
-        "Your phone and PC, one hop apart",
-        "Send photos, files, whole folders and text between your devices. Straight from one to the other: no cloud, no account, no mobile data.",
+        "Phone to PC in a hop",
+        listOf(TourBullet(Icons.Rounded.Laptop, "Send", " photos and files between your devices."),
+            TourBullet(Icons.Rounded.Lock, "Keep it private.", " No cloud or account.")),
     ) { active, height -> HopIllustration(active, height) },
     TourPage(
         "Pair once with a scan",
-        "Open HopDrop on your PC and scan the code it shows. That's it, for good. They don't even need to share a Wi-Fi: HopDrop connects to the PC directly.",
+        listOf(TourBullet(Icons.Rounded.QrCode2, "Scan", " the code on your PC once."),
+            TourBullet(Icons.Rounded.WifiTethering, "Any network works.", " Your phone can connect directly.")),
     ) { _, height -> PairIllustration(height) },
     TourPage(
         "Send in two taps",
-        "Pick files, photos, a folder or text, then tap Send next to a device. Several devices at once? Tap Select several.",
+        listOf(TourBullet(Icons.Rounded.Folder, "Pick", " what to send."),
+            TourBullet(Icons.AutoMirrored.Rounded.ArrowForward, "Tap Send", " beside your device."),
+            TourBullet(Icons.Rounded.Laptop, "Select several", " to send to more devices.")),
     ) { active, height ->
-        PhoneMock(height, Preview.state(selected = true), spotlight = Spot(0.03f, 0.612f, 0.94f, 0.273f, "Tap Send next to a device"), active = active)
+        PhoneMock(height, Preview.state(selected = true), spotlight = Spot(0.044f, 0.678f, 0.912f, 0.106f, "Tap Send next to a device"), active = active)
     },
     TourPage(
         "Share from any app",
-        "Tap Share in your gallery, browser or any app, and pick your PC in the top row. It's sent at once. Add the HopDrop tile to quick settings for your clipboard and latest photo.",
+        listOf(TourBullet(Icons.Rounded.Image, "In your gallery, tap Share.", ""),
+            TourBullet(Icons.Rounded.Laptop, "Tap your PC", ": the round icon with the small HopDrop badge."),
+            TourBullet(Icons.Rounded.CheckCircle, "It's sent.", " HopDrop doesn't even open.")),
     ) { active, height -> ShareSheetIllustration(active, height) },
     TourPage(
+        "The Quick Settings tile",
+        listOf(TourBullet(Icons.Rounded.TouchApp, "Pull down", " quick settings and tap HopDrop."),
+            TourBullet(Icons.Rounded.ContentPaste, "Send", " your clipboard or latest photo. Pick files too."),
+            TourBullet(Icons.Rounded.CheckCircle, "Add the tile:", if (Build.VERSION.SDK_INT >= 33) " Settings → Add the quick send tile." else " Edit quick settings and drag HopDrop in.")),
+    ) { active, height -> QuickTileIllustration(active, height) },
+    TourPage(
         "Everything lands in Activity",
-        "Received files are saved in Download/HopDrop, even with HopDrop closed. Links and text arrive ready to copy. If a device is away, your send waits and goes when it's back.",
+        listOf(TourBullet(Icons.Rounded.Folder, "Files", " save in Download/HopDrop, even when HopDrop is closed."),
+            TourBullet(Icons.Rounded.ContentPaste, "Links and text", " are ready to copy."),
+            TourBullet(Icons.Rounded.CheckCircle, "Away device?", " Your send waits until it's back.")),
     ) { active, height ->
-        PhoneMock(height, Preview.state(tab = Tab.Activity, text = true), spotlight = Spot(0.03f, 0.335f, 0.94f, 0.225f, "Copy or open it in one tap"), active = active)
+        PhoneMock(height, Preview.state(tab = Tab.Activity, text = true), spotlight = Spot(0.044f, 0.348f, 0.912f, 0.213f, "Copy or open it in one tap"), active = active)
     },
     TourPage(
-        if (firstTime) "Ready when you are" else "That's what's new",
-        if (firstTime) "On your PC, install HopDrop from the Microsoft Store or github.com/Abdallah-Tarek-prog/HopDrop, then scan its code."
-        else "Your paired devices are all set. Settings has the new clipboard and auto-backup options.",
+        if (firstTime) "Ready when you are" else "You're all set",
+        if (firstTime) listOf(TourBullet(Icons.Rounded.Laptop, "Install HopDrop", " on your PC from Microsoft Store or github.com/Abdallah-Tarek-prog/HopDrop."),
+            TourBullet(Icons.Rounded.QrCode2, "Scan", " the code shown on your PC."))
+        else listOf(TourBullet(Icons.Rounded.CheckCircle, "Your devices are paired.", ""),
+            TourBullet(Icons.AutoMirrored.Rounded.ArrowForward, "Start sending", " whenever you're ready.")),
     ) { active, height -> ReadyIllustration(active, height) },
 )
 
+/**
+ * One page: the title and bullets are measured first and the picture gets the room they leave (at most 370 dp, at least
+ * 120 dp), so large text shrinks the picture instead of being cut off. Only when even that isn't enough does the page scroll.
+ */
 @Composable
 private fun TourPage(page: TourPage, active: Boolean) {
     BoxWithConstraints(Modifier.fillMaxSize().padding(horizontal = 24.dp)) {
-        val pictureHeight = min(maxHeight * 0.62f, 460.dp)
-        Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(Modifier.fillMaxWidth().height(pictureHeight), contentAlignment = Alignment.Center) { page.picture(active, pictureHeight) }
-            Spacer(Modifier.height(20.dp))
-            Text(page.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
-            Spacer(Modifier.height(10.dp))
-            Text(page.body, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+        val room = maxHeight
+        SubcomposeLayout(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) { constraints ->
+            val width = constraints.maxWidth
+            val words = subcompose("words") {
+                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Spacer(Modifier.height(14.dp))
+                    Text(page.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+                    Spacer(Modifier.height(12.dp))
+                    BulletList(page.bullets)
+                    Spacer(Modifier.height(8.dp))
+                }
+            }.first().measure(Constraints(minWidth = width, maxWidth = width))
+            val least = 120.dp.roundToPx()
+            val most = maxOf(least, min(370.dp, room * 0.56f).roundToPx())
+            val pictureHeight = (room.roundToPx() - words.height).coerceIn(least, most)
+            val picture = subcompose("picture") {
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    val density = LocalDensity.current
+                    CompositionLocalProvider(LocalDensity provides Density(density.density, 1f)) { page.picture(active, pictureHeight.toDp()) }
+                }
+            }.first().measure(Constraints.fixed(width, pictureHeight))
+            layout(width, pictureHeight + words.height) {
+                picture.place(0, 0)
+                words.place(0, pictureHeight)
+            }
+        }
+    }
+}
+
+@Composable
+private fun BulletList(bullets: List<TourBullet>) {
+    val primary = MaterialTheme.colorScheme.primary
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        for (bullet in bullets) Row(verticalAlignment = Alignment.Top) {
+            Icon(bullet.icon, contentDescription = null, tint = primary, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(10.dp))
+            Text(buildAnnotatedString {
+                withStyle(SpanStyle(color = primary, fontWeight = FontWeight.SemiBold)) { append(bullet.lead) }
+                append(bullet.rest)
+            }, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -367,48 +456,113 @@ private fun PairIllustration(height: Dp) {
     }
 }
 
-/** Android's share sheet with the paired PC in its top row, highlighted; and the quick send tile below it. */
+/** Keeps drawn pictures readable on narrow phones without squeezing their rows. */
+@Composable
+private fun ScaledPicture(height: Dp, baseHeight: Dp, content: @Composable () -> Unit) {
+    BoxWithConstraints(Modifier.fillMaxWidth().height(height), contentAlignment = Alignment.Center) {
+        val scale = minOf(maxWidth / 340.dp, height / baseHeight, 1f)
+        Box(Modifier.size(340.dp * scale, baseHeight * scale)) {
+            Box(Modifier.wrapContentSize(unbounded = true, align = Alignment.TopStart).graphicsLayer {
+                scaleX = scale; scaleY = scale
+                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+            }.requiredSize(340.dp, baseHeight)) { content() }
+        }
+    }
+}
+
+/** Android's share sheet with the paired PC in its top row, highlighted. */
 @Composable
 private fun ShareSheetIllustration(active: Boolean, height: Dp) {
     val scheme = MaterialTheme.colorScheme
     val pulse = rememberInfiniteTransition(label = "share")
     val ring by pulse.animateFloat(0f, 1f, infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Restart), label = "ring")
-    val w = min(height * 0.9f, 340.dp)
-    Column(Modifier.width(w), horizontalAlignment = Alignment.CenterHorizontally) {
-        Surface(shape = RoundedCornerShape(24.dp), color = scheme.surfaceContainerHigh, shadowElevation = 10.dp, modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp)) {
-                Box(Modifier.align(Alignment.CenterHorizontally).size(32.dp, 4.dp).clip(CircleShape).background(scheme.outlineVariant))
-                Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(Brush.linearGradient(listOf(Color(0xFF6FA8DC), Color(0xFF3D6FA8)))))
-                    Column(Modifier.padding(start = 12.dp)) {
-                        Text("Sharing 3 photos", style = MaterialTheme.typography.titleSmall)
-                        Text("Gallery", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+    ScaledPicture(height, 292.dp) {
+        Column(Modifier.width(340.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Surface(shape = RoundedCornerShape(24.dp), color = scheme.surfaceContainerHigh, shadowElevation = 10.dp, modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp)) {
+                    Box(Modifier.align(Alignment.CenterHorizontally).size(32.dp, 4.dp).clip(CircleShape).background(scheme.outlineVariant))
+                    Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(Brush.linearGradient(listOf(Color(0xFF6FA8DC), Color(0xFF3D6FA8)))))
+                        Column(Modifier.padding(start = 12.dp)) {
+                            Text("Sharing 3 photos", style = MaterialTheme.typography.titleSmall)
+                            Text("Gallery", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                        }
                     }
-                }
-                Row(Modifier.padding(top = 18.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    ShareTarget("LOQ Laptop", Icons.Rounded.Laptop, highlight = true, ring = if (active) ring else -1f)
-                    ShareTarget("Galaxy Tab", Icons.Rounded.PhoneAndroid)
-                    ShareTarget("Messages", null, Color(0xFF5BB974))
-                    ShareTarget("Email", null, Color(0xFFE8705F))
-                }
-                Spacer(Modifier.height(14.dp))
-                Box(Modifier.fillMaxWidth().height(1.dp).background(scheme.outlineVariant))
-                Row(Modifier.padding(top = 14.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    for ((name, color) in listOf("Drive" to Color(0xFFF2C14E), "HopDrop" to Color(0xFF121212), "Notes" to Color(0xFF8E7CC3), "Copy" to Color(0xFF9AA0A6))) {
-                        ShareTarget(name, null, color, logo = name == "HopDrop")
+                    Row(Modifier.padding(top = 18.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        ShareTarget("LOQ Laptop", Icons.Rounded.Laptop, highlight = true, ring = if (active) ring else -1f)
+                        ShareTarget("Galaxy Tab", Icons.Rounded.PhoneAndroid)
+                        ShareTarget("Messages", null, Color(0xFF5BB974))
+                        ShareTarget("Email", null, Color(0xFFE8705F))
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    Box(Modifier.fillMaxWidth().height(1.dp).background(scheme.outlineVariant))
+                    Row(Modifier.padding(top = 14.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        for ((name, color) in listOf("Drive" to Color(0xFFF2C14E), "HopDrop" to Color(0xFF121212), "Notes" to Color(0xFF8E7CC3), "Copy" to Color(0xFF9AA0A6))) {
+                            ShareTarget(name, null, color, logo = name == "HopDrop")
+                        }
                     }
                 }
             }
         }
-        Spacer(Modifier.height(18.dp))
-        // The quick settings tile.
-        Surface(shape = RoundedCornerShape(20.dp), color = scheme.primary, shadowElevation = 4.dp) {
-            Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Rounded.ContentPaste, contentDescription = null, tint = scheme.onPrimary, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(10.dp))
-                Column {
-                    Text("HopDrop", style = MaterialTheme.typography.titleSmall, color = scheme.onPrimary)
-                    Text("Quick send tile", style = MaterialTheme.typography.labelSmall, color = scheme.onPrimary.copy(alpha = 0.85f))
+    }
+}
+
+/** A drawn quick-settings panel and the floating card opened by its tile. */
+@Composable
+private fun QuickTileIllustration(active: Boolean, height: Dp) {
+    val scheme = MaterialTheme.colorScheme
+    val pulse = rememberInfiniteTransition(label = "quick tile")
+    val ring by pulse.animateFloat(0f, 1f, infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Restart), label = "ring")
+    ScaledPicture(height, 420.dp) {
+        Box(Modifier.size(340.dp, 420.dp).clip(RoundedCornerShape(26.dp)).background(Color(0xFF24262E))) {
+            Column(Modifier.fillMaxWidth().padding(18.dp)) {
+                Text("9:41", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    for (name in listOf("Internet", "Bluetooth")) {
+                        Surface(shape = RoundedCornerShape(18.dp), color = Color(0xFF454851), modifier = Modifier.weight(1f)) {
+                            Text(name, color = Color.White, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(16.dp))
+                        }
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                Box {
+                    Surface(shape = RoundedCornerShape(18.dp), color = scheme.primary) {
+                        Row(Modifier.padding(horizontal = 18.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            LogoMark(24.dp)
+                            Spacer(Modifier.width(10.dp))
+                            Text("HopDrop", color = scheme.onPrimary, style = MaterialTheme.typography.titleSmall)
+                        }
+                    }
+                    if (active) Box(Modifier.matchParentSize().border(3.dp, scheme.onPrimary.copy(alpha = 1f - ring * 0.6f), RoundedCornerShape(18.dp)))
+                }
+            }
+            Surface(shape = RoundedCornerShape(24.dp), color = scheme.surfaceContainerLow, shadowElevation = 10.dp,
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(10.dp)) {
+                Column(Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        LogoMark(22.dp)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Quick send", style = MaterialTheme.typography.titleMedium)
+                    }
+                    Text("Send to", style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 10.dp, bottom = 5.dp))
+                    Surface(shape = CircleShape, color = scheme.primaryContainer) {
+                        Text("LOQ Laptop", style = MaterialTheme.typography.labelMedium, color = scheme.onPrimaryContainer,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp))
+                    }
+                    Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        for ((icon, label) in listOf(Icons.Rounded.ContentPaste to "Clipboard", Icons.Rounded.Image to "Latest photo",
+                            Icons.AutoMirrored.Rounded.InsertDriveFile to "Files")) {
+                            Surface(shape = RoundedCornerShape(14.dp), color = scheme.surfaceContainerHighest, modifier = Modifier.weight(1f)) {
+                                Column(Modifier.padding(vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(icon, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(24.dp))
+                                    Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1,
+                                        modifier = Modifier.padding(top = 8.dp))
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -438,28 +592,18 @@ private fun ShareTarget(name: String, icon: ImageVector?, color: Color = Color.U
 /** The last page: the logo, and what HopDrop promises. */
 @Composable
 private fun ReadyIllustration(active: Boolean, height: Dp) {
-    val scheme = MaterialTheme.colorScheme
-    val glow = rememberInfiniteTransition(label = "ready")
-    val pulse by glow.animateFloat(0.92f, 1.04f, infiniteRepeatable(tween(1600, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "pulse")
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.size(min(height * 0.42f, 180.dp)).graphicsLayer { val s = if (active) pulse else 1f; scaleX = s; scaleY = s }
-            .clip(RoundedCornerShape(40.dp)).background(Color(0xFF121212)), contentAlignment = Alignment.Center) {
-            LogoMark(min(height * 0.32f, 140.dp))
-        }
-        Spacer(Modifier.height(28.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Promise(Icons.Rounded.Lock, "Encrypted, and only your paired devices can send to you")
-            Promise(Icons.Rounded.WifiTethering, "Same Wi-Fi or not, it finds a way to your PC")
-            Promise(Icons.Rounded.CheckCircle, "Picks up where it stopped if the connection drops")
-        }
-    }
+    ScaledPicture(height, 190.dp) { ReadyPicture(active) }
 }
 
+/** Just the pulsing logo: the page's bullets say what to do next, so the picture adds no more words. */
 @Composable
-private fun Promise(icon: ImageVector, text: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.width(10.dp))
-        Text(text, style = MaterialTheme.typography.bodyMedium)
+private fun ReadyPicture(active: Boolean) {
+    val glow = rememberInfiniteTransition(label = "ready")
+    val pulse by glow.animateFloat(0.92f, 1.04f, infiniteRepeatable(tween(1600, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "pulse")
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(160.dp).graphicsLayer { val s = if (active) pulse else 1f; scaleX = s; scaleY = s }
+            .clip(RoundedCornerShape(48.dp)).background(Color(0xFF121212)), contentAlignment = Alignment.Center) {
+            LogoMark(124.dp)
+        }
     }
 }

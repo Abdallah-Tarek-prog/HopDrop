@@ -21,7 +21,7 @@ public final class Protocol {
     public static final int MAX_DATA = 1048576, MAX_JSON = 65536;
     public static final String APP = "1.1.0";
     /** Protocol extensions this build understands; a peer uses one only when both list it in their hello (absent = baseline v2). */
-    public static final List<String> FEATURES = Collections.unmodifiableList(Arrays.asList("consent", "folders", "pages", "resume", "text", "pipeline", "merge"));
+    public static final List<String> FEATURES = Collections.unmodifiableList(Arrays.asList("consent", "folders", "pages", "resume", "text", "pipeline", "merge", "backup"));
     private Protocol() { }
     public static final class Frame {
         public final int kind; public final byte[] body;

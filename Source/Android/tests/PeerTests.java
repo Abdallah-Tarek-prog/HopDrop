@@ -26,6 +26,7 @@ public final class PeerTests {
             pa.pairSas("127.0.0.1",17611);pb.pairSas("127.0.0.1",17610);System.out.println("PASS Java SAS each direction");
             pa.pairQr(pb.issueQr(Collections.singletonList("127.0.0.1"),17611));
             pa.send(pa.pairingDevice(bid),items(zero,first,second,unicode,large));
+            check(bid.equals(DesktopPeer.lastOutgoingProgressDevice)&&bid.equals(DesktopPeer.lastOutgoingResultDevice),"outgoing events identify their device");
             for(Path p:new Path[]{zero,first,second,unicode,large}){Path dest=br.resolve(p.equals(second)?"same (1).txt":p.getFileName().toString());check(Files.exists(dest)&&hash(p).equals(hash(dest)),"Java A->B checksum "+p);}
             pb.send(pb.pairingDevice(aid),items(unicode,zero));check(hash(unicode).equals(hash(ar.resolve(unicode.getFileName()))),"Java B->A checksum");System.out.println("PASS Java transfers both directions, 50 MB, zero, duplicate, Unicode");}
         try(Peer pa=DesktopPeer.open(a,ar,"Java A");Peer pb=DesktopPeer.open(b,br,"Java B")){
@@ -54,6 +55,12 @@ public final class PeerTests {
             pa.send(toB,Collections.singletonList(new Peer.FileItem("two.jpg",1,()->Files.newInputStream(two),"Camera")),true);
             check(Files.exists(br.resolve("Camera").resolve("one.jpg"))&&Files.exists(br.resolve("Camera").resolve("two.jpg"))&&!Files.exists(br.resolve("Camera (1)")),"backup merges into the existing folder");
             System.out.println("PASS Java backups merge into the existing folder");
+            pa.send(toB,Collections.singletonList(new Peer.FileItem("one.jpg",1,()->Files.newInputStream(one),"Camera")),true,"Camera");
+            pa.send(toB,Collections.singletonList(new Peer.FileItem("one.jpg",1,()->Files.newInputStream(one),"Camera")),true,"Camera");
+            check(Files.exists(br.resolve("Backups").resolve("Java A").resolve("Camera").resolve("one.jpg")),"backup uses Java receiver's backup folder");
+            check(Files.exists(br.resolve("Backups").resolve("Java A").resolve("Camera").resolve("one (1).jpg")),"backup file clash gets a unique name");
+            check(Files.readString(b.resolve("backup-registry.txt")).contains("|Java A|Camera|2"),"Java backup registry");
+            System.out.println("PASS Java negotiated backups use the backup folder and registry");
             // Text arrives as text (with the clipboard mark), not as a file.
             DesktopPeer.lastText=null;check(pa.sendText(toB,"https://example.com/?q=\"hop\" ✓",true),"text went as text");
             check("https://example.com/?q=\"hop\" ✓".equals(DesktopPeer.lastText)&&DesktopPeer.lastClip,"text received: "+DesktopPeer.lastText);
@@ -70,7 +77,13 @@ public final class PeerTests {
             List<String> resumed=pa.send(toB,drop);check(DesktopPeer.sawReconnecting,"sender reconnected");check(resumed.size()==3,"three files confirmed "+resumed);
             check(hash(big).equals(hash(br.resolve("big.bin"))),"resumed file intact");check(Files.exists(br.resolve("twice.txt"))&&Files.exists(br.resolve("twice (1).txt"))&&!Files.exists(br.resolve("twice (2).txt")),"no duplicates");
             check(DesktopPeer.written.get()<bytes.length*13L/10,"resumed instead of resending: "+DesktopPeer.written.get());
-            System.out.println("PASS Java dropped connection resumes without resending or duplicates");}
+            System.out.println("PASS Java dropped connection resumes without resending or duplicates");
+            // If the sender does not return before the resume window, its half-written file is removed.
+            Peer.keepInterruptedMs=100;DesktopPeer.dropNextAfter=1_000_000;
+            try{pa.send(toB,items(big));long parts;try(java.util.stream.Stream<Path> all=Files.walk(br)){parts=all.filter(p->p.getFileName().toString().endsWith(".part")).count();}
+                check(parts==0,"expired resume removed partial files: "+parts);}
+            finally{Peer.keepInterruptedMs=120000;}
+            System.out.println("PASS Java expired resume cleans partial files");}
         // Regression: a single file that takes longer than the idle timeout to upload must not fail on the sender,
         // whose reader hears nothing until file_ok (phone->laptop uploads over ~30 s used to fail).
         Peer.idleTimeoutMs=1500;

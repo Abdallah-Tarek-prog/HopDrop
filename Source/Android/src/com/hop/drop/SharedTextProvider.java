@@ -19,9 +19,10 @@ public final class SharedTextProvider extends ContentProvider {
         try(FileOutputStream out=new FileOutputStream(new File(dir,name))){out.write(text.getBytes(StandardCharsets.UTF_8));}
         return new Uri.Builder().scheme("content").authority(c.getPackageName()+".sharedtext").appendPath(name).appendQueryParameter("name",com.hop.drop.core.FileNames.forText(text)).build();}
     private File file(Uri uri)throws FileNotFoundException{String n=uri.getLastPathSegment();java.util.List<String> parts=uri.getPathSegments();
-        if(parts.size()>=2&&parts.size()<=34&&"received".equals(parts.get(0))){
+        if(parts.size()>=2&&parts.size()<=34&&("received".equals(parts.get(0))||"received-backup".equals(parts.get(0)))){
             // Received files, also inside received folders: every part must already be a safe name, so nothing outside Download/HopDrop is reachable.
             File target=new File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS),"HopDrop");
+            if("received-backup".equals(parts.get(0)))target=new File(target,"Backups");
             for(String part:parts.subList(1,parts.size())){if(!com.hop.drop.core.FileNames.sanitize(part).equals(part))throw new FileNotFoundException("Invalid file name");target=new File(target,part);}
             return target;}
         if(n==null||!n.matches("[0-9a-f-]{36}\\.txt"))throw new FileNotFoundException("Invalid shared text");return new File(new File(getContext().getCacheDir(),"shared"),n);}

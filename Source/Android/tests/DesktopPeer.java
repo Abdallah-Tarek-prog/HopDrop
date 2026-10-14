@@ -21,6 +21,7 @@ public final class DesktopPeer {
     public static final java.util.concurrent.atomic.AtomicLong written=new java.util.concurrent.atomic.AtomicLong();
     /** The last text a paired device sent, and whether it was marked as copied (clipboard sharing). */
     public static volatile String lastText;public static volatile boolean lastClip;
+    public static volatile String lastOutgoingProgressDevice,lastOutgoingResultDevice;
     /** A socket whose writes stop after a limit, like a Wi-Fi link going away mid-transfer. */
     static final class DroppingSocket extends Socket {
         private final long limit;private long count;
@@ -48,15 +49,21 @@ public final class DesktopPeer {
         Peer.Sockets sockets=new Peer.Sockets(){public Socket connect(String address,int port)throws IOException{long drop=dropNextAfter;dropNextAfter=-1;Socket s=new DroppingSocket(drop);s.connect(new InetSocketAddress(address,port),5000);s.setSoTimeout(Peer.idleTimeoutMs);return s;}
             public boolean localServerAddress(InetAddress address){return address.isLoopbackAddress();}};
         Peer.Storage storage=new Peer.Storage(){public long freeBytes(){return receive.toFile().getUsableSpace();}public String folder(){return receive.getFileName().toString();}
+            public long backupFreeBytes(){return freeBytes();}public String backupFolder(){return "Backups";}
+            public Output beginBackup(String folder,String name)throws IOException{return write(receive.resolve("Backups"),folder,name);}
+            public void backupReceived(String id,String device,String folder,int count){try{Path file=data.resolve("backup-registry.txt");int total=count;
+                if(Files.exists(file)){String[] old=Files.readString(file).split("\\|");if(old.length==4&&old[0].equals(id)&&old[2].equals(folder))total+=Integer.parseInt(old[3]);}
+                Files.writeString(file,id+"|"+device+"|"+folder+"|"+total);}catch(IOException e){throw new IllegalStateException(e);}}
             public Output begin(String name)throws IOException{return begin(null,name);}
             public String uniqueFolder(String name){return FileNames.unique(name,n->Files.exists(receive.resolve(n)));}
-            public Output begin(String folder,String name)throws IOException{Path dir=folder==null?receive:receive.resolve(folder);Files.createDirectories(dir);Path temp=Files.createTempFile(dir,".hopdrop-",".part");OutputStream out=Files.newOutputStream(temp);return new Output(){public OutputStream stream(){return out;}
+            public Output begin(String folder,String name)throws IOException{return write(receive,folder,name);}
+            private Output write(Path root,String folder,String name)throws IOException{Path dir=folder==null?root:root.resolve(folder);Files.createDirectories(dir);Path temp=Files.createTempFile(dir,".hopdrop-",".part");OutputStream out=Files.newOutputStream(temp);return new Output(){public OutputStream stream(){return out;}
                 public String finish()throws IOException{out.close();String unique=FileNames.unique(name,n->Files.exists(dir.resolve(n)));Files.move(temp,dir.resolve(unique));return folder==null?unique:folder+"/"+unique;}
                 public void abort(){try{out.close();Files.deleteIfExists(temp);}catch(IOException ignored){}}};}};
         Peer.Events events=new Peer.Events(){public boolean confirm(String peer,String code,boolean incoming){System.out.println("SAS "+(incoming?"incoming":"outgoing")+" "+peer+" "+code);return true;}
-            public void progress(Peer.Progress p){if(p.waiting)sawWaiting=true;if(p.reconnecting)sawReconnecting=true;}
+            public void progress(Peer.Progress p){if(p.waiting)sawWaiting=true;if(p.reconnecting)sawReconnecting=true;if(!p.incoming)lastOutgoingProgressDevice=p.deviceId;}
             public boolean offer(Peer.Offer o){Boolean answer=answerOffers;if(answer==null)return false;System.out.println("OFFER "+o.peer+" "+o.files);new Thread(()->o.answer(answer)).start();return true;}
-            public void finished(Peer.Result r){System.out.println((r.error==null?"TRANSFER_OK":"TRANSFER_FAIL")+" "+(r.incoming?"RECEIVE":"SEND")+" "+r.peer+" "+r.files+" "+r.folder+" "+r.error);}
+            public void finished(Peer.Result r){if(!r.incoming)lastOutgoingResultDevice=r.deviceId;System.out.println((r.error==null?"TRANSFER_OK":"TRANSFER_FAIL")+" "+(r.incoming?"RECEIVE":"SEND")+" "+r.peer+" "+r.files+" "+r.folder+" "+r.error);}
             public void paired(Peer.Device d){System.out.println("PAIRED "+d.id+" "+d.name);}
             public void text(Peer.Device from,String text,boolean clip){lastClip=clip;lastText=text;}};
         return new Peer(key,cert,name,book,sockets,storage,events);

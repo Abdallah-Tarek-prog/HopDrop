@@ -10,11 +10,13 @@ public sealed record HopDropPaths(string DataDirectory, string LogDirectory, str
     public string? SettingsFile { get; init; }
     public string? DevicesFile { get; init; }
     public string? HistoryFile { get; init; }
+    public string? BackupsFile { get; init; }
     public string? IdentityPfxFile { get; init; }
     public string? IdentityKeyFile { get; init; }
     public string SettingsPath => SettingsFile ?? Path.Combine(DataDirectory, "settings.json");
     public string DevicesPath => DevicesFile ?? Path.Combine(DataDirectory, "devices.json");
     public string HistoryPath => HistoryFile ?? Path.Combine(DataDirectory, "history.json");
+    public string BackupsPath => BackupsFile ?? Path.Combine(DataDirectory, "backups.json");
     public string IdentityPfxPath => IdentityPfxFile ?? Path.Combine(DataDirectory, "identity.pfx");
     public string IdentityKeyPath => IdentityKeyFile ?? Path.Combine(DataDirectory, "identity.key");
     public static HopDropPaths Default => new(
@@ -23,13 +25,15 @@ public sealed record HopDropPaths(string DataDirectory, string LogDirectory, str
     public string DefaultReceiveDirectory => ReceiveDirectory is null
         ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "HopDrop")
         : Path.GetFullPath(ReceiveDirectory);
+    public string DefaultBackupDirectory => Path.Combine(DefaultReceiveDirectory, "Backups");
 }
 
 /// <param name="AskBeforeReceiving">Files from devices that aren't trusted wait for the user's OK.</param>
 /// <param name="Visibility">"everyone": discovery announces this device's name; "paired": announcements carry no name, so only paired devices recognise it.</param>
-public sealed record AppSettings(string Name, string ReceiveDirectory, bool AskBeforeReceiving = false, string Visibility = "everyone");
+public sealed record AppSettings(string Name, string ReceiveDirectory, bool AskBeforeReceiving = false, string Visibility = "everyone", string? BackupDirectory = null);
+public sealed record ReceivedBackup(string DeviceId, string DeviceName, string Folder, int FileCount, DateTimeOffset LastRun, string? Location = null);
 /// <param name="Trusted">The user trusts this device: its files arrive without asking and without Windows' "downloaded file" mark.</param>
-public sealed record PairedDevice(string Id, string Name, string Platform, DateTimeOffset PairedAt, List<string> LastAddresses, DateTimeOffset LastSeen, string? Alias = null, int Port = 7410, bool Trusted = false);
+public sealed record PairedDevice(string Id, string Name, string Platform, DateTimeOffset PairedAt, List<string> LastAddresses, DateTimeOffset LastSeen, string? Alias = null, int Port = 7410, bool Trusted = false, DirectLinkInfo? Link = null);
 /// <param name="Count">How many files the transfer had when <paramref name="Files"/> keeps only the first ones; null when it lists them all.</param>
 /// <param name="Text">A text message (no files) sent or received, e.g. a link or a copied clipboard.</param>
 public sealed record HistoryEntry(DateTimeOffset At, string PeerId, string Direction, string Result, List<string> Files, string? Folder, int? Count = null, string? Text = null)

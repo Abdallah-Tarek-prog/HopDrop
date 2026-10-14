@@ -36,7 +36,6 @@ import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.automirrored.rounded.TextSnippet
 import androidx.compose.material.icons.rounded.SystemUpdate
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
@@ -101,7 +100,7 @@ fun SendScreen(state: HopUiState, actions: HopActions, padding: PaddingValues) {
             item(key = "no-devices") {
                 HopCard {
                     EmptyState(Icons.Rounded.Devices, "No devices yet", "Pair a phone or PC once, then send with one tap.") {
-                        Button(onClick = { state.tab = Tab.Devices; state.pairSheet = true }) { Text("Pair a device") }
+                        Button(onClick = actions::scanQr) { Text("Pair a device") }
                     }
                 }
             }
@@ -109,7 +108,8 @@ fun SendScreen(state: HopUiState, actions: HopActions, padding: PaddingValues) {
             items(state.devices, key = { "device:" + it.id }) { device ->
                 DeviceSendRow(
                     device, ready = !state.nothingSelected, now = now, onSend = { actions.send(device) },
-                    onCancel = { actions.cancelSend(device) }, modifier = Modifier.animateItem(),
+                    onCancel = { actions.cancelSend(device) }, onConnect = { actions.connectDirectly(device) },
+                    connecting = state.connectingTo == device.id, modifier = Modifier.animateItem(),
                     picked = picking?.contains(device.id),
                     onPick = { on -> state.picking = (picking ?: emptySet()).let { if (on) it + device.id else it - device.id } },
                 )
@@ -138,13 +138,13 @@ fun SendScreen(state: HopUiState, actions: HopActions, padding: PaddingValues) {
     }
     writing?.let { initial -> TextNoteDialog(initial, onDismiss = { writing = null }, onAdd = { writing = null; actions.addText(it) }) }
     if (bluetoothAsk) {
-        AlertDialog(
-            onDismissRequest = { bluetoothAsk = false },
+        HopModal(
+            onDismissRequest = { bluetoothAsk = false }, paneTitle = "Send with Bluetooth",
             icon = { Icon(Icons.Rounded.Bluetooth, contentDescription = null) },
             title = { Text("Send with Bluetooth") },
             text = { Text("Much slower than Wi-Fi, and rarely needed: HopDrop reaches your PC directly even without a shared Wi-Fi. " +
                 "On the PC, click Receive via Bluetooth first, then pick the PC in the list.") },
-            confirmButton = { TextButton(onClick = { bluetoothAsk = false; actions.bluetooth() }) { Text("Continue") } },
+            confirmButton = { Button(onClick = { bluetoothAsk = false; actions.bluetooth() }) { Text("Continue") } },
             dismissButton = { TextButton(onClick = { bluetoothAsk = false }) { Text("Cancel") } },
         )
     }
@@ -315,7 +315,8 @@ private fun SelectedRow(icon: @Composable () -> Unit, name: String, detail: Stri
 /** [picked]: null when not choosing several devices, else whether this one is ticked. */
 @Composable
 private fun DeviceSendRow(
-    device: DeviceUi, ready: Boolean, now: Long, onSend: () -> Unit, onCancel: () -> Unit, modifier: Modifier,
+    device: DeviceUi, ready: Boolean, now: Long, onSend: () -> Unit, onCancel: () -> Unit,
+    onConnect: () -> Unit, connecting: Boolean, modifier: Modifier,
     picked: Boolean? = null, onPick: (Boolean) -> Unit = {},
 ) {
     val out = device.outgoing
@@ -327,6 +328,7 @@ private fun DeviceSendRow(
                 Text(device.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
                     when {
+                        connecting -> "Connecting directly…"
                         device.direct -> "Connected directly"
                         device.online -> presence(true, device.lastSeen, now)
                         device.hasLink -> presence(false, device.lastSeen, now) + "  ·  connects directly"
@@ -338,13 +340,17 @@ private fun DeviceSendRow(
             }
             when {
                 picked != null -> Checkbox(checked = picked, onCheckedChange = onPick)
-                device.waiting > 0 && (out == null || !out.active) -> TextButton(onClick = onCancel) { Text("Cancel") }
                 out != null && out.active -> IconButton(onClick = onCancel) { Icon(Icons.Rounded.Close, contentDescription = "Cancel sending") }
                 ready -> Button(onClick = onSend, contentPadding = PaddingValues(horizontal = 18.dp)) {
                     Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Send")
                 }
+                connecting -> FilledTonalButton(onClick = {}, enabled = false) { Text("Connecting…") }
+                !device.online && !device.direct && device.hasLink -> FilledTonalButton(
+                    onClick = onConnect, contentPadding = PaddingValues(horizontal = 18.dp),
+                ) { Text("Connect") }
+                device.waiting > 0 -> TextButton(onClick = onCancel) { Text("Cancel") }
                 // Nothing chosen yet: a quiet button. Tapping it says what's missing instead of doing nothing.
                 else -> FilledTonalButton(
                     onClick = onSend, contentPadding = PaddingValues(horizontal = 18.dp),
@@ -359,6 +365,7 @@ private fun DeviceSendRow(
                 device.waiting > 0 -> Column(Modifier.padding(top = 12.dp)) {
                     StatusLine(Icons.Rounded.Schedule, MaterialTheme.colorScheme.onSurfaceVariant,
                         (if (device.waiting == 1) "1 send is" else "${device.waiting} sends are") + " waiting. They go when ${device.name} is back.")
+                    if (ready || device.hasLink && !device.online) TextButton(onClick = onCancel) { Text("Cancel waiting sends") }
                 }
             }
         }

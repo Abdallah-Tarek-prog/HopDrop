@@ -71,7 +71,7 @@ public sealed partial class MainWindow : FluentWindow
         Loaded += (_, _) =>
         {
             ApplyTheme();
-            _navigation.Navigate(_devices.Count == 0 && _peer is not null ? typeof(DevicesPage) : typeof(SendPage));
+            _navigation.Navigate(InitialPage(_devices.Count > 0 || _peer is null) == "devices" ? typeof(DevicesPage) : typeof(SendPage));
         };
         _themeChanged = (_, _) => Dispatcher.InvokeAsync(() => { ApplyBrandAccent(); RenderCurrent(); RenderLive(); });
         ApplicationThemeManager.Changed += _themeChanged;
@@ -202,6 +202,7 @@ public sealed partial class MainWindow : FluentWindow
         if (On("devices")) { FillPaired(); FillNearby(); }
         if (On("send")) UpdateSendDevices();
     }
+    internal static string InitialPage(bool hasDevices) => hasDevices ? "send" : "devices";
     internal void OnQueueChanged()
     {
         foreach (var id in App.Instance.Queue.Entries.Select(e => e.DeviceId).Distinct()) _live.Remove("pending:" + id);
@@ -215,7 +216,8 @@ public sealed partial class MainWindow : FluentWindow
     }
     internal void OnDirectLinkChanged()
     {
-        if (On("devices")) { _qrUri = null; RenderCurrent(); }
+        if (On("send")) UpdateSendDevices();
+        else if (On("devices")) { _qrUri = null; RenderCurrent(); }
         else if (On("settings")) RenderCurrent();
     }
     internal void OnIncomingPairing(PairingRequest request) => Dispatcher.InvokeAsync(() =>
@@ -283,10 +285,13 @@ public sealed partial class MainWindow : FluentWindow
         item.Result = r; item.Updated = DateTime.UtcNow;
         RenderLive();
         if (On("send")) UpdateSendDevices();
-        if (r.Incoming || !IsActive) Platform.TransferToast(r, name, _peer?.ReceiveDirectory);
+        string? receivedRoot = r.Incoming && _peer is not null && r.SavedPaths.FirstOrDefault() is { } first &&
+            first.StartsWith(_peer.BackupDirectory + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+            ? _peer.BackupDirectory : _peer?.ReceiveDirectory;
+        if (r.Incoming || !IsActive) Platform.TransferToast(r, name, receivedRoot);
         await Task.Delay(150);
         if (_peer is not null) _history = await _peer.HistoryAsync();
-        if (On("activity")) RenderCurrent();
+        if (On("activity") || On("settings")) RenderCurrent();
     }
     private void Connecting(PairedDevice device)
     {

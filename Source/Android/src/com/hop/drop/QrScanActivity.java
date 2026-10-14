@@ -70,8 +70,8 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Scans another device's pairing QR code and returns its hopdrop://pair URI as the "uri" extra ("fallback" when the
- * user chooses number pairing instead). The preview fills the screen without stretching. Codes are read anywhere in
+ * Scans another device's pairing QR code and returns its hopdrop://pair URI as the "uri" extra, or a link choice.
+ * The preview fills the screen without stretching. Codes are read anywhere in
  * the frame, fastest near the middle. Pinch, double-tap or the zoom chip zooms in, so the phone can stay far enough
  * from a laptop screen to focus; a tap focuses on that spot.
  */
@@ -159,17 +159,9 @@ public final class QrScanActivity extends Activity implements TextureView.Surfac
         LinearLayout.LayoutParams messageParams = new LinearLayout.LayoutParams(-1, -2);
         messageParams.topMargin = dp(16);
         bottom.addView(message, messageParams);
-        TextView fallback = text("Pair with numbers instead", 15, true);
-        fallback.setTextColor(getColor(R.color.brand_light));
-        fallback.setPadding(dp(18), dp(11), dp(18), dp(11));
-        fallback.setBackground(pill(0x66000000));
-        fallback.setOnClickListener(view -> {
-            setResult(RESULT_OK, new Intent().putExtra("fallback", true));
-            finish();
-        });
-        LinearLayout.LayoutParams fallbackParams = new LinearLayout.LayoutParams(-2, -2);
-        fallbackParams.topMargin = dp(6);
-        bottom.addView(fallback, fallbackParams);
+        addLink(bottom, "Show my code", "show_qr");
+        addLink(bottom, "Compare numbers instead", "fallback");
+        addLink(bottom, "Enter an address", "address");
         root.addView(bottom, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
 
         permissionPanel = permissionPanel();
@@ -191,6 +183,22 @@ public final class QrScanActivity extends Activity implements TextureView.Surfac
             asked = true;
             requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION);
         }
+    }
+
+    private void addLink(LinearLayout bottom, String label, String extra) {
+        TextView link = text(label, 15, true);
+        link.setTextColor(getColor(R.color.brand_light));
+        link.setGravity(Gravity.CENTER);
+        link.setMinHeight(dp(48));
+        link.setPadding(dp(18), 0, dp(18), 0);
+        link.setBackground(pill(0x66000000));
+        link.setOnClickListener(view -> {
+            setResult(RESULT_OK, new Intent().putExtra(extra, true));
+            finish();
+        });
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-2, dp(48));
+        params.topMargin = dp(4);
+        bottom.addView(link, params);
     }
 
     @Override

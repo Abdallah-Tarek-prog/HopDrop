@@ -101,7 +101,8 @@ internal sealed class SendQueue : IDisposable
                     if (!retry)
                     {
                         _entries.Add(entry); Save();
-                        Platform.Notify("Offline · sends when it's back", name);
+                        var device = (await _peer.DevicesAsync()).FirstOrDefault(d => d.Id == entry.DeviceId);
+                        Platform.Notify("Offline · sends when it's back", name + "\n" + WaitingHint(device));
                     }
                 }
                 else
@@ -118,6 +119,13 @@ internal sealed class SendQueue : IDisposable
     private static void RememberDevice(string id)
     {
         try { Preferences.LastDevice = id; } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Debug.WriteLine(ex); }
+    }
+    internal static string WaitingHint(PairedDevice? device)
+    {
+        if (device?.Platform == "android" && App.Instance.Link?.State == DirectLinkState.On)
+            return "Open HopDrop on your phone and tap Connect";
+        return Preferences.DirectLink ? "Connect both devices to the same Wi-Fi" :
+            "Use the same Wi-Fi or turn on Settings → Direct connection";
     }
     private async Task<string> DeviceNameAsync(string id)
     {

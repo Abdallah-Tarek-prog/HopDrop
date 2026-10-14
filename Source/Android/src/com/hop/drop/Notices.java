@@ -19,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 final class Notices {
     static final int OUTGOING = 410;
+    static final String OUTGOING_GROUP = "hopdrop.outgoing";
     static final int PAIRING = 412;
     static final int RECEIVER = 413;
     static final int RECEIVER_PROBLEM = 414;
@@ -39,8 +40,14 @@ final class Notices {
         List<LocalSockets.Address> addresses = LocalSockets.describe(app);
         String where = addresses.isEmpty() ? "Join a Wi-Fi network or turn on your hotspot"
                 : "Visible as " + name + " · " + addresses.get(0).ip;
-        return app.notification("transfers", "Ready to receive files", where, true, -1)
-                .setSmallIcon(R.drawable.ic_notification).setShowWhen(false).build();
+        Notification.Builder ready = app.notification("transfers", "Ready to receive files", where, true, -1)
+                .setSmallIcon(R.drawable.ic_notification).setShowWhen(false);
+        if (!app.book().all().isEmpty()) {
+            Intent send = new Intent(app, QuickSendActivity.class).putExtra("clipboard", true);
+            ready.addAction(0, "Send clipboard", PendingIntent.getActivity(app, 5, send,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
+        }
+        return ready.build();
     }
 
     void showReady() {
@@ -52,17 +59,24 @@ final class Notices {
         Long last = posted.get(p.transferId);
         if (last != null && at - last < 1000 && !p.waiting && !p.reconnecting) return;
         posted.put(p.transferId, at);
+        int id = p.incoming ? RECEIVER : outgoingId(p.deviceId);
+        PendingIntent cancelAction = cancelAction(p);
         if (p.reconnecting) {
-            manager.notify(p.incoming ? RECEIVER : OUTGOING, app.notification("transfers", p.incoming
+            Notification.Builder reconnecting = app.notification("transfers", p.incoming
                     ? "Waiting for " + p.peer + " to reconnect" : "Reconnecting to " + p.peer,
                     "The connection dropped. HopDrop continues where it stopped.", true, -1)
-                    .setSmallIcon(p.incoming ? R.drawable.ic_direction_in : R.drawable.ic_direction_out).setShowWhen(false).build());
+                    .setSmallIcon(p.incoming ? R.drawable.ic_direction_in : R.drawable.ic_direction_out).setShowWhen(false)
+                    .addAction(0, "Cancel", cancelAction);
+            if (!p.incoming) reconnecting.setGroup(OUTGOING_GROUP);
+            manager.notify(id, reconnecting.build());
             return;
         }
         if (p.waiting) {
-            manager.notify(OUTGOING, app.notification("transfers", "Waiting for " + p.peer + " to accept",
+            manager.notify(id, app.notification("transfers", "Waiting for " + p.peer + " to accept",
                     Format.files(p.count) + " will start sending once they accept.", true, -1)
-                    .setSmallIcon(R.drawable.ic_direction_out).setShowWhen(false).build());
+                    .setSmallIcon(R.drawable.ic_direction_out).setShowWhen(false)
+                    .setGroup(OUTGOING_GROUP)
+                    .addAction(0, "Cancel", cancelAction).build());
             return;
         }
         String title = (p.incoming ? "Receiving " : "Sending ") + Format.files(p.count)
@@ -70,9 +84,6 @@ final class Notices {
         String left = p.secondsLeft < 0 ? "" : " · " + Format.duration(p.secondsLeft) + " left";
         String amount = Format.amount(p.done, p.total);
         String now = p.count == 1 ? p.file : p.file + "  (" + p.index + " of " + p.count + ")";
-        Intent cancel = new Intent(app, p.incoming ? ReceiveService.class : TransferService.class).setAction("cancel");
-        PendingIntent cancelAction = PendingIntent.getService(app, p.incoming ? 2 : 1, cancel,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification.Builder builder = app.notification("transfers", title, amount + left, true, p.percent())
                 .setSmallIcon(p.incoming ? R.drawable.ic_direction_in : R.drawable.ic_direction_out)
                 .setStyle(new Notification.BigTextStyle().bigText(now + "\n" + amount + " · "
@@ -80,8 +91,22 @@ final class Notices {
                 .setShowWhen(false)
                 .setCategory(Notification.CATEGORY_PROGRESS)
                 .addAction(0, "Cancel", cancelAction);
+        if (!p.incoming) builder.setGroup(OUTGOING_GROUP);
         if (p.percent() >= 0) builder.setSubText(p.percent() + "%");
-        manager.notify(p.incoming ? RECEIVER : OUTGOING, builder.build());
+        manager.notify(id, builder.build());
+    }
+
+    static int outgoingId(String deviceId) { return 0x40000000 | (deviceId.hashCode() & 0x3fffffff); }
+
+    private PendingIntent cancelAction(Peer.Progress p) {
+        Intent cancel = new Intent(app, p.incoming ? ReceiveService.class : TransferService.class).setAction("cancel");
+        if (!p.incoming) cancel.putExtra("device", p.deviceId).setData(Uri.parse("hopdrop:cancel/" + p.deviceId));
+        return PendingIntent.getService(app, p.incoming ? 2 : outgoingId(p.deviceId), cancel,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    void clearOutgoing(String deviceId) {
+        if (deviceId != null) manager.cancel(outgoingId(deviceId));
     }
 
     void result(Peer.Result r) {
@@ -134,7 +159,7 @@ final class Notices {
                 }
             }
         }
-        if (r.incoming) showReady(); else manager.cancel(OUTGOING);
+        if (r.incoming) showReady(); else clearOutgoing(r.deviceId);
         manager.notify(1000 + (r.transferId.hashCode() & 0xffff), n.build());
     }
 

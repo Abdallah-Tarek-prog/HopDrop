@@ -18,6 +18,18 @@ internal static class Store
     /// <summary>Running from an installed MSIX package (Store or a test install).</summary>
     public static bool Packaged { get; } = Detect();
 
+    /// <summary>
+    /// The local test install (`build.ps1 -Store -Install`, package HopDrop.LocalTest). Like E2E runs it takes the --e2e-*
+    /// test hooks, so a real phone can be tested against it; the Store and installer versions don't.
+    /// </summary>
+    public static bool LocalTest { get; } = Packaged && IsTestPackage();
+
+    private static bool IsTestPackage()
+    {
+        try { return Package.Current.Id.Name == "HopDrop.LocalTest"; }
+        catch (Exception e) { Debug.WriteLine(e); return false; }
+    }
+
     /// <summary>The "hopdrop.exe" command the package adds (packaged executables can't be started by their path).</summary>
     public static string Alias => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft", "WindowsApps", "hopdrop.exe");
 

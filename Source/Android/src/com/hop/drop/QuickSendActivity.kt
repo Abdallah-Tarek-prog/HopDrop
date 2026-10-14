@@ -8,14 +8,20 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -32,6 +38,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -57,6 +64,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import com.hop.drop.core.Format
 import com.hop.drop.core.Peer
 import com.hop.drop.ui.DeviceAvatar
@@ -68,7 +76,7 @@ import com.hop.drop.ui.ThemeMode
 import com.hop.drop.ui.Thumbnail
 
 /**
- * The Quick Settings tile's sheet: pick the device (the last one used is already picked) and tap what to send — the
+ * The Quick Settings tile's floating card: pick the device (the last one used is already picked) and tap what to send — the
  * clipboard, the latest photo or screenshot, or files. Two taps from anywhere, and it closes itself.
  */
 class QuickSendActivity : ComponentActivity() {
@@ -77,6 +85,8 @@ class QuickSendActivity : ComponentActivity() {
     private var latest by mutableStateOf<Uri?>(null)
     private var photosAllowed by mutableStateOf(false)
     private var target by mutableStateOf<String?>(null)
+    private var sendClipboardOnFocus = false
+    private var clipboardHandled = false
     private lateinit var app: HopApp
 
     private val pickFiles = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
@@ -100,12 +110,18 @@ class QuickSendActivity : ComponentActivity() {
             return
         }
         val last = prefs.getString("last_device", null)
-        target = devices.firstOrNull { it.id == last }?.id ?: devices.maxByOrNull { it.lastSeen }?.id
+        val lastDevice = devices.firstOrNull { it.id == last }
+        target = lastDevice?.id ?: devices.maxByOrNull { it.lastSeen }?.id
+        sendClipboardOnFocus = intent.getBooleanExtra("clipboard", false) && lastDevice != null
+        if (sendClipboardOnFocus) {
+            setContent { Box(Modifier.fillMaxSize()) }
+            return
+        }
         photosAllowed = checkSelfPermission(photoPermission) == PackageManager.PERMISSION_GRANTED
         if (photosAllowed) latest = latestPhoto()
         setContent {
             val theme = ThemeMode.entries.getOrElse(prefs.getInt("theme", 0)) { ThemeMode.System }
-            HopDropTheme(theme, Palette.of(prefs.getString("palette", null))) { Sheet(devices) }
+            HopDropTheme(theme, Palette.of(prefs.getString("palette", null))) { QuickCard(devices) }
         }
     }
 
@@ -117,6 +133,17 @@ class QuickSendActivity : ComponentActivity() {
         val item = clip?.takeIf { it.itemCount > 0 }?.getItemAt(0)
         clipUri = item?.uri
         clipText = item?.text?.toString()?.takeIf { it.isNotBlank() } ?: item?.coerceToText(this)?.toString()?.takeIf { it.isNotBlank() && item.uri == null }
+        if (sendClipboardOnFocus && !clipboardHandled) {
+            clipboardHandled = true
+            when {
+                clipText != null -> send(announce = true) { it.texts.add(clipText!!); it.clip = true }
+                clipUri != null -> send(announce = true) { it.files.add(clipUri!!) }
+                else -> {
+                    Toast.makeText(this, "Nothing copied", Toast.LENGTH_SHORT).show()
+                    finish()
+                }
+            }
+        }
     }
 
     private val photoPermission get() = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_IMAGES else Manifest.permission.READ_EXTERNAL_STORAGE
@@ -132,8 +159,8 @@ class QuickSendActivity : ComponentActivity() {
         }
     } catch (e: Exception) { null }
 
-    /** Starts the send to the picked device and closes the sheet. */
-    private fun send(fill: (Sends.Job) -> Unit) {
+    /** Starts the send to the picked device and closes the card. */
+    private fun send(announce: Boolean = false, fill: (Sends.Job) -> Unit) {
         val device = target?.let { app.book().get(it) } ?: return finish()
         val ready = Sends.Job(device.id, "")
         fill(ready)
@@ -142,7 +169,7 @@ class QuickSendActivity : ComponentActivity() {
         try {
             startForegroundService(ready.intent(this))
             Shortcuts.used(this, device.id)
-            if (!ready.textOnly()) Toast.makeText(this, "Sending to " + device.label(), Toast.LENGTH_SHORT).show()
+            if (announce || !ready.textOnly()) Toast.makeText(this, "Sending to " + device.label(), Toast.LENGTH_SHORT).show()
         } catch (e: RuntimeException) {
             Toast.makeText(this, "HopDrop couldn't start sending. Open HopDrop and try again.", Toast.LENGTH_LONG).show()
         }
@@ -150,24 +177,31 @@ class QuickSendActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun Sheet(devices: List<Peer.Device>) {
+    private fun QuickCard(devices: List<Peer.Device>) {
         var shown by remember { mutableStateOf(false) }
+        var closing by remember { mutableStateOf(false) }
+        val motion = remember { Settings.Global.getFloat(contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) != 0f }
+        fun close() { closing = true; shown = false }
         LaunchedEffect(Unit) { shown = true }
+        LaunchedEffect(closing) { if (closing) { if (motion) delay(120); finish() } }
+        BackHandler { close() }
+        val scrim by animateFloatAsState(if (shown) 0.45f else 0f,
+            tween(if (motion) if (shown) 200 else 120 else 0), label = "quick send scrim")
         Box(
-            Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f))
-                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { finish() },
+            Modifier.fillMaxSize().background(Color.Black.copy(alpha = scrim))
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { close() },
             contentAlignment = Alignment.BottomCenter,
         ) {
-            AnimatedVisibility(shown, enter = slideInVertically { it / 2 } + fadeIn()) {
+            AnimatedVisibility(shown, enter = fadeIn(tween(if (motion) 200 else 0)) + scaleIn(tween(if (motion) 200 else 0), initialScale = 0.92f),
+                exit = fadeOut(tween(if (motion) 120 else 0)) + scaleOut(tween(if (motion) 120 else 0), targetScale = 0.92f)) {
                 Surface(
-                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                    shape = RoundedCornerShape(28.dp),
                     color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    modifier = Modifier.fillMaxWidth().clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { },
+                    modifier = Modifier.padding(horizontal = 16.dp).navigationBarsPadding().padding(bottom = 16.dp)
+                        .widthIn(max = 400.dp).fillMaxWidth()
+                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { },
                 ) {
-                    Column(Modifier.navigationBarsPadding().padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 20.dp)) {
-                        Box(Modifier.align(Alignment.CenterHorizontally).size(36.dp, 4.dp).clip(RoundedCornerShape(2.dp))
-                            .background(MaterialTheme.colorScheme.outlineVariant))
-                        Spacer(Modifier.height(16.dp))
+                    Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 20.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             LogoMark(26.dp)
                             Spacer(Modifier.width(10.dp))

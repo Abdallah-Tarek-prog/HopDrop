@@ -38,6 +38,8 @@ import com.hop.drop.net.LocalSockets
 import com.hop.drop.ui.AddressUi
 import com.hop.drop.ui.BackupSetupUi
 import com.hop.drop.ui.BackupUi
+import com.hop.drop.ui.ReceivedBackupUi
+import com.hop.drop.store.ReceiveStorage
 import com.hop.drop.ui.DeviceUi
 import com.hop.drop.ui.HistoryFile
 import com.hop.drop.ui.HistoryUi
@@ -62,6 +64,9 @@ import com.hop.drop.ui.Tab
 import com.hop.drop.ui.ThemeMode
 import com.hop.drop.ui.UpdateUi
 import com.hop.drop.ui.isDark
+import com.hop.drop.ui.hasWhatsNew
+import java.io.EOFException
+import java.io.IOException
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -88,7 +93,9 @@ class MainActivity : ComponentActivity(), HopActions {
     private val chooseReceive = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { it?.let(::setReceiveFolder) }
     private val scan = registerForActivityResult(ActivityResultContracts.StartActivityForResult(), ::onScanned)
     private val notifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) { offerBackgroundActivity() }
+    private val storage = registerForActivityResult(ActivityResultContracts.RequestPermission()) { offerBackgroundActivity() }
     private val chooseBackup = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { it?.let(::backupFolderChosen) }
+    private val chooseBackupPlacePicker = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { it?.let(::setBackupPlace) }
 
     private val qrRefresh = object : Runnable {
         override fun run() {
@@ -105,13 +112,22 @@ class MainActivity : ComponentActivity(), HopActions {
         if (savedInstanceState != null) restore(savedInstanceState) else handle(intent)
         state.settings = loadSettings()
         refreshAll()
-        // First start: the tour comes first; Android's questions (notifications, battery) wait until it's done.
-        if (savedInstanceState == null && !prefs.getBoolean("onboarded", false)) state.onboarding = true
-        else if (savedInstanceState?.getBoolean("onboarding") == true) state.onboarding = true
-        if (!state.onboarding) askPermissions(savedInstanceState == null)
-        if (Build.VERSION.SDK_INT <= 28 && checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE), 62)
+        if (savedInstanceState != null) {
+            state.onboarding = savedInstanceState.getBoolean("onboarding")
+            state.whatsNewVersion = savedInstanceState.getInt("whats_new_version", 0).takeIf { it > 0 }
+        } else {
+            val info = packageManager.getPackageInfo(packageName, 0)
+            val version = appVersionCode()
+            val seen = prefs.getInt("seen_version", 0)
+            val usedBefore = prefs.getBoolean("onboarded", false) || state.devices.isNotEmpty() || state.history.isNotEmpty() ||
+                info.firstInstallTime != info.lastUpdateTime
+            when {
+                !usedBefore -> state.onboarding = true
+                seen < version && hasWhatsNew(version) -> state.whatsNewVersion = version
+                seen < version -> prefs.edit().putInt("seen_version", version).putBoolean("onboarded", true).apply()
+            }
         }
+        if (!state.onboarding && state.whatsNewVersion == null) askPermissions(savedInstanceState == null)
         setContent {
             val settings = state.settings
             val dark = isDark(settings.theme)
@@ -130,9 +146,12 @@ class MainActivity : ComponentActivity(), HopActions {
 
     /** Notifications (Android 13+), then the one-time offer to receive with the screen off. */
     private fun askPermissions(fresh: Boolean) {
+        if (state.onboarding || state.whatsNewVersion != null) return
         val askNotifications = Build.VERSION.SDK_INT >= 33 &&
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         if (askNotifications) notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+        else if (Build.VERSION.SDK_INT <= 28 && checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED)
+            storage.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         else if (fresh) main.post(::offerBackgroundActivity)
     }
 
@@ -181,6 +200,7 @@ class MainActivity : ComponentActivity(), HopActions {
         super.onSaveInstanceState(out)
         out.putInt("tab", state.tab.ordinal)
         out.putBoolean("onboarding", state.onboarding)
+        out.putInt("whats_new_version", state.whatsNewVersion ?: 0)
         out.putParcelableArrayList("files", ArrayList(state.files.map { it.uri }))
         out.putStringArrayList("file_names", ArrayList(state.files.map { it.name }))
         out.putLongArray("file_sizes", state.files.map { it.size }.toLongArray())
@@ -240,7 +260,6 @@ class MainActivity : ComponentActivity(), HopActions {
 
     fun onPaired() {
         closeMyQr()
-        state.pairSheet = false
         refreshAll()
         work.execute { Shortcuts.update(this, app.book().all()) }
     }
@@ -250,6 +269,7 @@ class MainActivity : ComponentActivity(), HopActions {
         state.live = app.live().items().map(::toLive)
         refreshPhone()
         refreshDevices()
+        if (state.settingsOpen || state.backupsOpen || state.receivedBackupsOpen) state.settings = loadSettings()
     }
 
     // ---- Turning engine objects into what the screens show ----
@@ -372,15 +392,21 @@ class MainActivity : ComponentActivity(), HopActions {
             updateChecks = Updater.enabled(this),
             updatesSupported = Updater.supported(this),
             clipAuto = p.getBoolean("clip_auto", true),
-            backup = Backup.state(this).let { b ->
-                BackupUi(b.on, b.folder, b.deviceId?.let { app.book().get(it)?.label() }, b.charging, b.status, b.lastRun)
-            },
+            backups = Backup.entries(this).map { b -> BackupUi(
+                id = b.id, on = b.on, folder = b.folder, device = b.device?.let { app.book().get(it)?.label() },
+                deviceId = b.device, kinds = b.kinds, charging = b.charging, timed = b.timed,
+                from = b.from, to = b.to, status = b.status, lastRun = b.lastRun,
+            ) },
+            backupPlace = folderName("backup_folder", "Download/HopDrop/Backups"),
+            receivedBackups = ReceiveStorage.backups(this).map { ReceivedBackupUi(it.id, it.device, it.folder, it.count, it.lastRun, it.location, it.place) },
             canAddTile = Build.VERSION.SDK_INT >= 33,
         )
     }
 
-    private fun folderName(): String {
-        val saved = prefs.getString("folder", null) ?: return "Download/HopDrop"
+    private fun folderName(): String = folderName("folder", "Download/HopDrop")
+
+    private fun folderName(key: String, default: String): String {
+        val saved = prefs.getString(key, null) ?: return default
         try {
             val tree = Uri.parse(saved)
             val doc = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
@@ -579,8 +605,8 @@ class MainActivity : ComponentActivity(), HopActions {
 
     override fun connectDirectly(device: DeviceUi) {
         val d = app.book().get(device.id) ?: return
-        if (!d.hasLink()) return
-        state.say("Connecting directly to ${d.label()}…")
+        if (!d.hasLink() || state.connectingTo != null) return
+        state.connectingTo = d.id
         work.execute {
             try {
                 app.directLink().use(d.linkSsid, d.linkKey, d.linkIp, 60000)
@@ -588,13 +614,13 @@ class MainActivity : ComponentActivity(), HopActions {
                     d.addresses.remove(d.linkIp)
                     d.addresses.add(0, d.linkIp)
                     app.peer().ping(d)
-                    runOnUiThread { state.say("Connected directly to ${d.label()}"); refreshDevices() }
+                    runOnUiThread { state.connectingTo = null; refreshDevices() }
                     Sends.retry(app, d.id, true)
                 } finally {
                     app.directLink().done()
                 }
             } catch (e: Exception) {
-                runOnUiThread { state.say(ErrorText.forDevice(e, d.label())) }
+                runOnUiThread { state.connectingTo = null; state.say(ErrorText.forDevice(e, d.label())) }
             }
         }
     }
@@ -662,6 +688,8 @@ class MainActivity : ComponentActivity(), HopActions {
     private fun onScanned(result: ActivityResult) {
         val data = result.data ?: return
         if (result.resultCode != RESULT_OK) return
+        if (data.getBooleanExtra("show_qr", false)) { showMyQr(); return }
+        if (data.getBooleanExtra("address", false)) { state.askAddress = true; return }
         if (data.getBooleanExtra("fallback", false)) {
             state.tab = Tab.Devices
             state.say("Tap the device under Nearby, then check both screens show the same number.")
@@ -686,7 +714,8 @@ class MainActivity : ComponentActivity(), HopActions {
                 }
                 Shortcuts.update(this, app.book().all())
             } catch (e: Exception) {
-                runOnUiThread { if (state.pairing != null) state.pairing = PairingUi(name, ErrorText.forDevice(e, name)) }
+                runOnUiThread { if (state.pairing != null) state.pairing = PairingUi(name,
+                    if (e is PairNetworkException) e.message else ErrorText.forDevice(e, name)) }
             }
         }
     }
@@ -695,21 +724,41 @@ class MainActivity : ComponentActivity(), HopActions {
      * Pairs with a scanned code: over the network both devices are on, else (or when that fails) through the PC's direct
      * link from the code — so the phone doesn't need to be on the same Wi-Fi. The link is kept briefly for a first send.
      */
+    private class PairNetworkException(message: String, cause: Throwable? = null) : IOException(message, cause)
+
+    private fun pairingNoAnswer(error: Exception) = Sends.unreachable(error) || error is EOFException
+
     private fun pairSmart(code: PairUri): Peer.Device {
         val lan = LocalSockets.sameNetwork(this, code.addresses)
+        // Without a direct link in the code, the PC's addresses are tried even from another network: a router may connect them.
         if (lan || code.linkSsid == null) {
             try {
                 return app.peer().pairQr(code, null)
             } catch (e: Exception) {
-                if (code.linkSsid == null || !Sends.unreachable(e)) throw e
+                if (!pairingNoAnswer(e)) throw e
+                if (code.linkSsid == null) throw PairNetworkException(
+                    if (lan) "Your PC didn't answer on this network. Open HopDrop on it, then check its firewall or guest Wi-Fi."
+                    else "This phone and PC are on different networks. Join the same Wi-Fi, or turn on Direct connection in HopDrop on the PC.", e)
             }
         }
         runOnUiThread { if (state.pairing != null) state.pairing = PairingUi(code.name, null, direct = true) }
-        app.directLink().use(code.linkSsid, code.linkKey, code.linkIp, 60000)
         try {
-            return app.peer().pairQr(code, listOf(code.linkIp))
-        } finally {
-            app.directLink().done()
+            app.directLink().use(code.linkSsid, code.linkKey, code.linkIp, 60000)
+            try {
+                return app.peer().pairQr(code, listOf(code.linkIp))
+            } finally {
+                app.directLink().done()
+            }
+        } catch (e: Exception) {
+            if (!pairingNoAnswer(e)) throw e
+            val fix = when {
+                e.message?.startsWith("wifi_off") == true -> "Turn on Wi-Fi on this phone."
+                e.message?.contains("Android didn't allow") == true -> "Android didn't allow it on this phone."
+                e.message?.contains("another PC") == true -> "Finish the other direct connection first."
+                else -> "Check that HopDrop is open on the PC and you're near it."
+            }
+            throw PairNetworkException((if (lan) "Your PC didn't answer on this network, and the direct connection failed too. "
+                else "This phone and PC are on different networks, and the direct connection failed. ") + fix, e)
         }
     }
 
@@ -979,22 +1028,13 @@ class MainActivity : ComponentActivity(), HopActions {
 
     // ---- Auto-backup (Backup.java) ----
 
-    override fun setBackup(on: Boolean) {
-        if (!on) {
-            Backup.stop(this)
-            state.settings = loadSettings()
-            return
-        }
-        if (app.book().all().isEmpty()) {
-            state.say("Pair a device first. Backups go to one of your paired devices.")
-            return
-        }
-        chooseBackupFolder()
+    override fun chooseBackupFolder(id: String?) {
+        if (id == null && app.book().all().isEmpty()) { state.say("Pair a device first."); return }
+        backupEditingId = id
+        chooseBackup.launch(null)
     }
 
-    override fun chooseBackupFolder() = chooseBackup.launch(null)
-
-    private var backupTree: Uri? = null
+    private var backupEditingId: String? = null
 
     /** Step 2: the folder is picked; count what's in it, then ask for the device and about the files already there. */
     private fun backupFolderChosen(tree: Uri) {
@@ -1004,36 +1044,59 @@ class MainActivity : ComponentActivity(), HopActions {
             state.say("HopDrop can't read that folder. Choose another one.")
             return
         }
-        backupTree = tree
+        val editing = backupEditingId
         work.execute {
             val name = FolderScan.name(contentResolver, tree)
             val count = try { FolderScan.files(contentResolver, tree).size } catch (e: Exception) { 0 }
-            runOnUiThread { state.backupSetup = BackupSetupUi(name, count, 0) }
+            runOnUiThread {
+                val id = if (editing == null) Backup.create(app, tree, name, app.book().all().first().id)
+                    else editing.also { Backup.setFolder(app, it, tree, name, true) }
+                state.settings = loadSettings()
+                state.backupsOpen = true
+                state.backupOpen = id
+                if (editing == null) state.backupSetup = BackupSetupUi(name, count, 0)
+            }
         }
     }
 
     override fun startBackup(deviceId: String, existing: Boolean) {
-        val tree = backupTree ?: return
         val setup = state.backupSetup ?: return
+        val id = state.backupOpen ?: return
         state.backupSetup = null
-        Backup.start(app, tree, setup.folderName, deviceId, existing)
+        Backup.setDevice(app, id, deviceId)
+        Backup.activate(app, id, existing)
         state.settings = loadSettings()
         state.say(if (existing) "Backing up ${setup.folderName}" else "New files in ${setup.folderName} will be backed up")
     }
 
-    override fun setBackupDevice(id: String) {
-        Backup.setDevice(app, id)
+    override fun setBackupDevice(id: String, deviceId: String) {
+        Backup.setDevice(app, id, deviceId)
         state.settings = loadSettings()
     }
 
-    override fun setBackupCharging(on: Boolean) {
-        Backup.setCharging(app, on)
+    override fun setBackupOn(id: String, on: Boolean) { Backup.setOn(app, id, on); state.settings = loadSettings() }
+    override fun setBackupKinds(id: String, kinds: Int) { Backup.setKinds(app, id, kinds); state.settings = loadSettings() }
+    override fun setBackupCharging(id: String, on: Boolean) {
+        Backup.setCharging(app, id, on)
         state.settings = loadSettings()
     }
-
-    override fun backupNow() {
-        Backup.check(app, true)
+    override fun setBackupWindow(id: String, timed: Boolean, from: Int, to: Int) {
+        Backup.setWindow(app, id, timed, from, to); state.settings = loadSettings()
+    }
+    override fun backupNow(id: String) {
+        Backup.check(app, id, true)
         state.say("Looking for new files…")
+    }
+    override fun removeBackup(id: String) { Backup.remove(app, id); state.backupOpen = null; state.settings = loadSettings() }
+    override fun chooseBackupPlace() = chooseBackupPlacePicker.launch(null)
+    private fun setBackupPlace(uri: Uri) {
+        try { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
+        catch (e: Exception) { state.say("HopDrop can't save backups there."); return }
+        prefs.edit().putString("backup_folder", uri.toString()).apply(); state.settings = loadSettings()
+    }
+    override fun resetBackupPlace() { prefs.edit().remove("backup_folder").apply(); state.settings = loadSettings() }
+    override fun forgetReceivedBackup(id: String, folder: String, location: String) {
+        ReceiveStorage.forgetBackup(this, id, folder, location); state.settings = loadSettings()
     }
 
     override fun addTile() {
@@ -1054,9 +1117,9 @@ class MainActivity : ComponentActivity(), HopActions {
     // ---- Tour ----
 
     override fun finishOnboarding(pair: Boolean) {
-        prefs.edit().putBoolean("onboarded", true).apply()
+        prefs.edit().putBoolean("onboarded", true).putInt("seen_version", appVersionCode()).apply()
         state.onboarding = false
-        askPermissions(true)
+        main.postDelayed({ askPermissions(true) }, 200)
         if (pair) {
             state.tab = Tab.Devices
             scanQr()
@@ -1066,6 +1129,18 @@ class MainActivity : ComponentActivity(), HopActions {
     override fun showTour() {
         state.settingsOpen = false
         state.onboarding = true
+    }
+
+    override fun dismissWhatsNew(showTour: Boolean) {
+        prefs.edit().putInt("seen_version", appVersionCode()).putBoolean("onboarded", true).apply()
+        state.whatsNewVersion = null
+        if (showTour) state.onboarding = true else main.postDelayed({ askPermissions(true) }, 200)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun appVersionCode(): Int {
+        val info = packageManager.getPackageInfo(packageName, 0)
+        return if (Build.VERSION.SDK_INT >= 28) info.longVersionCode.toInt() else info.versionCode
     }
 
     // ---- Updates (Updater.kt) ----
@@ -1170,7 +1245,8 @@ class MainActivity : ComponentActivity(), HopActions {
 
     /** Once: receiving in the background is on, but Android may still pause HopDrop to save battery. */
     private fun offerBackgroundActivity() {
-        if (prefs.getBoolean("background_offered", false) || !ReceiveService.background(this) || !batteryRestricted() || isFinishing) return
+        if (state.onboarding || state.whatsNewVersion != null || prefs.getBoolean("background_offered", false) ||
+            !ReceiveService.background(this) || !batteryRestricted() || isFinishing) return
         prefs.edit().putBoolean("background_offered", true).apply()
         state.askBackground = true
     }

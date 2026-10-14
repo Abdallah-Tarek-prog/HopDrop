@@ -98,16 +98,21 @@ data class SettingsUi(
     val updatesSupported: Boolean = true,
     /** Text a paired device copied goes straight onto this phone's clipboard. */
     val clipAuto: Boolean = true,
-    val backup: BackupUi = BackupUi(),
+    val backups: List<BackupUi> = emptyList(),
+    val backupPlace: String = "Download/HopDrop/Backups",
+    val receivedBackups: List<ReceivedBackupUi> = emptyList(),
     /** Android 13+ can add the Quick Settings tile with one tap. */
     val canAddTile: Boolean = false,
 )
 
 /** Settings → Auto-backup. */
 data class BackupUi(
-    val on: Boolean = false, val folder: String? = null, val device: String? = null, val charging: Boolean = false,
-    val status: String? = null, val lastRun: Long = 0,
+    val id: String = "", val on: Boolean = false, val folder: String? = null, val device: String? = null,
+    val deviceId: String? = null, val kinds: Int = 15, val charging: Boolean = false, val timed: Boolean = false,
+    val from: Int = 0, val to: Int = 0, val status: String? = null, val lastRun: Long = 0,
 )
+data class ReceivedBackupUi(val id: String, val device: String, val folder: String, val count: Int, val lastRun: Long,
+    val location: String, val place: String)
 
 /** Turning auto-backup on: the folder is picked; [existing] files are already in it (ask whether to send them too). */
 data class BackupSetupUi(val folderName: String, val existing: Int, val step: Int)
@@ -133,18 +138,26 @@ class HopUiState {
     val offers = mutableStateListOf<OfferUi>()
     var pairing by mutableStateOf<PairingUi?>(null)
     var qr by mutableStateOf<QrUi?>(null)
-    var pairSheet by mutableStateOf(false)
+    var askAddress by mutableStateOf(false)
+    var deviceOpen by mutableStateOf<String?>(null)
+    var allFilesOf by mutableStateOf<HistoryUi?>(null)
     var askBackground by mutableStateOf(false)
     var message by mutableStateOf<UiMessage?>(null)
     var update by mutableStateOf<UpdateUi?>(null)
     var checkingUpdates by mutableStateOf(false)
     /** First start (and Settings → Show the tour): the tutorial covers the app until it's finished or skipped. */
     var onboarding by mutableStateOf(false)
+    /** An update's short What's new modal, keyed by version code. */
+    var whatsNewVersion by mutableStateOf<Int?>(null)
     /** Send to several devices: ticked devices while choosing. Null when not choosing. */
     var picking by mutableStateOf<Set<String>?>(null)
     /** The device the phone is joined to through its direct link, or null. */
     var directTo by mutableStateOf<String?>(null)
+    var connectingTo by mutableStateOf<String?>(null)
     var backupSetup by mutableStateOf<BackupSetupUi?>(null)
+    var backupsOpen by mutableStateOf(false)
+    var backupOpen by mutableStateOf<String?>(null)
+    var receivedBackupsOpen by mutableStateOf(false)
 
     val nothingSelected: Boolean get() = files.isEmpty() && folders.isEmpty()
 
@@ -209,17 +222,24 @@ interface HopActions {
     fun openLink(url: String)
 
     fun setClipAuto(on: Boolean)
-    fun setBackup(on: Boolean)
-    fun chooseBackupFolder()
-    fun setBackupDevice(id: String)
-    fun setBackupCharging(on: Boolean)
-    fun backupNow()
+    fun chooseBackupFolder(id: String? = null)
+    fun setBackupOn(id: String, on: Boolean)
+    fun setBackupDevice(id: String, deviceId: String)
+    fun setBackupKinds(id: String, kinds: Int)
+    fun setBackupCharging(id: String, on: Boolean)
+    fun setBackupWindow(id: String, timed: Boolean, from: Int, to: Int)
+    fun backupNow(id: String)
+    fun removeBackup(id: String)
+    fun chooseBackupPlace()
+    fun resetBackupPlace()
+    fun forgetReceivedBackup(id: String, folder: String, location: String)
     /** Finishes turning auto-backup on: [existing] = also send the files already in the folder. */
     fun startBackup(deviceId: String, existing: Boolean)
     fun addTile()
     /** The tutorial ended; [pair] = go straight to scanning a pairing code. */
     fun finishOnboarding(pair: Boolean)
     fun showTour()
+    fun dismissWhatsNew(showTour: Boolean)
 
     fun setUpdateChecks(on: Boolean)
     fun checkForUpdates()

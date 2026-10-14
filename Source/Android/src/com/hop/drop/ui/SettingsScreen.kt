@@ -20,9 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Backup
@@ -38,8 +36,8 @@ import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.PrivacyTip
 import androidx.compose.material.icons.rounded.RocketLaunch
 import androidx.compose.material.icons.rounded.SystemUpdate
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
@@ -82,7 +80,6 @@ fun SettingsScreen(state: HopUiState, actions: HopActions, snackbar: SnackbarHos
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
     var renaming by remember { mutableStateOf(false) }
     var licences by remember { mutableStateOf(false) }
-    var backupDevice by remember { mutableStateOf(false) }
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
         topBar = {
@@ -132,22 +129,16 @@ fun SettingsScreen(state: HopUiState, actions: HopActions, snackbar: SnackbarHos
                 }
             }
             item(key = "backup") {
-                val b = s.backup
-                Group("Auto-backup") {
-                    SwitchRow("Back up a folder", if (b.on) "New files go to ${b.device ?: "your device"} on their own" else "For example your camera's photos, to your PC",
-                        b.on, actions::setBackup)
-                    if (b.on) {
-                        SettingRow(clickable = actions::chooseBackupFolder, icon = Icons.Rounded.Folder, title = "Folder", detail = b.folder ?: "Pick a folder")
-                        SettingRow(clickable = { backupDevice = true }, icon = Icons.Rounded.Devices, title = "Send to", detail = b.device ?: "Pick a device")
-                        SwitchRow("Only while charging", "Saves battery on big backups", b.charging, actions::setBackupCharging)
-                        SettingRow(clickable = actions::backupNow, icon = Icons.Rounded.Backup, title = "Back up now",
-                            detail = listOfNotNull(b.status, b.lastRun.takeIf { it > 0 }?.let {
-                                "last " + java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT).format(java.util.Date(it))
-                            }).joinToString("  ·  ").ifEmpty { "Look for new files now" })
-                        Text("Works whenever both are on the same Wi-Fi, also with HopDrop closed (with Receive in the background on). Files arrive in one ${b.folder ?: ""} folder.",
-                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp))
-                    }
+                Group("Backups") {
+                    val on = s.backups.count { it.on }
+                    SettingRow(clickable = { state.backupsOpen = true }, icon = Icons.Rounded.Backup, title = "Auto-backup",
+                        detail = when {
+                            s.backups.isEmpty() -> "Back up a folder to one of your devices"
+                            on == 0 -> "Off"
+                            else -> if (on == 1) "1 backup on" else "$on backups on"
+                        })
+                    SettingRow(clickable = { state.receivedBackupsOpen = true }, icon = Icons.Rounded.Folder, title = "Backups received",
+                        detail = "From your other devices, saved in ${s.backupPlace}")
                 }
             }
             item(key = "privacy") {
@@ -231,30 +222,12 @@ fun SettingsScreen(state: HopUiState, actions: HopActions, snackbar: SnackbarHos
             onSave = { name -> actions.setPhoneName(name).also { if (it == null) renaming = false } },
         )
     }
-    if (backupDevice) {
-        AlertDialog(
-            onDismissRequest = { backupDevice = false },
-            title = { Text("Back up to") },
-            text = {
-                Column {
-                    for (d in state.devices) {
-                        Row(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).clickable { backupDevice = false; actions.setBackupDevice(d.id) }.padding(vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically) {
-                            DeviceAvatar(d.platform, d.online, size = 32.dp)
-                            Text(d.name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 12.dp))
-                        }
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { backupDevice = false }) { Text("Cancel") } },
-        )
-    }
     if (licences) {
-        AlertDialog(
-            onDismissRequest = { licences = false },
+        HopModal(
+            onDismissRequest = { licences = false }, paneTitle = "Licences",
             title = { Text("Licences") },
             text = {
-                Column(Modifier.verticalScroll(rememberScrollState())) {
+                Column {
                     Text("HopDrop is free software under the GNU General Public License, version 3.\n\n" +
                         "It includes:\n" +
                         "•  ZXing, for reading QR codes (Apache License 2.0)\n" +
@@ -262,7 +235,7 @@ fun SettingsScreen(state: HopUiState, actions: HopActions, snackbar: SnackbarHos
                         "•  Plus Jakarta Sans font (SIL Open Font License 1.1)")
                 }
             },
-            confirmButton = { TextButton(onClick = { licences = false }) { Text("Close") } },
+            confirmButton = { Button(onClick = { licences = false }) { Text("Done") } },
         )
     }
 }

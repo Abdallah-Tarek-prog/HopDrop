@@ -258,7 +258,7 @@ public sealed partial class MainWindow
             row.Send.ToolTip = !queued && _files.Count == 0 ? "Add files first" : null;
             row.Bar.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
             row.Status.Visibility = item is null && !queued ? Visibility.Collapsed : Visibility.Visible;
-            if (queued) { row.Presence.Text = "Offline · sends when it's back"; row.Presence.Foreground = Palette.Muted; row.Dot.Fill = Palette.Muted; row.Status.Text = "Waiting for this device"; row.Status.Foreground = Palette.Muted; row.Bar.Visibility = Visibility.Collapsed; continue; }
+            if (queued) { row.Presence.Text = "Offline · sends when it's back"; row.Presence.Foreground = Palette.Muted; row.Dot.Fill = Palette.Muted; row.Status.Text = SendQueue.WaitingHint(device); row.Status.Foreground = Palette.Muted; row.Bar.Visibility = Visibility.Collapsed; continue; }
             if (item is null) continue;
             if (item.Failure is not null) { row.Status.Text = item.Failure; row.Status.Foreground = Palette.Danger; }
             else if (item.Result is TransferResult r)
@@ -309,6 +309,7 @@ public sealed partial class MainWindow
     private DispatcherTimer? _qrTimer;
     private DateTimeOffset _qrExpiry;
     private string? _qrUri;
+    internal bool HasPairingCode => _qrUri is not null;
     private StackPanel? _qrHost;
     private string? _qrSuccessName;
     private StackPanel? _pairedHost;
@@ -617,6 +618,42 @@ public sealed partial class MainWindow
         if (ZoneMark.Supported(folderPath) == false)
             folderInfo.Children.Add(Ui.Colored("This drive can't mark files as downloaded, so Windows won't warn before opening files from devices you haven't trusted.", Palette.Amber));
         page.Children.Add(Ui.SettingRow(SymbolRegular.Folder24, "Receive folder", "Files from phones and other PCs are saved here.", folderActions, folderInfo));
+        page.Children.Add(Ui.Section("Backups"));
+        string backupPath = _peer?.BackupDirectory ?? HopDropPaths.Default.DefaultBackupDirectory;
+        var backupActions = new StackPanel { Orientation = Orientation.Horizontal };
+        backupActions.Children.Add(Ui.Button("Change…", async () =>
+        {
+            var dialog = new OpenFolderDialog { Title = "Choose where HopDrop saves backups", InitialDirectory = backupPath };
+            if (dialog.ShowDialog(this) == true && _peer is not null) { await _peer.SetBackupDirectoryAsync(dialog.FolderName); RenderCurrent(); }
+        }, icon: SymbolRegular.FolderSwap24));
+        backupActions.Children.Add(Ui.Button("Open", () => { Directory.CreateDirectory(backupPath); Platform.OpenFolder(backupPath); }, icon: SymbolRegular.FolderOpen24));
+        backupActions.Children.Add(Ui.Button("Default", async () => { if (_peer is not null) { await _peer.SetBackupDirectoryAsync(HopDropPaths.Default.DefaultBackupDirectory); RenderCurrent(); } }));
+        page.Children.Add(Ui.SettingRow(SymbolRegular.Folder24, "Save backups in", backupPath, backupActions));
+        var backupList = new StackPanel();
+        page.Children.Add(backupList);
+        if (_peer is not null) _ = ShowBackupsAsync(_peer, backupPath, backupList);
+        async Task ShowBackupsAsync(HopDropPeer peer, string root, StackPanel host)
+        {
+            try
+            {
+                var entries = await peer.BackupsAsync();
+                if (entries.Count == 0) { host.Children.Add(Ui.Subtle("No backups received yet")); return; }
+                foreach (var entry in entries.OrderByDescending(x => x.LastRun))
+                {
+                    string place = entry.Location ?? Path.Combine(root, FileNames.Sanitize(entry.DeviceName), FileNames.Sanitize(entry.Folder));
+                    var buttons = new StackPanel { Orientation = Orientation.Horizontal };
+                    buttons.Children.Add(Ui.Button("Open folder", () => { if (Directory.Exists(place)) Platform.OpenFolder(place); else ShowError("Backup folder isn't available."); }));
+                    buttons.Children.Add(Ui.Button("Forget entry", async () =>
+                    {
+                        await peer.ForgetBackupAsync(entry.DeviceId, entry.Folder, entry.Location);
+                        RenderCurrent();
+                    }));
+                    host.Children.Add(Ui.SettingRow(SymbolRegular.Folder24, entry.DeviceName + " · " + entry.Folder,
+                        entry.FileCount + " files · Last run " + entry.LastRun.ToLocalTime().ToString("g"), buttons));
+                }
+            }
+            catch (Exception e) { host.Children.Add(Ui.Subtle("Couldn't load backups: " + e.Message)); }
+        }
         var ask = new ToggleSwitch { IsChecked = _peer?.AskBeforeReceiving == true };
         ask.Checked += async (_, _) => { if (_peer is not null) await _peer.SetAskBeforeReceivingAsync(true); };
         ask.Unchecked += async (_, _) => { if (_peer is not null) await _peer.SetAskBeforeReceivingAsync(false); };

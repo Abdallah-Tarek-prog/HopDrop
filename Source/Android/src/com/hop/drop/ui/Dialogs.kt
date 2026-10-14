@@ -1,7 +1,6 @@
 package com.hop.drop.ui
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,36 +12,25 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.BatteryChargingFull
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.ErrorOutline
-import androidx.compose.material.icons.rounded.Lan
 import androidx.compose.material.icons.rounded.Link
-import androidx.compose.material.icons.rounded.QrCode2
-import androidx.compose.material.icons.rounded.QrCodeScanner
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,7 +40,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -61,7 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hop.drop.core.Format
 
-/** Every dialog that can pop up over any screen: pairing, files waiting for an answer, QR code, pair options. */
+/** Dialogs that can pop up over any screen. */
 @Composable
 fun GlobalDialogs(state: HopUiState, actions: HopActions) {
     val prompt = state.prompt
@@ -72,16 +59,26 @@ fun GlobalDialogs(state: HopUiState, actions: HopActions) {
         offer != null -> OfferDialog(offer, actions)
         pairing != null -> PairingDialog(pairing, actions)
     }
-    state.qr?.let { QrSheet(it, actions) }
-    state.backupSetup?.let { BackupSetupDialog(it, state.devices, actions) { state.backupSetup = null } }
-    if (state.pairSheet) PairOptionsSheet(actions) { state.pairSheet = false }
+    state.qr?.let { QrModal(it, actions) }
+    state.backupSetup?.let { setup ->
+        BackupSetupDialog(setup, state.settings.backups.firstOrNull { it.id == state.backupOpen }?.deviceId, actions) {
+            state.backupSetup = null
+            state.backupOpen?.let(actions::removeBackup)
+        }
+    }
+    if (state.askAddress) TextInputDialog(
+        title = "Pair by IP address", initial = "", label = "Address", placeholder = "192.168.1.23",
+        help = "Shown on the other device under Devices.", keyboard = KeyboardType.Uri, confirm = "Pair",
+        onDismiss = { state.askAddress = false },
+        onSave = { address -> actions.pairByAddress(address).also { if (it == null) state.askAddress = false } },
+    )
     if (state.askBackground) {
-        AlertDialog(
-            onDismissRequest = { state.askBackground = false },
+        HopModal(
+            onDismissRequest = { state.askBackground = false }, paneTitle = "Receive files any time",
             icon = { Icon(Icons.Rounded.BatteryChargingFull, contentDescription = null) },
             title = { Text("Receive files any time") },
             text = { Text("Let HopDrop run in the background so files arrive even when the screen is off.") },
-            confirmButton = { TextButton(onClick = { state.askBackground = false; actions.allowBackground() }) { Text("Allow") } },
+            confirmButton = { Button(onClick = { state.askBackground = false; actions.allowBackground() }) { Text("Allow") } },
             dismissButton = { TextButton(onClick = { state.askBackground = false }) { Text("Not now") } },
         )
     }
@@ -90,10 +87,10 @@ fun GlobalDialogs(state: HopUiState, actions: HopActions) {
 /** Number comparison: both screens show the same six digits when nobody is in the middle. */
 @Composable
 private fun PairCodeDialog(prompt: PromptUi, actions: HopActions) {
-    AlertDialog(
-        onDismissRequest = {},
+    HopModal(
+        onDismissRequest = { actions.answerPrompt(false) }, required = true, paneTitle = "Pair with ${prompt.name}?",
         icon = { Icon(Icons.Rounded.Link, contentDescription = null) },
-        title = { Text("Pair with ${prompt.name}?", textAlign = TextAlign.Center) },
+        title = { Text("Pair with ${prompt.name}?") },
         text = {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
@@ -105,7 +102,7 @@ private fun PairCodeDialog(prompt: PromptUi, actions: HopActions) {
                 Text("Check that ${prompt.name} shows the same number.", textAlign = TextAlign.Center)
             }
         },
-        confirmButton = { TextButton(onClick = { actions.answerPrompt(true) }) { Text("They match") } },
+        confirmButton = { Button(onClick = { actions.answerPrompt(true) }) { Text("They match") } },
         dismissButton = { TextButton(onClick = { actions.answerPrompt(false) }) { Text("Cancel") } },
     )
 }
@@ -114,12 +111,13 @@ private fun PairCodeDialog(prompt: PromptUi, actions: HopActions) {
 @Composable
 private fun OfferDialog(offer: OfferUi, actions: HopActions) {
     val items = topItems(offer.files)
-    AlertDialog(
-        onDismissRequest = {},
+    HopModal(
+        onDismissRequest = { actions.answerOffer(offer, false) }, required = true,
+        paneTitle = "${offer.peer} wants to send you files",
         icon = { Icon(Icons.Rounded.Download, contentDescription = null) },
-        title = { Text("${offer.peer} wants to send you " + Format.files(offer.files.size), textAlign = TextAlign.Center) },
+        title = { Text("${offer.peer} wants to send you " + Format.files(offer.files.size)) },
         text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
+            Column {
                 for (name in items.take(6)) {
                     Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         FileIcon(name.removeSuffix(" folder"), null, size = 32.dp, folder = name.endsWith(" folder"))
@@ -133,7 +131,7 @@ private fun OfferDialog(offer: OfferUi, actions: HopActions) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
             }
         },
-        confirmButton = { TextButton(onClick = { actions.answerOffer(offer, true) }) { Text("Accept") } },
+        confirmButton = { Button(onClick = { actions.answerOffer(offer, true) }) { Text("Accept") } },
         dismissButton = { TextButton(onClick = { actions.answerOffer(offer, false) }) { Text("Decline") } },
     )
 }
@@ -142,10 +140,11 @@ private fun OfferDialog(offer: OfferUi, actions: HopActions) {
 @Composable
 private fun PairingDialog(pairing: PairingUi, actions: HopActions) {
     val failed = pairing.error != null
-    AlertDialog(
-        onDismissRequest = { if (failed) actions.dismissPairing() },
+    HopModal(
+        onDismissRequest = actions::dismissPairing, required = !failed,
+        paneTitle = if (failed) "Couldn't pair" else "Pairing with ${pairing.name}",
         icon = { Icon(if (failed) Icons.Rounded.ErrorOutline else Icons.Rounded.Link, contentDescription = null) },
-        title = { Text(if (failed) "Couldn't pair" else "Pairing with ${pairing.name}…", textAlign = TextAlign.Center) },
+        title = { Text(if (failed) "Couldn't pair" else "Pairing with ${pairing.name}…") },
         text = {
             if (failed) Text(pairing.error ?: "")
             else Column {
@@ -155,90 +154,38 @@ private fun PairingDialog(pairing: PairingUi, actions: HopActions) {
             }
         },
         confirmButton = {
-            if (failed) TextButton(onClick = { actions.dismissPairing(); actions.scanQr() }) { Text("Scan again") }
+            if (failed) Button(onClick = { actions.dismissPairing(); actions.scanQr() }) { Text("Scan again") }
         },
         dismissButton = { TextButton(onClick = actions::dismissPairing) { Text(if (failed) "Close" else "Cancel") } },
     )
 }
 
 /** This phone's pairing code, for another device to scan. Keeps the screen on while it shows. */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun QrSheet(qr: QrUi, actions: HopActions) {
-    val view = LocalView.current
-    DisposableEffect(Unit) {
-        view.keepScreenOn = true
-        onDispose { view.keepScreenOn = false }
-    }
-    ModalBottomSheet(onDismissRequest = actions::closeMyQr) {
-        Column(
-            Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text("Scan to pair", style = MaterialTheme.typography.titleLarge)
-            Text("Open HopDrop on the other device and scan this code.", style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 4.dp))
-            Surface(color = Color.White, shape = RoundedCornerShape(20.dp), modifier = Modifier.padding(top = 20.dp).widthIn(max = 300.dp).fillMaxWidth().aspectRatio(1f)) {
-                Image(qr.image, contentDescription = "Pairing QR code", filterQuality = FilterQuality.None, modifier = Modifier.padding(14.dp))
-            }
-            Text("Works once, for 5 minutes", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 12.dp))
-            if (qr.addresses.isNotEmpty()) {
-                FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)) {
-                    for (a in qr.addresses) Text(a.kind + "  " + a.ip, style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun QrModal(qr: QrUi, actions: HopActions) {
+    HopModal(
+        onDismissRequest = actions::closeMyQr, paneTitle = "Scan to pair", keepScreenOn = true,
+        title = { Text("Scan to pair") },
+        text = {
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Open HopDrop on the other device and scan this code.", style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 4.dp))
+                Surface(color = Color.White, shape = RoundedCornerShape(20.dp), modifier = Modifier.padding(top = 20.dp).widthIn(max = 300.dp).fillMaxWidth().aspectRatio(1f)) {
+                    Image(qr.image, contentDescription = "Pairing QR code", filterQuality = FilterQuality.None, modifier = Modifier.padding(14.dp))
+                }
+                Text("Works once, for 5 minutes", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 12.dp))
+                if (qr.addresses.isNotEmpty()) {
+                    FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)) {
+                        for (a in qr.addresses) Text(a.kind + "  " + a.ip, style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
-        }
-    }
-}
-
-/** The ways to pair, from the Devices tab's "Pair device" button. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun PairOptionsSheet(actions: HopActions, onDismiss: () -> Unit) {
-    var byAddress by remember { mutableStateOf(false) }
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.navigationBarsPadding().padding(start = 16.dp, end = 16.dp, bottom = 20.dp)) {
-            Text("Pair a device", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 8.dp))
-            Text("Pair once, then send with one tap.", style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 8.dp, top = 2.dp, bottom = 16.dp))
-            PairOption(Icons.Rounded.QrCodeScanner, "Scan a QR code", "Use the code shown on the other device", primary = true) {
-                onDismiss(); actions.scanQr()
-            }
-            PairOption(Icons.Rounded.QrCode2, "Show my QR code", "For the other device to scan") { onDismiss(); actions.showMyQr() }
-            PairOption(Icons.Rounded.Lan, "Enter an IP address", "If the device doesn't show up nearby") { byAddress = true }
-        }
-    }
-    if (byAddress) {
-        TextInputDialog(
-            title = "Pair by IP address", initial = "", label = "Address", placeholder = "192.168.1.23",
-            help = "Shown on the other device under Devices.", keyboard = KeyboardType.Uri, confirm = "Pair",
-            onDismiss = { byAddress = false },
-            onSave = { text -> actions.pairByAddress(text).also { if (it == null) { byAddress = false; onDismiss() } } },
-        )
-    }
-}
-
-@Composable
-private fun PairOption(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, detail: String, primary: Boolean = false, onClick: () -> Unit) {
-    val scheme = MaterialTheme.colorScheme
-    Row(
-        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(if (primary) scheme.primaryContainer else scheme.surfaceContainerLow)
-            .clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(Modifier.size(40.dp).clip(CircleShape).background(if (primary) scheme.primary else scheme.secondaryContainer), contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = if (primary) scheme.onPrimary else scheme.onSecondaryContainer)
-        }
-        Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
-            Text(title, style = MaterialTheme.typography.titleSmall, color = if (primary) scheme.onPrimaryContainer else scheme.onSurface)
-            Text(detail, style = MaterialTheme.typography.bodySmall, color = if (primary) scheme.onPrimaryContainer else scheme.onSurfaceVariant)
-        }
-        Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null,
-            tint = if (primary) scheme.onPrimaryContainer else scheme.onSurfaceVariant)
-    }
-    Spacer(Modifier.height(8.dp))
+        },
+        confirmButton = { Button(onClick = actions::closeMyQr) { Text("Done") } },
+    )
 }
 
 /**
@@ -246,39 +193,17 @@ private fun PairOption(icon: androidx.compose.ui.graphics.vector.ImageVector, ti
  * then whether to send the files already in the folder or only new ones.
  */
 @Composable
-private fun BackupSetupDialog(setup: BackupSetupUi, devices: List<DeviceUi>, actions: HopActions, onDismiss: () -> Unit) {
-    var device by remember { mutableStateOf(devices.singleOrNull()?.id ?: devices.firstOrNull { it.online }?.id) }
-    var choosing by remember { mutableStateOf(devices.size > 1) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
+private fun BackupSetupDialog(setup: BackupSetupUi, device: String?, actions: HopActions, onDismiss: () -> Unit) {
+    HopModal(
+        onDismissRequest = onDismiss, paneTitle = "Back up ${setup.folderName}",
         icon = { Icon(Icons.Rounded.Backup, contentDescription = null) },
-        title = { Text(if (choosing) "Back up to which device?" else "Back up ${setup.folderName}", textAlign = TextAlign.Center) },
-        text = {
-            if (choosing) Column {
-                for (d in devices) {
-                    Row(
-                        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).clickable { device = d.id }.padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        androidx.compose.material3.RadioButton(selected = device == d.id, onClick = { device = d.id })
-                        DeviceAvatar(d.platform, d.online, size = 32.dp)
-                        Text(d.name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 12.dp))
-                    }
-                }
-            } else Text(
-                if (setup.existing > 0) "It already has ${Format.files(setup.existing)}. Send those too, or only files added from now on?"
-                else "New files added to it go to ${devices.firstOrNull { it.id == device }?.name ?: "your device"} by themselves, whenever it's on the same Wi-Fi."
-            )
-        },
+        title = { Text("Send the ${setup.existing} files already there, or only new ones?") },
+        text = { Text("Choose which files to send first. You can change this backup's settings later.") },
         confirmButton = {
-            if (choosing) TextButton(onClick = { choosing = false }, enabled = device != null) { Text("Next") }
-            else TextButton(onClick = { device?.let { actions.startBackup(it, setup.existing > 0) } }) {
-                Text(if (setup.existing > 0) "Send all ${setup.existing}" else "Turn on")
-            }
+            Button(onClick = { device?.let { actions.startBackup(it, true) } }, enabled = device != null) { Text("Send existing files") }
         },
         dismissButton = {
-            if (!choosing && setup.existing > 0) TextButton(onClick = { device?.let { actions.startBackup(it, false) } }) { Text("Only new ones") }
-            else TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = { device?.let { actions.startBackup(it, false) } }, enabled = device != null) { Text("Only new files") }
         },
     )
 }
@@ -291,8 +216,8 @@ fun TextInputDialog(
 ) {
     var text by remember { mutableStateOf(initial) }
     var error by remember { mutableStateOf<String?>(null) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
+    HopModal(
+        onDismissRequest = onDismiss, paneTitle = title,
         title = { Text(title) },
         text = {
             OutlinedTextField(
@@ -307,7 +232,7 @@ fun TextInputDialog(
                 modifier = Modifier.fillMaxWidth(),
             )
         },
-        confirmButton = { TextButton(onClick = { error = onSave(text.trim()) }) { Text(confirm) } },
+        confirmButton = { Button(onClick = { error = onSave(text.trim()) }) { Text(confirm) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
@@ -316,8 +241,8 @@ fun TextInputDialog(
 @Composable
 fun TextNoteDialog(initial: String, onDismiss: () -> Unit, onAdd: (String) -> Unit) {
     var text by remember { mutableStateOf(initial) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
+    HopModal(
+        onDismissRequest = onDismiss, paneTitle = "Send text",
         title = { Text("Send text") },
         text = {
             OutlinedTextField(
@@ -330,7 +255,7 @@ fun TextNoteDialog(initial: String, onDismiss: () -> Unit, onAdd: (String) -> Un
                 modifier = Modifier.fillMaxWidth(),
             )
         },
-        confirmButton = { TextButton(onClick = { onAdd(text) }, enabled = text.isNotBlank()) { Text("Add") } },
+        confirmButton = { Button(onClick = { onAdd(text) }, enabled = text.isNotBlank()) { Text("Add") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

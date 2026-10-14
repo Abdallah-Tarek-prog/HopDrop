@@ -128,19 +128,19 @@ public sealed partial class HopDropPeer
         SendAsync(target, paths.Select(p => new SendItem(p)).ToList(), ct);
     /// <summary>Sends files and folders. A very large selection to a device that can't take it in one transfer goes in several.</summary>
     /// <param name="merge">Sent folders go into the receiver's existing folders of the same name instead of new "Photos (1)" ones (backups).</param>
-    public async Task<TransferResult> SendAsync(string target, IReadOnlyList<SendItem> items, CancellationToken ct = default, bool merge = false)
+    public async Task<TransferResult> SendAsync(string target, IReadOnlyList<SendItem> items, CancellationToken ct = default, bool merge = false, string? backupFolder = null)
     {
         if (items.Count == 0) throw new ArgumentException("At least one file required", nameof(items));
         var saved = new List<string>();
         TransferResult? last = null;
         for (int start = 0; start < items.Count;)
         {
-            var (result, taken) = await SendBatchAsync(target, items, start, ct, merge);
+            var (result, taken) = await SendBatchAsync(target, items, start, ct, merge, backupFolder);
             saved.AddRange(result.SavedPaths); start += taken; last = result;
         }
         return items.Count == last!.Offered ? last : last with { SavedPaths = saved, Offered = items.Count };
     }
-    private async Task<(TransferResult Result, int Taken)> SendBatchAsync(string target, IReadOnlyList<SendItem> items, int start, CancellationToken ct, bool merge = false)
+    private async Task<(TransferResult Result, int Taken)> SendBatchAsync(string target, IReadOnlyList<SendItem> items, int start, CancellationToken ct, bool merge = false, string? backupFolder = null)
     {
         string? alias = null;
         PairedDevice? device = null;
@@ -195,7 +195,7 @@ public sealed partial class HopDropPeer
                 try
                 {
                     connection ??= await ConnectTargetAsync(transferStop.Token);
-                    await SendFilesAsync(connection, id, files, paths, state, peerName, total, meter, clock, transferStop.Token, merge);
+                    await SendFilesAsync(connection, id, files, paths, state, peerName, total, meter, clock, transferStop.Token, merge, backupFolder);
                     break;
                 }
                 catch (Exception e) when (resume && attempt < Reconnects && !transferStop.IsCancellationRequested && Retryable(e))
@@ -243,12 +243,13 @@ public sealed partial class HopDropPeer
     /// from where the receiver says it stopped, and records each confirmed file in <paramref name="state"/>.
     /// </summary>
     private async Task SendFilesAsync(Connection connection, Guid id, List<OfferedFile> files, List<string> paths, Outgoing state, string peerName, long total,
-        TransferMeter meter, Stopwatch clock, CancellationToken ct, bool merge = false)
+        TransferMeter meter, Stopwatch clock, CancellationToken ct, bool merge = false, string? backupFolder = null)
     {
         var pending = Enumerable.Range(0, files.Count).Where(i => state.SavedAs[i] is null).ToArray();
         var offered = pending.Select((original, j) => files[original] with { Index = j }).ToArray();
         long offeredTotal = offered.Any(f => f.Size < 0) ? -1 : offered.Sum(f => f.Size);
-        await WriteOfferAsync(connection, id, offered, offeredTotal, ct, merge && connection.Features.Contains("merge"));
+        await WriteOfferAsync(connection, id, offered, offeredTotal, ct, merge && connection.Features.Contains("merge"),
+            connection.Features.Contains("backup") && connection.Features.Contains("folders") ? backupFolder : null);
         // A receiver that asks its user first says "pending" (only to senders that list "consent") and may take up to two minutes.
         bool consent = connection.Features.Contains("consent");
         var skip = new HashSet<int>(); int partialIndex = -1; long partialOffset = 0;
@@ -359,7 +360,7 @@ public sealed partial class HopDropPeer
         }
     }
     /// <summary>Sends the offer, split over "offer_more" messages when the list doesn't fit in one (receivers that list "pages").</summary>
-    private static async Task WriteOfferAsync(Connection connection, Guid id, OfferedFile[] offered, long total, CancellationToken ct, bool merge = false)
+    private static async Task WriteOfferAsync(Connection connection, Guid id, OfferedFile[] offered, long total, CancellationToken ct, bool merge = false, string? backupFolder = null)
     {
         var pages = new List<List<Dictionary<string, object>>> { new() };
         int size = 0;
@@ -369,9 +370,10 @@ public sealed partial class HopDropPeer
             if (size + entry > OfferBudget && pages[^1].Count > 0) { pages.Add([]); size = 0; }
             pages[^1].Add(Entry(file)); size += entry;
         }
-        object offer = merge
-            ? new { type = "offer", transferId = id, count = offered.Length, totalBytes = total, files = pages[0], more = pages.Count > 1, merge = true }
-            : new { type = "offer", transferId = id, count = offered.Length, totalBytes = total, files = pages[0], more = pages.Count > 1 };
+        var offer = new Dictionary<string, object> { ["type"] = "offer", ["transferId"] = id, ["count"] = offered.Length,
+            ["totalBytes"] = total, ["files"] = pages[0], ["more"] = pages.Count > 1 };
+        if (merge) offer["merge"] = true;
+        if (merge && backupFolder is not null) { offer["backup"] = true; offer["backupFolder"] = backupFolder; }
         await Messages.WriteAsync(connection.Stream, offer, ct);
         for (int p = 1; p < pages.Count; p++)
             await Messages.WriteAsync(connection.Stream, new { type = "offer_more", files = pages[p], more = p < pages.Count - 1 }, ct);
@@ -461,7 +463,7 @@ public sealed partial class HopDropPeer
         Directory.CreateDirectory(target);
         return target;
     }
-    private async Task ReceiveAsync(Stream stream, JsonElement offer, string peerId, string peerName, bool trusted, IReadOnlySet<string> senderFeatures, CancellationToken ct)
+    private async Task ReceiveAsync(Stream stream, JsonElement offer, string peerId, string peerName, string senderName, bool trusted, IReadOnlySet<string> senderFeatures, CancellationToken ct)
     {
         if (!Guid.TryParse(Messages.String(offer, "transferId"), out var id)) throw new HopDropException("protocol_error", "Invalid transfer id");
         int count = checked((int)Messages.Long(offer, "count"));
@@ -472,17 +474,20 @@ public sealed partial class HopDropPeer
         if (total >= 0 && files.Sum(f => f.Size) != total) throw new HopDropException("protocol_error", "Invalid total size");
         bool canResume = senderFeatures.Contains("resume");
         bool merge = senderFeatures.Contains("merge") && offer.TryGetProperty("merge", out var m) && m.ValueKind == JsonValueKind.True;
+        bool backup = merge && senderFeatures.Contains("backup") && senderFeatures.Contains("folders") && offer.TryGetProperty("backup", out var b) && b.ValueKind == JsonValueKind.True;
+        string? backupName = backup ? FileNames.Sanitize(Messages.String(offer, "backupFolder")) : null;
+        string? senderFolder = backup ? FileNames.Sanitize(senderName) : null;
         // The same transfer coming back after a dropped connection: skip what's saved, continue the half-received file.
         _interrupted.TryRemove((peerId, id), out var earlier);
         if (earlier is not null) { earlier.Expiry.Cancel(); trusted = earlier.Trusted; }
-        string dir = ReceiveDirectory;
+        string dir = backup ? Path.Combine(BackupDirectory, senderFolder!) : ReceiveDirectory;
         Directory.CreateDirectory(dir);
         if (earlier is null)
         {
             long free = _options.FreeSpace?.Invoke(dir) ?? new DriveInfo(Path.GetPathRoot(Path.GetFullPath(dir))!).AvailableFreeSpace;
             if (total >= 0 && free < total + 16L * 1024 * 1024) throw new HopDropException("no_space", "Not enough free space");
         }
-        string folder = earlier?.Folder ?? FolderLabel(dir);
+        string folder = earlier?.Folder ?? FolderLabel(backup ? BackupDirectory : dir);
         Task<JsonDocument>? pending = null;
         if (earlier is null && AskBeforeReceiving && !trusted && OfferReceived is not null)
             pending = await AskAsync(stream, id, peerId, peerName, files, total, senderFeatures.Contains("consent"), ct);
@@ -552,7 +557,11 @@ public sealed partial class HopDropPeer
                     if (i == partialIndex) earlier!.DropPartial();
                     string target;
                     await _namingGate.WaitAsync(transferStop.Token);
-                    try { target = TargetFolder(dir, file.Folder, tops, merge); } finally { _namingGate.Release(); }
+                    try {
+                        if (backup && (file.Folder is null || !(file.Folder == backupName || file.Folder.StartsWith(backupName + "/", StringComparison.Ordinal))))
+                            throw new HopDropException("protocol_error", "Invalid backup path");
+                        target = TargetFolder(dir, file.Folder, tops, merge);
+                    } finally { _namingGate.Release(); }
                     temp = Path.Combine(target, ".hopdrop-" + Guid.NewGuid().ToString("N") + ".part");
                     output = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None, 0, FileOptions.Asynchronous);
                     hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
@@ -642,6 +651,15 @@ public sealed partial class HopDropPeer
         }
         if (suspended) return;
         // Outside the try: the files are saved, so a failure to write Activity mustn't report the transfer as failed.
+        if (backup)
+        {
+            try { await _backups.UpdateAsync(list =>
+            {
+                string location = Path.Combine(dir, backupName!);
+                var previous = list.FirstOrDefault(x => x.DeviceId == peerId && x.Folder == backupName && x.Location == location);
+                return [.. list.Where(x => x != previous), new ReceivedBackup(peerId, senderName, backupName!, (previous?.FileCount ?? 0) + completed.Count, DateTimeOffset.Now, location)];
+            }); } catch (Exception e) { Error?.Invoke("Backups: " + e.Message); }
+        }
         TransferFinished?.Invoke(Result(null));
         try { await AddHistoryAsync(peerId, "received", null, completed.Select(c => c.Path).ToList(), folder); } catch (Exception e) { Error?.Invoke("Activity: " + e.Message); }
     }
@@ -683,9 +701,17 @@ public sealed partial class HopDropPeer
         }
         string folder = Path.Combine(Path.GetTempPath(), "HopDrop text", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(folder);
-        string path = Path.Combine(folder, FileNames.ForText(text));
-        await File.WriteAllTextAsync(path, text, new System.Text.UTF8Encoding(false), ct);
-        await SendAsync(device.Id, [path], ct);
+        try
+        {
+            string path = Path.Combine(folder, FileNames.ForText(text));
+            await File.WriteAllTextAsync(path, text, new System.Text.UTF8Encoding(false), ct);
+            await SendAsync(device.Id, [path], ct);
+        }
+        finally
+        {
+            try { Directory.Delete(folder, true); }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { Error?.Invoke("Text file clean-up: " + e.Message); }
+        }
     }
     private async Task AddHistoryAsync(string peer, string direction, string? result, IEnumerable<string> files, string folder, string? text = null)
     {

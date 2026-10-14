@@ -1,6 +1,9 @@
 using System.Net;
 using HopDrop.Core;
 
+// Read by scripts and tests: UTF-8, so names and text outside the console's code page arrive intact. (A real console
+// keeps its own setting; changing Console.OutputEncoding would change it for the whole window.)
+if (Console.IsOutputRedirected) Console.SetOut(new StreamWriter(Console.OpenStandardOutput(), new System.Text.UTF8Encoding(false)) { AutoFlush = true });
 var arguments = args.ToList();
 string? Take(string option)
 {
@@ -20,6 +23,8 @@ try
     // Testing aid: a direct link to announce to paired devices and put in QR codes, "ssid,key,ip".
     string? link = Take("--link");
     bool merge = Flag("--merge");
+    string? backupFolder = Take("--backup-folder");
+    if (backupFolder is not null) merge = true;
     // Testing aid: the first connection of a send drops after this many bytes, like a lost Wi-Fi link.
     long dropAfter = Take("--drop-after") is string drop ? long.Parse(drop) : -1;
     if (ask is not (null or "accept" or "decline")) throw new ArgumentException("--ask takes accept or decline");
@@ -97,14 +102,15 @@ try
             Console.WriteLine($"Paired by number match: {code[..3]} {code[3..]}"); break;
         case "send":
             if (arguments.Count < 2) throw new ArgumentException("send <deviceId|ip[:port]> <files...>");
-            var sent = await peer.SendAsync(arguments[0], SendItem.From(arguments.Skip(1)), default, merge);
+            var sent = await peer.SendAsync(arguments[0], SendItem.From(arguments.Skip(1)), default, merge, backupFolder);
             Console.WriteLine($"Saved in {sent.ReceiveFolderDisplayName}: {string.Join(", ", sent.SavedPaths)}"); break;
         case "text":
             bool clip = Flag("--clip");
             if (arguments.Count != 2) throw new ArgumentException("text <deviceId> <text> [--clip]");
             await peer.SendTextAsync(arguments[0], arguments[1], clip); Console.WriteLine("Text sent"); break;
         case "devices":
-            foreach (var device in await peer.DevicesAsync()) Console.WriteLine($"{device.Id} {device.Name} {device.Platform} {string.Join(',', device.LastAddresses)}:{device.Port}");
+            foreach (var device in await peer.DevicesAsync()) Console.WriteLine($"{device.Id} {device.Name} {device.Platform} {string.Join(',', device.LastAddresses)}:{device.Port}" +
+                (device.Link is { } saved ? $" link={saved.Ssid} ({saved.Address})" : ""));
             break;
         case "nearby":
             await peer.StartAsync(); await peer.QueryNearbyAsync(); await Task.Delay(1500);

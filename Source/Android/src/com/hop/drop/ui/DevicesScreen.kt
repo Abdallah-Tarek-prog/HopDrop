@@ -14,10 +14,13 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
@@ -27,7 +30,6 @@ import androidx.compose.material.icons.rounded.Radar
 import androidx.compose.material.icons.rounded.VerifiedUser
 import androidx.compose.material.icons.rounded.WifiOff
 import androidx.compose.material.icons.rounded.WifiTethering
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.ButtonDefaults
@@ -40,8 +42,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.Button
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -52,7 +55,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -69,7 +71,6 @@ fun DevicesScreen(state: HopUiState, actions: HopActions, padding: PaddingValues
     val now = rememberNow()
     val scope = rememberCoroutineScope()
     var refreshing by remember { mutableStateOf(false) }
-    var openId by remember { mutableStateOf<String?>(null) }
     PullToRefreshBox(
         isRefreshing = refreshing,
         onRefresh = {
@@ -93,7 +94,7 @@ fun DevicesScreen(state: HopUiState, actions: HopActions, padding: PaddingValues
                 }
             } else {
                 items(state.devices, key = { "paired:" + it.id }) { device ->
-                    PairedRow(device, now, Modifier.animateItem()) { openId = device.id }
+                    PairedRow(device, now, Modifier.animateItem()) { state.deviceOpen = device.id }
                 }
             }
             item(key = "nearby-header") {
@@ -123,8 +124,6 @@ fun DevicesScreen(state: HopUiState, actions: HopActions, padding: PaddingValues
             }
         }
     }
-    val open = state.devices.firstOrNull { it.id == openId }
-    if (open != null) DeviceSheet(open, now, actions) { openId = null }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -189,12 +188,28 @@ private fun NearbyRow(device: NearbyUi, modifier: Modifier, onPair: () -> Unit) 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DeviceSheet(device: DeviceUi, now: Long, actions: HopActions, onDismiss: () -> Unit) {
+fun DeviceDetailsScreen(device: DeviceUi, actions: HopActions, onDismiss: () -> Unit) {
     var renaming by remember { mutableStateOf(false) }
     var removing by remember { mutableStateOf(false) }
+    val now = rememberNow()
     val transparent = ListItemDefaults.colors(containerColor = Color.Transparent)
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.navigationBarsPadding().padding(bottom = 16.dp)) {
+    Scaffold(
+        topBar = { TopAppBar(title = { Text("Device details") }, navigationIcon = {
+            IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") }
+        }) },
+        bottomBar = {
+            Button(
+                onClick = { removing = true },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 24.dp, vertical = 8.dp),
+            ) {
+                Icon(Icons.Rounded.DeleteOutline, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Remove device")
+            }
+        },
+    ) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(vertical = 16.dp)) {
             Row(Modifier.padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
                 DeviceAvatar(device.platform, device.online, size = 56.dp)
                 Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
@@ -230,16 +245,6 @@ private fun DeviceSheet(device: DeviceUi, now: Long, actions: HopActions, onDism
             if (device.address != null) {
                 ListItem(headlineContent = { Text("Last address") }, supportingContent = { Text(device.address) }, colors = transparent)
             }
-            OutlinedButton(
-                onClick = { removing = true },
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
-            ) {
-                Icon(Icons.Rounded.DeleteOutline, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Remove device")
-            }
         }
     }
     if (renaming) {
@@ -250,13 +255,13 @@ private fun DeviceSheet(device: DeviceUi, now: Long, actions: HopActions, onDism
         )
     }
     if (removing) {
-        AlertDialog(
-            onDismissRequest = { removing = false },
+        HopModal(
+            onDismissRequest = { removing = false }, paneTitle = "Remove ${device.name}?",
             title = { Text("Remove ${device.name}?") },
             text = { Text("You'll need to pair again to send files between these devices.") },
             confirmButton = {
-                TextButton(onClick = { removing = false; onDismiss(); actions.remove(device) },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Remove") }
+                Button(onClick = { removing = false; onDismiss(); actions.remove(device) },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Remove") }
             },
             dismissButton = { TextButton(onClick = { removing = false }) { Text("Cancel") } },
         )

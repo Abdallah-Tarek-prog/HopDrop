@@ -28,7 +28,9 @@ public final class CoreTests {
         PairUri linked=PairUri.parse(example+"&ws=DIRECT-HopDrop-7K2Q&wk=pass%20word%2B12&wa=192.168.137.1");
         check("DIRECT-HopDrop-7K2Q".equals(linked.linkSsid)&&"pass word+12".equals(linked.linkKey)&&"192.168.137.1".equals(linked.linkIp),"QR direct link "+linked.linkKey);
         check("pass word+12".equals(PairUri.parse(linked.toString()).linkKey),"QR direct link round trip");
-        check(PairUri.parse(example+"&ws=x&wk=short&wa=192.168.137.1").linkSsid==null,"QR invalid direct link ignored");}
+        check(PairUri.parse(example+"&ws=x&wk=short&wa=192.168.137.1").linkSsid==null,"QR invalid direct link ignored");
+        check(PairUri.parse(example+"&ws=DIRECT-HopDrop-7K2Q&wk=%ZZ&wa=192.168.137.1").linkSsid==null,"QR malformed link escape ignored");
+        check(PairUri.parse(example+"&ws=DIRECT-HopDrop-7K2Q&wk=abcdefghijklmnopqrst").linkSsid==null,"QR incomplete link ignored");}
     private static void json(){Map<String,Object> m=Json.obj("type","hello","n","a\"b\n📁","p",2,"paired",true,"files",Arrays.asList(Json.obj("i",0,"name","α.txt")));
         Map<String,Object> got=Json.parseObject(Json.string(m));check(Json.string(got).equals(Json.string(m)),"JSON round trip");
         try{Json.parseObject("{\"type\":}");throw new AssertionError("Invalid JSON accepted");}catch(IllegalArgumentException expected){count++;}}
@@ -40,5 +42,25 @@ public final class CoreTests {
         m.update(10L*1024*1024,s);check(Math.abs(m.speed(10L*1024*1024,s)-10L*1024*1024)<1,"meter first sample");check(m.secondsLeft(10L*1024*1024,s)==9,"meter eta");
         m.update(12L*1024*1024,2*s);double smoothed=m.speed(12L*1024*1024,2*s);check(smoothed<10L*1024*1024&&smoothed>2L*1024*1024,"meter smoothing");
         check(m.due(2*s)&&!m.due(2*s+100_000_000L)&&m.due(2*s+300_000_000L),"meter throttle");check(new TransferMeter(-1,0).secondsLeft(5,s)==-1,"meter unknown total");}
-    public static void main(String[] args)throws Exception{sas();qr();names();json();framing();meter();System.out.println("PASS core tests: "+count+" checks");}
+    private static void backup(){
+        check(BackupRules.kind(BackupRules.PHOTOS,"image/jpeg","photo.bin"),"photo MIME");
+        check(BackupRules.kind(BackupRules.VIDEOS,null,"clip.mp4"),"video extension");
+        check(BackupRules.kind(BackupRules.DOCUMENTS,"application/octet-stream","report.pdf"),"document extension");
+        check(BackupRules.kind(BackupRules.AUDIO,"audio/mpeg","song.bin"),"audio MIME");
+        check(!BackupRules.kind(BackupRules.PHOTOS,"audio/mpeg","song.mp3"),"kind excludes audio");
+        check(BackupRules.kind(BackupRules.ALL,null,"unknown.xyz"),"all includes unknown files");
+        check(BackupRules.inWindow(60,60,360)&&!BackupRules.inWindow(360,60,360),"day window bounds");
+        check(BackupRules.inWindow(1439,1380,120)&&BackupRules.inWindow(0,1380,120)&&!BackupRules.inWindow(600,1380,120),"midnight window");
+        check(!BackupRules.allowed(true,true,false,false,100,0,0)&&BackupRules.allowed(true,true,true,false,100,0,0),"charger rule");
+        check(BackupRules.allowed(true,false,false,true,30,1380,120)&&!BackupRules.allowed(true,false,false,true,600,1380,120),"timed rule");
+        check(BackupRules.allowed(true,false,false,false,600,1380,120),"manual check skips window");
+        check(!BackupRules.allowed(false,false,true,false,100,0,0),"off rule");
+        Map<String,Object> old=BackupRules.legacy("first",true,"content://tree","Camera","abcdef",true,"Up to date",7);
+        check(Boolean.TRUE.equals(old.get("on"))&&old.get("kinds").equals(BackupRules.ALL)&&old.get("lastRun").equals(7L)&&old.get("device").equals("abcdef"),"legacy settings migrate");
+        check(!BackupRules.sentFile("first","abcdef").equals(BackupRules.sentFile("second","abcdef")),"per-backup sent lists");
+        check(!BackupRules.sentFile("first","abcdef").equals(BackupRules.sentFile("first","123456")),"per-device sent lists");
+        check(BackupRules.oldSentFile("abcdef").equals("backup-sent-abcdef.txt"),"legacy sent list name");
+        check(BackupRules.sentFile("legacy","abcdef").equals(BackupRules.oldSentFile("abcdef")),"migration reuses old sent list");
+    }
+    public static void main(String[] args)throws Exception{sas();qr();names();json();framing();meter();backup();System.out.println("PASS core tests: "+count+" checks");}
 }

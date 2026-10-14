@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,9 +29,9 @@ import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -43,7 +42,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -70,31 +68,61 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun HopDropApp(state: HopUiState, actions: HopActions) {
     val snackbar = remember { SnackbarHostState() }
+    var lastDevice by remember { mutableStateOf<DeviceUi?>(null) }
+    var lastFiles by remember { mutableStateOf<HistoryUi?>(null) }
     LaunchedEffect(state.message) {
         val message = state.message ?: return@LaunchedEffect
         snackbar.currentSnackbarData?.dismiss()
         snackbar.showSnackbar(message.text)
     }
-    BackHandler(enabled = state.settingsOpen) { state.settingsOpen = false }
-    BackHandler(enabled = !state.settingsOpen && state.tab != Tab.Send) { state.tab = Tab.Send }
+    LaunchedEffect(state.deviceOpen, state.devices) {
+        if (state.deviceOpen != null) {
+            lastDevice = state.devices.firstOrNull { it.id == state.deviceOpen }
+            if (lastDevice == null) state.deviceOpen = null
+        }
+    }
+    LaunchedEffect(state.allFilesOf) { if (state.allFilesOf != null) lastFiles = state.allFilesOf }
+    BackHandler(enabled = state.deviceOpen != null) { state.deviceOpen = null }
+    BackHandler(enabled = state.allFilesOf != null) { state.allFilesOf = null }
+    BackHandler(enabled = state.backupsOpen && state.backupOpen == null) { state.backupsOpen = false }
+    BackHandler(enabled = state.backupOpen != null) { state.backupOpen = null }
+    BackHandler(enabled = state.receivedBackupsOpen) { state.receivedBackupsOpen = false }
+    BackHandler(enabled = state.settingsOpen && !state.backupsOpen && !state.receivedBackupsOpen && state.deviceOpen == null && state.allFilesOf == null) { state.settingsOpen = false }
+    BackHandler(enabled = !state.settingsOpen && state.deviceOpen == null && state.allFilesOf == null && state.tab != Tab.Send) { state.tab = Tab.Send }
     if (state.onboarding) {
         Onboarding(state, actions)
         return
     }
     Box(Modifier.background(MaterialTheme.colorScheme.surface)) {
         AnimatedContent(
-            targetState = state.settingsOpen,
+            targetState = when {
+                state.deviceOpen != null -> "device"
+                state.allFilesOf != null -> "files"
+                state.backupsOpen -> "backups"
+                state.receivedBackupsOpen -> "received-backups"
+                state.settingsOpen -> "settings"
+                else -> "main"
+            },
             transitionSpec = {
-                if (targetState) (slideInHorizontally(tween(260)) { it / 3 } + fadeIn(tween(200))) togetherWith fadeOut(tween(120))
+                if (targetState != "main") (slideInHorizontally(tween(260)) { it / 3 } + fadeIn(tween(200))) togetherWith fadeOut(tween(120))
                 else fadeIn(tween(200)) togetherWith (slideOutHorizontally(tween(200)) { it / 3 } + fadeOut(tween(150)))
             },
             label = "settings",
-        ) { settings ->
-            if (settings) SettingsScreen(state, actions, snackbar) { state.settingsOpen = false }
-            else MainScreen(state, actions, snackbar)
+        ) { page ->
+            when (page) {
+                "device" -> (state.devices.firstOrNull { it.id == state.deviceOpen } ?: lastDevice)?.let {
+                    DeviceDetailsScreen(it, actions) { state.deviceOpen = null }
+                }
+                "files" -> (state.allFilesOf ?: lastFiles)?.let { AllFilesScreen(it, actions) { state.allFilesOf = null } }
+                "backups" -> AutoBackupsScreen(state, actions) { state.backupsOpen = false }
+                "received-backups" -> ReceivedBackupsScreen(state, actions) { state.receivedBackupsOpen = false }
+                "settings" -> SettingsScreen(state, actions, snackbar) { state.settingsOpen = false }
+                else -> MainScreen(state, actions, snackbar)
+            }
         }
     }
     GlobalDialogs(state, actions)
+    if (state.whatsNewVersion != null) WhatsNew(state, actions)
 }
 
 /** Top bar, the three tabs and their content. Also drawn, untouchable, in the tour's phone pictures. */
@@ -154,7 +182,7 @@ internal fun MainScreen(state: HopUiState, actions: HopActions, snackbar: Snackb
         floatingActionButton = {
             AnimatedVisibility(state.tab == Tab.Devices, enter = scaleIn() + fadeIn(), exit = scaleOut() + fadeOut()) {
                 ExtendedFloatingActionButton(
-                    onClick = { state.pairSheet = true },
+                    onClick = actions::scanQr,
                     icon = { Icon(Icons.Rounded.QrCodeScanner, contentDescription = null) },
                     text = { Text("Pair device") },
                 )
@@ -179,15 +207,15 @@ internal fun MainScreen(state: HopUiState, actions: HopActions, snackbar: Snackb
             }
         }
     }
-    if (statusOpen) ReceiverSheet(state.phone, state.settings.background, actions) { statusOpen = false }
+    if (statusOpen) ReceiverModal(state.phone, state.settings.background, actions) { statusOpen = false }
     if (confirmClear) {
-        AlertDialog(
-            onDismissRequest = { confirmClear = false },
+        HopModal(
+            onDismissRequest = { confirmClear = false }, paneTitle = "Clear activity?",
             title = { Text("Clear activity?") },
             text = { Text("This clears the list only. Received files stay where they are.") },
             confirmButton = {
-                TextButton(onClick = { confirmClear = false; actions.clearHistory() },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Clear") }
+                Button(onClick = { confirmClear = false; actions.clearHistory() },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Clear") }
             },
             dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancel") } },
         )
@@ -208,13 +236,12 @@ private fun ReceiverPill(receiving: Boolean, onClick: () -> Unit) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ReceiverSheet(phone: PhoneUi, background: Boolean, actions: HopActions, onDismiss: () -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.navigationBarsPadding().padding(bottom = 16.dp)) {
-            Text(if (phone.receiving) "Ready to receive" else "Not receiving", style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(horizontal = 24.dp))
+private fun ReceiverModal(phone: PhoneUi, background: Boolean, actions: HopActions, onDismiss: () -> Unit) {
+    val title = if (phone.receiving) "Ready to receive" else "Not receiving"
+    HopModal(onDismissRequest = onDismiss, paneTitle = title,
+        title = { Text(title) },
+        text = { Column {
             Text(
                 when {
                     !phone.receiving -> "Close HopDrop and open it again. If that doesn't help, turn Wi-Fi off and on."
@@ -222,7 +249,7 @@ private fun ReceiverSheet(phone: PhoneUi, background: Boolean, actions: HopActio
                     else -> "Paired devices can send to this phone while HopDrop is open."
                 },
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 6.dp),
+                modifier = Modifier.padding(vertical = 6.dp),
             )
             ListItem(headlineContent = { Text("Name") }, supportingContent = { Text(phone.name) },
                 colors = ListItemDefaults.colors(containerColor = Color.Transparent))
@@ -238,6 +265,7 @@ private fun ReceiverSheet(phone: PhoneUi, background: Boolean, actions: HopActio
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 )
             }
-        }
-    }
+        } },
+        confirmButton = { Button(onClick = onDismiss) { Text("Done") } },
+    )
 }

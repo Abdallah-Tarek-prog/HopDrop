@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -29,7 +28,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Notes
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.ExpandMore
@@ -43,10 +41,12 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -96,7 +96,6 @@ fun ActivityScreen(state: HopUiState, actions: HopActions, padding: PaddingValue
     var filter by rememberSaveable { mutableStateOf(Filter.All) }
     var expanded by rememberSaveable { mutableStateOf(setOf<String>()) }
     var menuFor by remember { mutableStateOf<HistoryUi?>(null) }
-    var allFilesOf by remember { mutableStateOf<HistoryUi?>(null) }
     val history = state.history
     val shown = remember(history, query, filter) {
         val q = query.trim().lowercase(Locale.getDefault())
@@ -138,22 +137,22 @@ fun ActivityScreen(state: HopUiState, actions: HopActions, padding: PaddingValue
                     if (entry.text != null) TextCard(
                         entry, expanded = entry.key in expanded,
                         onToggle = { expanded = if (entry.key in expanded) expanded - entry.key else expanded + entry.key },
-                        onLongPress = { menuFor = entry }, actions = actions, modifier = Modifier.animateItem(),
+                        onLongPress = { menuFor = entry }, menuOpen = menuFor?.key == entry.key,
+                        onMenuDismiss = { menuFor = null }, actions = actions, modifier = Modifier.animateItem(),
                     ) else HistoryCard(
                         entry = entry,
                         expanded = entry.key in expanded,
                         onToggle = { expanded = if (entry.key in expanded) expanded - entry.key else expanded + entry.key },
                         onLongPress = { menuFor = entry },
+                        menuOpen = menuFor?.key == entry.key, onMenuDismiss = { menuFor = null },
                         actions = actions,
-                        onShowAll = { allFilesOf = entry },
+                        onShowAll = { state.allFilesOf = entry },
                         modifier = Modifier.animateItem(),
                     )
                 }
             }
         }
     }
-    menuFor?.let { entry -> HistoryMenu(entry, actions) { menuFor = null } }
-    allFilesOf?.let { entry -> AllFilesSheet(entry, actions) { allFilesOf = null } }
 }
 
 @Composable
@@ -190,7 +189,7 @@ private fun statusLine(e: HistoryUi): String = when {
 @Composable
 private fun HistoryCard(
     entry: HistoryUi, expanded: Boolean, onToggle: () -> Unit, onLongPress: () -> Unit, actions: HopActions,
-    onShowAll: () -> Unit, modifier: Modifier,
+    onShowAll: () -> Unit, menuOpen: Boolean, onMenuDismiss: () -> Unit, modifier: Modifier,
 ) {
     val scheme = MaterialTheme.colorScheme
     val chevron by animateFloatAsState(if (expanded) 180f else 0f, label = "chevron")
@@ -216,6 +215,7 @@ private fun HistoryCard(
         AnimatedVisibility(expanded, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
             HistoryDetails(entry, actions, onShowAll)
         }
+        HistoryMenu(entry, actions, menuOpen, onMenuDismiss)
     }
 }
 
@@ -225,7 +225,8 @@ private fun singleLink(text: String): String? = text.trim().takeIf { Regex("(?i)
 /** A text message: who, the text itself (three lines, all of it when opened), and Copy / Open link / Share. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun TextCard(entry: HistoryUi, expanded: Boolean, onToggle: () -> Unit, onLongPress: () -> Unit, actions: HopActions, modifier: Modifier) {
+private fun TextCard(entry: HistoryUi, expanded: Boolean, onToggle: () -> Unit, onLongPress: () -> Unit,
+    menuOpen: Boolean, onMenuDismiss: () -> Unit, actions: HopActions, modifier: Modifier) {
     val scheme = MaterialTheme.colorScheme
     val text = entry.text ?: return
     HopCard(modifier, onClick = onToggle, onLongClick = onLongPress, padding = PaddingValues(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 8.dp)) {
@@ -250,6 +251,7 @@ private fun TextCard(entry: HistoryUi, expanded: Boolean, onToggle: () -> Unit, 
             singleLink(text)?.let { link -> TextButton(onClick = { actions.openLink(link) }) { Text("Open link") } }
             TextButton(onClick = { actions.shareText(text) }) { Text("Share") }
         }
+        HistoryMenu(entry, actions, menuOpen, onMenuDismiss)
     }
 }
 
@@ -343,48 +345,36 @@ private fun FileRow(file: HistoryFile, actions: HopActions) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun HistoryMenu(entry: HistoryUi, actions: HopActions, onDismiss: () -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.navigationBarsPadding().padding(bottom = 12.dp)) {
-            Text((if (entry.incoming) "From " else "To ") + entry.peer, style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = 24.dp))
-            Text(statusLine(entry), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
-            Spacer(Modifier.height(8.dp))
-            if (entry.files.any { it.uri != null }) {
-                ListItem(
-                    headlineContent = { Text("Share") },
-                    leadingContent = { Icon(Icons.Rounded.Share, contentDescription = null) },
-                    colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
-                    modifier = Modifier.combinedClickable(onClick = { onDismiss(); actions.share(entry.files) }),
-                )
-            }
-            ListItem(
-                headlineContent = { Text("Remove from list") },
-                supportingContent = { Text("The files stay where they are") },
-                leadingContent = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null) },
-                colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
-                modifier = Modifier.combinedClickable(onClick = { onDismiss(); actions.removeFromHistory(entry) }),
-            )
-        }
+private fun HistoryMenu(entry: HistoryUi, actions: HopActions, expanded: Boolean, onDismiss: () -> Unit) {
+    val message = entry.text
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        if (message != null) DropdownMenuItem(text = { Text("Copy") }, onClick = {
+            onDismiss(); actions.copy("Text", message)
+        })
+        if (entry.files.any { it.uri != null } || message != null) DropdownMenuItem(text = { Text("Share") }, onClick = {
+            onDismiss()
+            if (message != null) actions.shareText(message) else actions.share(entry.files)
+        })
+        DropdownMenuItem(text = { Text("Remove from list") }, onClick = { onDismiss(); actions.removeFromHistory(entry) })
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AllFilesSheet(entry: HistoryUi, actions: HopActions, onDismiss: () -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Text((if (entry.incoming) "From " else "To ") + entry.peer, style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(horizontal = 24.dp))
-        Text(
-            if (entry.count > entry.files.size) "Showing ${String.format(Locale.getDefault(), "%,d", entry.files.size)} of ${Format.files(entry.count)}"
-            else Format.files(entry.count),
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
-        )
-        LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 32.dp)) {
+fun AllFilesScreen(entry: HistoryUi, actions: HopActions, onDismiss: () -> Unit) {
+    Scaffold(topBar = { TopAppBar(
+        title = { Text((if (entry.incoming) "From " else "To ") + entry.peer) },
+        navigationIcon = { IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") } },
+    ) }) { padding ->
+        LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = padding.calculateTopPadding(),
+            bottom = padding.calculateBottomPadding() + 32.dp)) {
+            item { Text(
+                if (entry.count > entry.files.size) "Showing ${String.format(Locale.getDefault(), "%,d", entry.files.size)} of ${Format.files(entry.count)}"
+                else Format.files(entry.count),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(vertical = 12.dp),
+            ) }
             items(entry.files) { FileRow(it, actions) }
         }
     }

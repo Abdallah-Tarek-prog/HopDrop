@@ -77,7 +77,13 @@ if ($Store) {
     $template = Get-Content -Raw (Join-Path $PSScriptRoot 'Store/AppxManifest.xml')
     $output = Join-Path $root 'Windows App/Store'
     $bundleDir = Join-Path $PSScriptRoot 'out/store-bundle'
-    foreach ($folder in $output, $bundleDir) { if (Test-Path $folder) { Remove-Item -Recurse -Force $folder }; New-Item -ItemType Directory -Force $folder | Out-Null }
+    New-Item -ItemType Directory -Force $output | Out-Null
+    foreach ($name in @("HopDrop_$msixVersion.msixbundle", "HopDrop_$msixVersion`_x64.msix", "HopDrop_$msixVersion`_arm64.msix")) {
+        $old = Join-Path $output $name
+        if (Test-Path -LiteralPath $old) { Remove-Item -LiteralPath $old }
+    }
+    if (Test-Path -LiteralPath $bundleDir) { Remove-Item -LiteralPath $bundleDir -Recurse -Force }
+    New-Item -ItemType Directory -Force $bundleDir | Out-Null
     $assets = Join-Path $PSScriptRoot 'out/store-assets'
     & powershell -NoProfile -File (Join-Path $PSScriptRoot 'Store/make-assets.ps1') -Out $assets
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -161,7 +167,8 @@ Restore-Target $cliProject ''
 & dotnet build $cliProject -c Release --no-restore
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-$run = Join-Path $PSScriptRoot ('.e2e/' + [guid]::NewGuid().ToString('N'))
+$run = Join-Path $PSScriptRoot '.e2e/cli-run'
+if (Test-Path -LiteralPath $run) { Remove-Item -LiteralPath $run -Recurse -Force }
 $cliRun = Join-Path $run 'cli'
 New-Item -ItemType Directory -Force -Path $cliRun | Out-Null
 Copy-Item -Path (Join-Path (Split-Path $cliDll) '*') -Destination $cliRun -Recurse
@@ -172,10 +179,12 @@ $aInput = Join-Path $run 'a/input'; $bInput = Join-Path $run 'b/input'
 New-Item -ItemType Directory -Force -Path $aData,$bData,$aReceive,$bReceive,$aInput,$bInput | Out-Null
 
 function Free-Port {
-    $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
-    $listener.Start()
-    $number = ([System.Net.IPEndPoint]$listener.LocalEndpoint).Port
-    $listener.Stop()
+    do {
+        $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+        $listener.Start()
+        $number = ([System.Net.IPEndPoint]$listener.LocalEndpoint).Port
+        $listener.Stop()
+    } while ($number -eq 7410)
     return $number
 }
 $aPort = Free-Port; $bPort = Free-Port

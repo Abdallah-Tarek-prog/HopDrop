@@ -87,6 +87,16 @@ public final class InteropRunner {
                     check(Files.exists(winReceive.resolve("Camera").resolve("a.jpg"))&&Files.exists(winReceive.resolve("Camera").resolve("b.jpg"))&&!Files.exists(winReceive.resolve("Camera (1)")),"backup merged on .NET side");
                     result("backups merge into the existing folder on .NET",true,null);}
                 catch(Throwable e){result("backups merge into the existing folder on .NET",false,e.getMessage());}}
+            if(javaSend&&winSend){
+                try{Path camera=source.resolve("Camera");Files.createDirectories(camera);Files.writeString(camera.resolve("backup.jpg"),"backup");
+                    Peer.Device d=java.pairingDevice(readWindowsId());java.send(d,Collections.singletonList(new Peer.FileItem("backup.jpg",6,()->Files.newInputStream(camera.resolve("backup.jpg")),"Camera")),true,"Camera");
+                    check(Files.exists(winReceive.resolve("Backups").resolve("Java Android Peer").resolve("Camera").resolve("backup.jpg")),"Java backup in Windows backup folder");
+                    runWindows("--backup-folder","Camera","send","127.0.0.1:17411",camera.toString());
+                    String[] record=Files.readString(javaData.resolve("backup-registry.txt")).split("\\|");
+                    check(record.length==4&&record[2].equals("Camera"),"Android backup registry");
+                    check(Files.exists(javaReceive.resolve("Backups").resolve(record[1]).resolve("Camera").resolve("backup.jpg")),"Windows backup in Java backup folder");
+                    result("backup offers use backup folders, both directions",true,null);}
+                catch(Throwable e){result("backup offers use backup folders, both directions",false,e.getMessage());}}
             if(javaSend){Path note=source.resolve("ask-note-2.txt");Files.writeString(note,"ask on windows");
                 try{Peer.Device d=java.pairingDevice(readWindowsId());String outcome;
                     if(server!=null){server.destroy();server.waitFor(5,TimeUnit.SECONDS);}startServer("--ask","decline");qr();

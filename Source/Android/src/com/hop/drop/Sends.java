@@ -51,6 +51,7 @@ final class Sends {
         /** Backups: sent folders fill the receiver's existing folder of the same name. */
         boolean merge;
         boolean backup;
+        String backupId, backupFolder;
         final long createdAt;
 
         Job(String id, String deviceId, String summary, long createdAt) {
@@ -84,7 +85,8 @@ final class Sends {
             for (Uri u : trees) t.add(u.toString());
             for (String[] item : listed) l.add(java.util.Arrays.asList((Object[]) item));
             return Json.obj("id", id, "device", deviceId, "summary", summary, "at", createdAt, "files", f, "trees", t,
-                    "texts", new ArrayList<Object>(texts), "listed", l, "clip", clip, "merge", merge, "backup", backup);
+                    "texts", new ArrayList<Object>(texts), "listed", l, "clip", clip, "merge", merge, "backup", backup,
+                    "backupId", backupId, "backupFolder", backupFolder);
         }
 
         static Job from(Map<String, Object> m) {
@@ -101,6 +103,8 @@ final class Sends {
             job.clip = Boolean.TRUE.equals(m.get("clip"));
             job.merge = Boolean.TRUE.equals(m.get("merge"));
             job.backup = Boolean.TRUE.equals(m.get("backup"));
+            job.backupId = m.get("backupId") instanceof String ? (String)m.get("backupId") : null;
+            job.backupFolder = m.get("backupFolder") instanceof String ? (String)m.get("backupFolder") : null;
             return job;
         }
 
@@ -191,11 +195,11 @@ final class Sends {
         try {
             reached = reach(app, d, direct);
         } catch (Exception e) {
-            if (job.backup) Backup.ended(app);
+            if (job.backup) Backup.ended(app, job);
             if (unreachable(e) && job.backup) {
                 // Backups don't wait in the queue: the next round picks the files up again.
                 app.live().clear(label);
-                Backup.waiting(app, label);
+                Backup.waiting(app, job, label);
             } else if (unreachable(e)) {
                 boolean fresh = !queued(app, job.id);
                 queue(app, job);
@@ -220,7 +224,7 @@ final class Sends {
             List<Peer.FileItem> items = items(app, job, shown);
             if (!items.isEmpty()) {
                 app.sendingFrom(label, shown);
-                app.peer().send(reached.device, items, job.merge);
+                app.peer().send(reached.device, items, job.merge, job.backup ? job.backupFolder : null);
                 if (job.backup) Backup.sent(app, job);
             }
             dequeue(app, job.id);
@@ -243,7 +247,7 @@ final class Sends {
             dequeue(app, job.id);
         } finally {
             if (reached.viaLink) app.directLink().done();
-            if (job.backup) Backup.ended(app);
+            if (job.backup) Backup.ended(app, job);
         }
     }
 

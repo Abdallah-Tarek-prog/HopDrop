@@ -14,7 +14,7 @@ public class PeerTests
     [Fact]
     public async Task OpenLoadsSettingsAndCanRenamePairedDevice()
     {
-        string root = Scratch();
+        string root = NewScratch();
         await using (var first = await Peer(root))
         {
             await first.SetNameAsync("Saved name");
@@ -30,11 +30,7 @@ public class PeerTests
         await second.SetAliasAsync(id, "My phone");
         Assert.Equal("My phone", Assert.Single(await second.DevicesAsync()).Alias);
     }
-    private static string Scratch()
-    {
-        string root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../.test-scratch"));
-        string path = Path.Combine(root, Guid.NewGuid().ToString("N")); Directory.CreateDirectory(path); return path;
-    }
+    private static string NewScratch() => Scratch.NewFolder();
     private static Task<HopDropPeer> Peer(string root, Func<string, long>? free = null) => HopDropPeer.OpenAsync(new PeerOptions(
         new HopDropPaths(Path.Combine(root, "data"), Path.Combine(root, "logs"), Path.Combine(root, "receive")), 0, "Test peer", free));
     private static async Task PairAsync(HopDropPeer shower, HopDropPeer scanner)
@@ -51,8 +47,8 @@ public class PeerTests
     [Fact]
     public async Task UnpairedPingIsRejected()
     {
-        await using var server = await Peer(Scratch()); await server.StartAsync();
-        using var identity = Identity.LoadOrCreate(new HopDropPaths(Path.Combine(Scratch(), "data"), Scratch()));
+        await using var server = await Peer(NewScratch()); await server.StartAsync();
+        using var identity = Identity.LoadOrCreate(new HopDropPaths(Path.Combine(NewScratch(), "data"), NewScratch()));
         var (client, stream) = await RawAsync(server, identity);
         using (client) using (stream)
         {
@@ -65,8 +61,8 @@ public class PeerTests
     [Fact]
     public async Task HelloIdentityMismatchIsRejected()
     {
-        await using var server = await Peer(Scratch()); await server.StartAsync();
-        using var identity = Identity.LoadOrCreate(new HopDropPaths(Path.Combine(Scratch(), "data"), Scratch()));
+        await using var server = await Peer(NewScratch()); await server.StartAsync();
+        using var identity = Identity.LoadOrCreate(new HopDropPaths(Path.Combine(NewScratch(), "data"), NewScratch()));
         var (client, stream) = await RawAsync(server, identity, new string('0', 64));
         using (client) using (stream)
         {
@@ -77,9 +73,9 @@ public class PeerTests
     [Fact]
     public async Task QrPinningRefusesDifferentCertificate()
     {
-        await using var expected = await Peer(Scratch()); await expected.StartAsync();
-        await using var impostor = await Peer(Scratch()); await impostor.StartAsync();
-        await using var scanner = await Peer(Scratch());
+        await using var expected = await Peer(NewScratch()); await expected.StartAsync();
+        await using var impostor = await Peer(NewScratch()); await impostor.StartAsync();
+        await using var scanner = await Peer(NewScratch());
         var qr = PairUri.Parse(expected.CreateQrUri([IPAddress.Loopback])) with { Port = impostor.Port };
         var error = await Assert.ThrowsAsync<HopDropException>(() => scanner.PairQrAsync(qr.ToString()));
         Assert.Equal("identity_mismatch", error.Code);
@@ -87,7 +83,7 @@ public class PeerTests
     [Fact]
     public async Task SasPairsWithSameCodeOnBothEnds()
     {
-        await using var a = await Peer(Scratch()); await using var b = await Peer(Scratch());
+        await using var a = await Peer(NewScratch()); await using var b = await Peer(NewScratch());
         string? responderCode = null;
         a.IncomingPairing += request => { responderCode = request.Code; request.Match(); };
         b.IncomingPairing += request => request.Match();
@@ -99,7 +95,7 @@ public class PeerTests
     [Fact]
     public async Task TransferSeveralFilesAndRememberPairing()
     {
-        string aRoot = Scratch(), bRoot = Scratch();
+        string aRoot = NewScratch(), bRoot = NewScratch();
         await using var a = await Peer(aRoot); await using var b = await Peer(bRoot);
         await PairAsync(a, b); await b.StartAsync();
         string input = Path.Combine(bRoot, "input"); Directory.CreateDirectory(input);
@@ -134,7 +130,7 @@ public class PeerTests
     [InlineData(true, "cancelled")]
     public async Task BadChecksumAndCancelDeletePartial(bool cancel, string expected)
     {
-        await using var receiver = await Peer(Scratch()); await using var sender = await Peer(Scratch());
+        await using var receiver = await Peer(NewScratch()); await using var sender = await Peer(NewScratch());
         await PairAsync(receiver, sender);
         var (client, stream) = await RawAsync(receiver, sender.Identity);
         using (client) using (stream)
@@ -167,7 +163,7 @@ public class PeerTests
     [Fact]
     public async Task UppercaseChecksumFromWireIsAccepted()
     {
-        await using var receiver = await Peer(Scratch()); await using var sender = await Peer(Scratch());
+        await using var receiver = await Peer(NewScratch()); await using var sender = await Peer(NewScratch());
         await PairAsync(receiver, sender);
         var (client, stream) = await RawAsync(receiver, sender.Identity);
         using (client) using (stream)
@@ -189,16 +185,16 @@ public class PeerTests
     [Fact]
     public async Task NoSpaceCanBeInjected()
     {
-        await using var receiver = await Peer(Scratch(), _ => 0); await using var sender = await Peer(Scratch());
+        await using var receiver = await Peer(NewScratch(), _ => 0); await using var sender = await Peer(NewScratch());
         await PairAsync(receiver, sender);
-        string path = Path.Combine(Scratch(), "tiny.bin"); await File.WriteAllBytesAsync(path, [1]);
+        string path = Path.Combine(NewScratch(), "tiny.bin"); await File.WriteAllBytesAsync(path, [1]);
         var error = await Assert.ThrowsAsync<HopDropException>(() => sender.SendAsync($"127.0.0.1:{receiver.Port}", [path]));
         Assert.Equal("no_space", error.Code);
     }
     [Fact]
     public async Task FilesFromUntrustedDevicesAreMarkedAndTrustedOnesAreNot()
     {
-        string aRoot = Scratch(), bRoot = Scratch();
+        string aRoot = NewScratch(), bRoot = NewScratch();
         await using var a = await Peer(aRoot); await using var b = await Peer(bRoot);
         await PairAsync(a, b);
         Assert.True(ZoneMark.Supported(a.ReceiveDirectory) != false, "test folder must be on NTFS");
@@ -218,7 +214,7 @@ public class PeerTests
     [Fact]
     public async Task AskBeforeReceivingDeclinesAcceptsAndSkipsTrustedDevices()
     {
-        string aRoot = Scratch(), bRoot = Scratch();
+        string aRoot = NewScratch(), bRoot = NewScratch();
         await using var a = await Peer(aRoot); await using var b = await Peer(bRoot);
         await PairAsync(a, b);
         await a.SetAskBeforeReceivingAsync(true);
@@ -245,7 +241,7 @@ public class PeerTests
     [Fact]
     public async Task SenderCancellingWhileReceiverAsksClosesThePrompt()
     {
-        string aRoot = Scratch(), bRoot = Scratch();
+        string aRoot = NewScratch(), bRoot = NewScratch();
         await using var a = await Peer(aRoot); await using var b = await Peer(bRoot);
         await PairAsync(a, b);
         await a.SetAskBeforeReceivingAsync(true);
@@ -264,7 +260,7 @@ public class PeerTests
     [Fact]
     public async Task FoldersArriveWithTheirStructureAndDontMerge()
     {
-        string aRoot = Scratch(), bRoot = Scratch();
+        string aRoot = NewScratch(), bRoot = NewScratch();
         await using var a = await Peer(aRoot); await using var b = await Peer(bRoot);
         await PairAsync(a, b);
         string photos = Path.Combine(bRoot, "Photos"); Directory.CreateDirectory(Path.Combine(photos, "2024"));
@@ -281,7 +277,7 @@ public class PeerTests
     [Fact]
     public async Task ReceivedFoldersStayInsideTheReceiveFolder()
     {
-        await using var receiver = await Peer(Scratch()); await using var sender = await Peer(Scratch());
+        await using var receiver = await Peer(NewScratch()); await using var sender = await Peer(NewScratch());
         await PairAsync(receiver, sender);
         var (client, stream) = await RawAsync(receiver, sender.Identity);
         using (client) using (stream)
@@ -305,7 +301,7 @@ public class PeerTests
     [Fact]
     public async Task LargeSelectionsGoInOneTransferAndOlderReceiversGetSeveral()
     {
-        string aRoot = Scratch(), bRoot = Scratch(), cRoot = Scratch();
+        string aRoot = NewScratch(), bRoot = NewScratch(), cRoot = NewScratch();
         await using var a = await Peer(aRoot); await using var b = await Peer(bRoot);
         await using var c = await HopDropPeer.OpenAsync(new PeerOptions(new HopDropPaths(Path.Combine(cRoot, "data"), Path.Combine(cRoot, "logs"), Path.Combine(cRoot, "receive")), 0, "Older peer") { Features = [] });
         await PairAsync(a, b); await PairAsync(c, b);
@@ -328,7 +324,7 @@ public class PeerTests
     [Fact]
     public async Task DroppedConnectionResumesWithoutResendingOrDuplicating()
     {
-        string aRoot = Scratch(), bRoot = Scratch();
+        string aRoot = NewScratch(), bRoot = NewScratch();
         long sent = 0; int connections = 0;
         Stream Filter(Stream network) => new TestStream(network, Interlocked.Increment(ref connections) == 2 ? 6_000_000 : long.MaxValue, count => Interlocked.Add(ref sent, count));
         await using var a = await Peer(aRoot);
@@ -373,7 +369,7 @@ public class PeerTests
     [Fact]
     public async Task TextArrivesAsTextAndIsRecordedOnBothSides()
     {
-        await using var a = await Peer(Scratch()); await using var b = await Peer(Scratch());
+        await using var a = await Peer(NewScratch()); await using var b = await Peer(NewScratch());
         await PairAsync(a, b);
         var received = new TaskCompletionSource<TextMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
         string? contacted = null;
@@ -391,10 +387,10 @@ public class PeerTests
     [Fact]
     public async Task TextToAnOlderVersionArrivesAsATextFile()
     {
-        string aRoot = Scratch();
+        string aRoot = NewScratch();
         await using var a = await HopDropPeer.OpenAsync(new PeerOptions(new HopDropPaths(Path.Combine(aRoot, "data"), Path.Combine(aRoot, "logs"), Path.Combine(aRoot, "receive")), 0, "Older peer")
         { Features = ["consent", "folders", "pages", "resume"] });
-        await using var b = await Peer(Scratch());
+        await using var b = await Peer(NewScratch());
         await PairAsync(a, b);
         bool texted = false; a.TextReceived += _ => texted = true;
         await b.SendTextAsync(a.Id, "Shopping list\nmilk");
@@ -408,7 +404,7 @@ public class PeerTests
     [InlineData(false)]
     public async Task ManySmallFilesArriveInOrderWithAndWithoutPipelining(bool receiverPipelines)
     {
-        string aRoot = Scratch(), bRoot = Scratch();
+        string aRoot = NewScratch(), bRoot = NewScratch();
         await using var a = await HopDropPeer.OpenAsync(new PeerOptions(new HopDropPaths(Path.Combine(aRoot, "data"), Path.Combine(aRoot, "logs"), Path.Combine(aRoot, "receive")), 0, "Receiver")
         { Features = receiverPipelines ? null : ["consent", "folders", "pages", "resume"] });
         await using var b = await Peer(bRoot);
@@ -424,7 +420,7 @@ public class PeerTests
     [Fact]
     public async Task BackupsMergeIntoTheExistingFolder()
     {
-        string aRoot = Scratch(), bRoot = Scratch();
+        string aRoot = NewScratch(), bRoot = NewScratch();
         await using var a = await Peer(aRoot); await using var b = await Peer(bRoot);
         await PairAsync(a, b);
         string camera = Path.Combine(bRoot, "Camera"); Directory.CreateDirectory(camera);
@@ -437,15 +433,54 @@ public class PeerTests
         Assert.True(File.Exists(Path.Combine(aRoot, "receive", "Camera (1)", "two.jpg")));
     }
     [Fact]
+    public async Task BackupOfferUsesChosenBackupFolderAndPersistsRegistry()
+    {
+        string aRoot = NewScratch(), bRoot = NewScratch();
+        await using var receiver = await Peer(aRoot); await using var sender = await Peer(bRoot);
+        await receiver.SetNameAsync("Receiving PC"); await sender.SetNameAsync("Phone");
+        string place = Path.Combine(aRoot, "chosen backups");
+        await receiver.SetBackupDirectoryAsync(place);
+        await PairAsync(receiver, sender);
+        string camera = Path.Combine(bRoot, "Camera"); Directory.CreateDirectory(camera);
+        string file = Path.Combine(camera, "one.jpg"); await File.WriteAllTextAsync(file, "one");
+        await sender.SendAsync(receiver.Id, SendItem.From([camera]), merge: true, backupFolder: "Camera");
+        await sender.SendAsync(receiver.Id, SendItem.From([camera]), merge: true, backupFolder: "Camera");
+        string folder = Path.Combine(place, "Phone", "Camera");
+        Assert.Equal(new[] { "one (1).jpg", "one.jpg" }, Directory.GetFiles(folder).Select(f => Path.GetFileName(f)).Order().ToArray());
+        Assert.False(Directory.Exists(Path.Combine(receiver.ReceiveDirectory, "Camera")));
+        var entry = Assert.Single(await receiver.BackupsAsync());
+        Assert.Equal(sender.Id, entry.DeviceId); Assert.Equal("Camera", entry.Folder); Assert.Equal(2, entry.FileCount);
+        Assert.Equal(folder, entry.Location);
+        await using (var saved = await HopDropPeer.OpenAsync(new PeerOptions(new HopDropPaths(Path.Combine(aRoot, "data"), Path.Combine(aRoot, "logs")), 0)))
+            Assert.Equal(2, Assert.Single(await saved.BackupsAsync()).FileCount);
+        await receiver.ForgetBackupAsync(sender.Id, "Camera");
+        Assert.Empty(await receiver.BackupsAsync()); Assert.Equal(2, Directory.GetFiles(folder).Length);
+        await using var reopened = await HopDropPeer.OpenAsync(new PeerOptions(new HopDropPaths(Path.Combine(aRoot, "data"), Path.Combine(aRoot, "logs")), 0));
+        Assert.Equal(place, reopened.BackupDirectory);
+    }
+    [Fact]
+    public async Task PeerWithoutBackupFeatureKeepsMergedOffersInReceiveFolder()
+    {
+        string aRoot = NewScratch(), bRoot = NewScratch();
+        await using var receiver = await HopDropPeer.OpenAsync(new PeerOptions(new HopDropPaths(Path.Combine(aRoot, "data"), Path.Combine(aRoot, "logs"), Path.Combine(aRoot, "receive")), 0)
+        { Features = ["consent", "folders", "pages", "resume", "merge"] });
+        await using var sender = await Peer(bRoot); await PairAsync(receiver, sender);
+        string camera = Path.Combine(bRoot, "Camera"); Directory.CreateDirectory(camera);
+        await File.WriteAllTextAsync(Path.Combine(camera, "one.jpg"), "one");
+        await sender.SendAsync(receiver.Id, SendItem.From([camera]), merge: true, backupFolder: "Camera");
+        Assert.True(File.Exists(Path.Combine(receiver.ReceiveDirectory, "Camera", "one.jpg")));
+        Assert.Empty(await receiver.BackupsAsync());
+    }
+    [Fact]
     public async Task DirectLinkTravelsInQrCodesAndNotToStrangers()
     {
-        await using var server = await Peer(Scratch());
+        await using var server = await Peer(NewScratch());
         server.DirectLink = new DirectLinkInfo("DIRECT-ab-HopDrop", "secretpassphrase1", "192.168.137.1");
         await server.StartAsync();
         var qr = PairUri.Parse(server.CreateQrUri([IPAddress.Loopback]));
         Assert.Equal(server.DirectLink, qr.Link);
         Assert.Null(PairUri.Parse(new PairUri(server.Id, "PC", "windows", 7410, [IPAddress.Loopback], new byte[16]).ToString()).Link);
-        using var identity = Identity.LoadOrCreate(new HopDropPaths(Path.Combine(Scratch(), "data"), Scratch()));
+        using var identity = Identity.LoadOrCreate(new HopDropPaths(Path.Combine(NewScratch(), "data"), NewScratch()));
         var (client, stream) = await RawAsync(server, identity);
         using (client) using (stream)
         {
@@ -456,7 +491,7 @@ public class PeerTests
     [Fact]
     public async Task ActivityKeepsTheNewest500Entries()
     {
-        string root = Scratch();
+        string root = NewScratch();
         await using var peer = await Peer(root);
         var store = new JsonStore<List<HistoryEntry>>(Path.Combine(root, "data", "history.json"), []);
         await store.UpdateAsync(_ => Enumerable.Range(0, 600).Select(i => new HistoryEntry(DateTimeOffset.UtcNow, "bluetooth", "received", "ok", [$"old{i}.txt"], null)).ToList());

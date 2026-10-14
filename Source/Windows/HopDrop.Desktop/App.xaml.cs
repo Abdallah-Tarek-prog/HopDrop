@@ -13,6 +13,7 @@ public partial class App : System.Windows.Application
     private CancellationTokenSource? _pipeStop;
     private HopDropPeer? _peer;
     private string? _pendingToast;
+    private bool _e2eMode;
     internal SendQueue Queue { get; private set; } = null!;
     internal DirectLink Link { get; private set; } = null!;
     private ClipboardShare? _clipboardShare;
@@ -41,6 +42,7 @@ public partial class App : System.Windows.Application
             bool background = args.Remove("--background");
             string? e2eReady = Take(args, "--e2e-serve");
             bool autoConfirm = args.Remove("--e2e-auto-confirm");
+            string? e2eLink = e2eReady is null ? null : Take(args, "--e2e-link");
             if (SnapshotMode)
             {
                 WindowInstance = new MainWindow(null);
@@ -71,13 +73,34 @@ public partial class App : System.Windows.Application
             AgentBridge.Start(_peer, DataDirectory, _pipeStop.Token);
             if (e2eReady is not null)
             {
+                _e2eMode = true;
+                Queue = new SendQueue(_peer, DataDirectory);
+                Link = new DirectLink(_peer);
+                _peer.DeviceContacted += id => Dispatcher.InvokeAsync(() => Queue.Retry(id));
+                _peer.NearbyDevicesChanged += _ => Dispatcher.InvokeAsync(Queue.RetryNearby);
                 if (autoConfirm) _peer.IncomingPairing += request =>
                 {
                     File.WriteAllText(e2eReady + ".sas", request.Code);
                     request.Match();
                 };
+                WindowInstance = new MainWindow(_peer, await _peer.DevicesAsync(), await _peer.HistoryAsync())
+                { ShowActivated = false, ShowInTaskbar = false, Opacity = 0 };
+                WindowInstance.Show();
+                await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                string? firstPage = WindowInstance.CurrentPage?.Key;
+                bool hasCode = WindowInstance.HasPairingCode;
+                WindowInstance.Hide();
+                if (firstPage is null) throw new InvalidOperationException("First page did not load");
+                if (e2eLink is not null)
+                {
+                    var parts = e2eLink.Split(',');
+                    if (parts.Length != 3 || new DirectLinkInfo(parts[0], parts[1], parts[2]) is not { Valid: true } fake)
+                        throw new ArgumentException("--e2e-link takes ssid,key,ip");
+                    _peer.DirectLink = fake;
+                }
                 Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(e2eReady))!);
-                await File.WriteAllTextAsync(e2eReady, System.Text.Json.JsonSerializer.Serialize(new { _peer.Id, _peer.Port, Qr = _peer.CreateQrUri([System.Net.IPAddress.Loopback]), Store.Packaged }));
+                await File.WriteAllTextAsync(e2eReady, System.Text.Json.JsonSerializer.Serialize(new { _peer.Id, _peer.Port,
+                    Qr = _peer.CreateQrUri([System.Net.IPAddress.Loopback]), FirstPage = firstPage, HasPairingCode = hasCode, Store.Packaged }));
                 return;
             }
             Queue = new SendQueue(_peer, DataDirectory);
@@ -87,7 +110,7 @@ public partial class App : System.Windows.Application
             AttachPeer(_peer);
             _pairedDevices = await _peer.DevicesAsync();
             Link.SetPairedPhones(_pairedDevices);
-            _clipboardShare = new ClipboardShare(this);
+            _clipboardShare = new ClipboardShare();
             Queue.RetryNearby();
             if (Updates.Installed) { Platform.RepairSignIn(); Updates.Start(); }
             if (_pendingToast is not null) { HandleToast(_pendingToast); _pendingToast = null; }
@@ -156,7 +179,7 @@ public partial class App : System.Windows.Application
                 if (line is not null)
                 {
                     var args = System.Text.Json.JsonSerializer.Deserialize<string[]>(line) ?? [];
-                    if (args.Contains("--e2e-send")) _ = HandleE2eSendAsync(args);
+                    if ((_e2eMode || Store.LocalTest) && args.Any(a => a.StartsWith("--e2e-", StringComparison.Ordinal))) _ = HandleE2eAsync(args);
                     else if (args.Contains("--receive-bluetooth")) await Dispatcher.InvokeAsync(ReceiveBluetooth);
                     else if (args.Contains("--background")) { }
                     else if (args.Contains("--minimized") && !args.Contains("--send")) await Dispatcher.InvokeAsync(ShowTray);
@@ -167,14 +190,43 @@ public partial class App : System.Windows.Application
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine(ex); }
         }
     }
-    private async Task HandleE2eSendAsync(string[] forwarded)
+    private async Task HandleE2eAsync(string[] forwarded)
     {
         var args = forwarded.ToList();
         string? resultPath = Take(args, "--e2e-result");
+        Take(args, "--data");
         int send = args.IndexOf("--e2e-send");
-        if (resultPath is null || send < 0 || send + 2 >= args.Count || _peer is null) return;
+        if (resultPath is null || _peer is null || !(_e2eMode || Store.LocalTest)) return;
         try
         {
+            if (args.Remove("--e2e-qr"))
+            {
+                await File.WriteAllTextAsync(resultPath, _peer.CreateQrUri([System.Net.IPAddress.Loopback]));
+                return;
+            }
+            if (Take(args, "--e2e-cancel") is string cancel)
+            {
+                Queue.Cancel(cancel);
+                await File.WriteAllTextAsync(resultPath, Queue.Has(cancel) ? "FAIL still queued" : "PASS cancelled");
+                return;
+            }
+            if (Take(args, "--e2e-text") is string textTarget)
+            {
+                if (args.Count != 1) throw new ArgumentException("--e2e-text takes a device and text");
+                await _peer.SendTextAsync(textTarget, args[0]);
+                await File.WriteAllTextAsync(resultPath, "PASS text");
+                return;
+            }
+            if (Take(args, "--e2e-multi") is string targets)
+            {
+                var items = SendItem.From(args);
+                var ids = targets.Split(',', StringSplitOptions.RemoveEmptyEntries);
+                if (ids.Length < 2 || items.Count == 0) throw new ArgumentException("--e2e-multi takes device ids and files");
+                await Task.WhenAll(ids.Select(id => Queue.SendFilesAsync(id, items)));
+                await File.WriteAllTextAsync(resultPath, "PASS " + ids.Length);
+                return;
+            }
+            if (send < 0 || send + 2 >= args.Count) throw new ArgumentException("--e2e-send takes a device and files");
             // --e2e-queue: through the "sends when it's back" queue, like the Send button (QUEUED when the device is away).
             if (args.Contains("--e2e-queue"))
             {
