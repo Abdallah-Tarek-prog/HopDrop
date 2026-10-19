@@ -469,6 +469,12 @@ Questions that require an answer keep focus until answered; Back chooses the neg
 **Receive storage**
 - Default: `Download/HopDrop` — MediaStore Downloads with `RELATIVE_PATH` and `IS_PENDING` on API 29+; on API 26–28 the public Downloads folder via `WRITE_EXTERNAL_STORAGE` (maxSdkVersion 28), requested when first needed.
 - Custom: the SAF tree picked in Settings; write to `<name>.part` then rename; delete partial files on failure. If the permission was lost, fall back to the default and tell the user.
+- **Many files (R23):** the receiver reads the names already taken in a folder (and, in a picked tree, the folder documents) once
+  and keeps them up to date while files keep arriving, instead of asking Android for every file; it forgets them after 30 s
+  without a new file and after any failure. Each file that arrived whole is finished (final name, visible, `file_ok`) on a
+  second thread, in order, while the next file already arrives (`Peer.Finisher`).
+- Timing log for this path: `adb shell setprop log.tag.HopDropTiming DEBUG`, then `adb logcat -s HopDropTiming` shows the
+  milliseconds per step for every 200 files received (`store/SaveTimings`). Off by default.
 - Backup place: a separate SAF tree or `Download/HopDrop/Backups` by default. Negotiated backup offers use its own free-space check
   and receive storage. The receiver keeps the backup list in preferences; changing the place does not move earlier files.
 

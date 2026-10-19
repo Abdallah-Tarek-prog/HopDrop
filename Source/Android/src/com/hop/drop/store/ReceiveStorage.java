@@ -9,6 +9,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
 import android.os.StatFs;
+import android.os.SystemClock;
 import android.provider.DocumentsContract;
 import android.provider.MediaStore;
 import com.hop.drop.core.FileNames;
@@ -18,6 +19,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,6 +33,22 @@ import java.util.UUID;
  */
 public final class ReceiveStorage implements Peer.Storage {
     private static final Object UNIQUE_LOCK=new Object();
+    /**
+     * Names already taken in a folder, and folders already found in a picked tree, read once and kept up to date while files
+     * keep arriving there. Asking Android again for every file cost about 60 ms a file on a Realme (Android 11), most of a
+     * small file's time. Forgotten after a short pause, so changes made outside HopDrop are picked up by the next transfer.
+     */
+    private static final Map<String,Cached> CACHE=new HashMap<>();
+    private static final long CACHE_MS=30000;
+    private static final class Cached{final Object value;long used;Cached(Object value){this.value=value;}}
+    private interface Load<T>{T get()throws IOException;}
+    /** The kept value for {@code key}, loaded when missing or stale. Callers hold UNIQUE_LOCK. */
+    @SuppressWarnings("unchecked")
+    private static <T> T cached(String key,Load<T> load)throws IOException{long now=SystemClock.elapsedRealtime();CACHE.values().removeIf(c->now-c.used>CACHE_MS);
+        Cached c=CACHE.get(key);if(c==null){c=new Cached(load.get());CACHE.put(key,c);}c.used=now;return (T)c.value;}
+    /** Something failed: read everything again next time rather than trust what's kept. */
+    private static void forget(){synchronized(UNIQUE_LOCK){CACHE.clear();}}
+    private static String lower(String name){return name.toLowerCase(java.util.Locale.ROOT);}
     private static final String DOWNLOADS="Download/HopDrop/";
     private static final String BACKUPS="Download/HopDrop/Backups/";
     private final Context context;private final SharedPreferences settings;private final ContentResolver resolver;
@@ -85,24 +103,25 @@ public final class ReceiveStorage implements Peer.Storage {
         return c!=null&&c.moveToFirst();}catch(Exception e){return false;}}
     private static File legacyRoot(){return new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),"HopDrop");}
     private final class SafOutput implements Peer.Storage.Output {
-        private final String folder,name;private final Uri parent;private Uri temp;private OutputStream stream;
-        SafOutput(Uri tree,String folder,String name)throws IOException{this.folder=folder;this.name=name;try{parent=safFolder(tree,folder);
-            temp=DocumentsContract.createDocument(resolver,parent,"application/octet-stream",".hopdrop-"+UUID.randomUUID()+".part");if(temp==null)throw new IOException("Cannot create file in selected folder");stream=resolver.openOutputStream(temp,"w");if(stream==null)throw new IOException("Cannot open selected folder");}catch(IOException e){throw e;}catch(Exception e){throw new IOException("Receive folder is unavailable: "+e.getMessage(),e);}}
+        private final String folder,name;private final Uri parent;private Uri temp;private OutputStream stream;private final SaveTimings.Clock clock=SaveTimings.start();
+        SafOutput(Uri tree,String folder,String name)throws IOException{this.folder=folder;this.name=name;try{synchronized(UNIQUE_LOCK){parent=cached("folder:"+tree+"|"+folder,()->safFolder(tree,folder));}clock.end(SaveTimings.FOLDER);
+            temp=DocumentsContract.createDocument(resolver,parent,"application/octet-stream",".hopdrop-"+UUID.randomUUID()+".part");clock.end(SaveTimings.CREATE);if(temp==null)throw new IOException("Cannot create file in selected folder");stream=resolver.openOutputStream(temp,"w");clock.end(SaveTimings.OPEN);if(stream==null)throw new IOException("Cannot open selected folder");stream=clock.wrap(stream);}catch(IOException e){forget();throw e;}catch(Exception e){forget();throw new IOException("Receive folder is unavailable: "+e.getMessage(),e);}}
         public OutputStream stream(){return stream;}
-        public String finish()throws IOException{try{stream.close();synchronized(UNIQUE_LOCK){Set<String> taken=names(parent);String finalName=FileNames.unique(name,n->taken.contains(n.toLowerCase(java.util.Locale.ROOT)));
-            Uri renamed=DocumentsContract.renameDocument(resolver,temp,finalName);if(renamed==null)throw new IOException("Could not rename received file");temp=null;return joined(folder,finalName);}}catch(Exception e){abort();throw new IOException(e);}}
+        public String finish()throws IOException{try{clock.begin();stream.close();clock.end(SaveTimings.CLOSE);synchronized(UNIQUE_LOCK){Set<String> taken=cached("names:"+parent,()->names(parent));String finalName=FileNames.unique(name,n->taken.contains(lower(n)));clock.end(SaveTimings.NAME);
+            Uri renamed=DocumentsContract.renameDocument(resolver,temp,finalName);if(renamed==null)throw new IOException("Could not rename received file");taken.add(lower(finalName));clock.end(SaveTimings.PUBLISH);clock.done();temp=null;return joined(folder,finalName);}}catch(Exception e){forget();abort();throw new IOException(e);}}
         public void abort(){try{if(stream!=null)stream.close();if(temp!=null)DocumentsContract.deleteDocument(resolver,temp);}catch(Exception ignored){}}
     }
     private final class MediaOutput implements Peer.Storage.Output {
-        private final String folder,name,relative;private Uri uri;private OutputStream stream;
+        private final String folder,name,relative;private Uri uri;private OutputStream stream;private final SaveTimings.Clock clock=SaveTimings.start();
         MediaOutput(String folder,String name)throws IOException{this(folder,name,DOWNLOADS);}
         MediaOutput(String folder,String name,String root)throws IOException{this.folder=folder;this.name=name;relative=folder==null?root:root+folder+"/";ContentValues v=new ContentValues();v.put(MediaStore.MediaColumns.DISPLAY_NAME,".hopdrop-"+UUID.randomUUID()+".part");v.put(MediaStore.MediaColumns.MIME_TYPE,"application/octet-stream");v.put(MediaStore.MediaColumns.RELATIVE_PATH,relative);v.put(MediaStore.MediaColumns.IS_PENDING,1);
-            uri=resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI,v);if(uri==null)throw new IOException("Cannot create download");stream=resolver.openOutputStream(uri,"w");if(stream==null)throw new IOException("Cannot write download");}
+            clock.begin();uri=resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI,v);clock.end(SaveTimings.CREATE);if(uri==null)throw new IOException("Cannot create download");stream=resolver.openOutputStream(uri,"w");clock.end(SaveTimings.OPEN);if(stream==null)throw new IOException("Cannot write download");stream=clock.wrap(stream);}
         public OutputStream stream(){return stream;}
-        public String finish()throws IOException{try{stream.close();synchronized(UNIQUE_LOCK){String finalName=FileNames.unique(name,this::exists);ContentValues v=new ContentValues();v.put(MediaStore.MediaColumns.DISPLAY_NAME,finalName);v.put(MediaStore.MediaColumns.IS_PENDING,0);
-            if(resolver.update(uri,v,null,null)!=1)throw new IOException("Cannot finish download");uri=null;return joined(folder,finalName);}}catch(Exception e){abort();throw new IOException(e);}}
-        private boolean exists(String n){try(Cursor c=resolver.query(MediaStore.Downloads.EXTERNAL_CONTENT_URI,new String[]{MediaStore.MediaColumns.DISPLAY_NAME},MediaStore.MediaColumns.RELATIVE_PATH+"=?",new String[]{relative},null)){
-            if(c!=null)while(c.moveToNext())if(n.equalsIgnoreCase(c.getString(0)))return true;return false;}catch(Exception e){return false;}}
+        public String finish()throws IOException{try{clock.begin();stream.close();clock.end(SaveTimings.CLOSE);synchronized(UNIQUE_LOCK){Set<String> taken=cached("media:"+relative,this::names);String finalName=FileNames.unique(name,n->taken.contains(lower(n)));clock.end(SaveTimings.NAME);ContentValues v=new ContentValues();v.put(MediaStore.MediaColumns.DISPLAY_NAME,finalName);v.put(MediaStore.MediaColumns.IS_PENDING,0);
+            if(resolver.update(uri,v,null,null)!=1)throw new IOException("Cannot finish download");taken.add(lower(finalName));clock.end(SaveTimings.PUBLISH);clock.done();uri=null;return joined(folder,finalName);}}catch(Exception e){forget();abort();throw new IOException(e);}}
+        /** Lower-case names of the files HopDrop can see in this folder. */
+        private Set<String> names(){Set<String> found=new HashSet<>();try(Cursor c=resolver.query(MediaStore.Downloads.EXTERNAL_CONTENT_URI,new String[]{MediaStore.MediaColumns.DISPLAY_NAME},MediaStore.MediaColumns.RELATIVE_PATH+"=?",new String[]{relative},null)){
+            if(c!=null)while(c.moveToNext())found.add(lower(c.getString(0)));}catch(Exception ignored){}return found;}
         public void abort(){try{if(stream!=null)stream.close();if(uri!=null)resolver.delete(uri,null,null);}catch(Exception ignored){}}
     }
     private static final class LegacyOutput implements Peer.Storage.Output {

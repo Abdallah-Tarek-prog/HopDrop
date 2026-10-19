@@ -290,6 +290,25 @@ public final class Peer implements AutoCloseable {
             this.completedFiles=completedFiles;this.completedNames=completedNames;this.folders=folders;this.bytes=bytes;}
         void dropPartial(){if(partialOutput!=null)partialOutput.abort();partialOutput=null;partialHash=null;partial=null;partialWritten=0;}
     }
+    /**
+     * The last step of saving each received file (its final name, visible to other apps) and its file_ok, done in order on
+     * one thread per incoming transfer while the next file already arrives. On a phone that step takes longer than receiving
+     * a small file, so a folder of thousands of files waited on it twice per file.
+     */
+    private static final class Finisher {
+        private final ExecutorService thread=Executors.newSingleThreadExecutor(r->{Thread t=new Thread(r,"HopDrop finisher");t.setDaemon(true);return t;});
+        private final OutputStream out;private final List<Offered> completedFiles;private final List<String> saved;private volatile Exception failed;
+        Finisher(OutputStream out,List<Offered> completedFiles,List<String> saved){this.out=out;this.completedFiles=completedFiles;this.saved=saved;}
+        /** Queues a file that arrived whole and checked out. Throws what finishing an earlier one ran into. */
+        void add(Offered file,int i,Storage.Output output)throws Exception{Exception earlier=failed;if(earlier!=null){output.abort();throw earlier;}
+            thread.execute(()->{if(failed!=null){output.abort();return;}
+                try{String name=output.finish();synchronized(saved){completedFiles.add(file);saved.add(name);}Protocol.send(out,"type","file_ok","i",i,"savedAs",name);}
+                catch(Exception e){if(failed==null)failed=e;}});}
+        /** Waits until every queued file is saved and confirmed; throws the first failure. */
+        void drain()throws Exception{close();Exception f=failed;if(f!=null)throw f;}
+        /** Lets the queued files finish (they arrived whole), then ends the thread. */
+        void close(){thread.shutdown();try{if(!thread.awaitTermination(60,TimeUnit.SECONDS))thread.shutdownNow();}catch(InterruptedException e){thread.shutdownNow();Thread.currentThread().interrupt();}}
+    }
     /** What a sender knows about its transfer across reconnects. */
     private static final class Outgoing {
         final String[] savedAs;long done;String folder="";
@@ -481,8 +500,9 @@ public final class Peer implements AutoCloseable {
         Protocol.sendObject(s.getOutputStream(),accept);
         long done=earlier!=null?earlier.bytes:0;Storage.Output current=null;Offered currentFile=null;MessageDigest hash=null;long written=0;
         TransferMeter meter=new TransferMeter(total,System.nanoTime());Protocol.Reader reader=new Protocol.Reader(s.getInputStream(),Protocol.MAX_DATA);
+        Finisher finisher=new Finisher(s.getOutputStream(),completedFiles,saved);int received=saved.size();
         try{for(int i=0;i<files.size();i++){if(already.containsKey(i))continue;Offered file=files.get(i);
-                report(meter,true,transferId,true,peerName,file.name,saved.size()+1,offeredCount,done,total);
+                report(meter,true,transferId,true,peerName,file.name,received+1,offeredCount,done,total);
                 Map<String,Object> begin;if(first!=null){try{begin=first.get(30,TimeUnit.SECONDS);}catch(TimeoutException late){throw new IOException("timeout: Sender timed out");}catch(ExecutionException failed){throw failed.getCause() instanceof Exception?(Exception)failed.getCause():failed;}first=null;}
                 else begin=Protocol.message(s.getInputStream());if("cancel".equals(Json.str(begin,"type")))throw new IOException("cancelled: Sender cancelled");Protocol.expect(begin,"file");if(Json.num(begin,"i")!=i)throw new IOException("protocol_error: Wrong file index");
                 Object o=begin.get("offset");long offset=o instanceof Number?((Number)o).longValue():0;currentFile=file;
@@ -491,14 +511,16 @@ public final class Peer implements AutoCloseable {
                     if(backup){if(path==null||!(path.equals(backupName)||path.startsWith(backupName+"/")))throw new IOException("protocol_error: Invalid backup path");current=storage.beginBackup(senderFolder+"/"+path,file.name);}
                     else current=storage.begin(path,file.name);hash=MessageDigest.getInstance("SHA-256");written=0;}
                 while(true){if(reader.next()==2){int n=reader.length();if(file.size>=0&&written+n>file.size)throw new IOException("io_error: File exceeds offered size");
-                        current.stream().write(reader.data(),0,n);hash.update(reader.data(),0,n);written+=n;done+=n;report(meter,false,transferId,true,peerName,file.name,saved.size()+1,offeredCount,done,total);continue;}
+                        current.stream().write(reader.data(),0,n);hash.update(reader.data(),0,n);written+=n;done+=n;report(meter,false,transferId,true,peerName,file.name,received+1,offeredCount,done,total);continue;}
                     Map<String,Object> end=reader.message();if(Json.str(end,"type").equals("cancel"))throw new IOException("cancelled: Sender cancelled");Protocol.expect(end,"file_end");if(Json.num(end,"i")!=i)throw new IOException("protocol_error: Wrong file index");if(file.size>=0&&written!=file.size)throw new IOException("io_error: File size differs");
                     if(!Protocol.hex(hash.digest()).equalsIgnoreCase(Json.str(end,"sha256")))throw new IOException("checksum_mismatch: File checksum differs");break;}
-                String finalName=current.finish();current=null;currentFile=null;completedFiles.add(file);saved.add(finalName);Protocol.send(s.getOutputStream(),"type","file_ok","i",i,"savedAs",finalName);}
-            Protocol.expect(Protocol.message(s.getInputStream()),"done");Protocol.send(s.getOutputStream(),"type","done_ok","saved",saved.size());
+                Storage.Output whole=current;current=null;currentFile=null;received++;finisher.add(file,i,whole);}
+            finisher.drain();Protocol.expect(Protocol.message(s.getInputStream()),"done");Protocol.send(s.getOutputStream(),"type","done_ok","saved",saved.size());
             if(backup)storage.backupReceived(peerId,senderName,backupName,saved.size());
             events.finished(new Result(transferId,true,peerName,saved,offeredCount,folder,null,done,(System.nanoTime()-started)/1000000));}
         catch(Exception e){
+            // Files that arrived whole still get their names and file_ok before anything else is decided or sent.
+            finisher.close();
             // The connection dropped again before the half-received file was taken over: carry it on (or clean it up) like any other.
             if(earlier!=null&&earlier.partialOutput!=null&&current==null){current=earlier.partialOutput;currentFile=earlier.partial;hash=earlier.partialHash;written=earlier.partialWritten;earlier.partialOutput=null;earlier.partialHash=null;}
             if(canResume&&!cancelledSockets.contains(s)&&retryable(e)){
