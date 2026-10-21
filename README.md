@@ -19,7 +19,7 @@ From the [Releases page](https://github.com/Abdallah-Tarek-prog/HopDrop/releases
 1. Install the app on both devices. The phone shows a short tour (skip it any time); the PC opens on its pairing code.
 2. Pair once: on the phone, tap **Pair my first device** (or **Devices → Pair device → Scan a QR code**) and scan the code on the PC.
    Pinch or double-tap to zoom if the phone struggles to focus. **They don't need to be on the same Wi-Fi:** when they aren't, the
-   phone connects to the PC directly (the first time, Android asks "Connect?").
+   phone connects to the PC directly (Android asks you to confirm the network; some phones, like realme's, ask every time).
    - Other ways: tap **Pair** next to a device under **Nearby** (same Wi-Fi) or pair by IP address; both screens show the same 6-digit
      number, confirm on both.
 3. Done. Devices stay paired until you remove them on either side. If phones can't reach a PC that runs the installer version, use

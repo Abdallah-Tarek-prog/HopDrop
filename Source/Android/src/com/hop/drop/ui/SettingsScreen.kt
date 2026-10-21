@@ -232,7 +232,7 @@ fun SettingsScreen(state: HopUiState, actions: HopActions, snackbar: SnackbarHos
                         "It includes:\n" +
                         "•  ZXing, for reading QR codes (Apache License 2.0)\n" +
                         "•  Jetpack Compose and AndroidX (Apache License 2.0)\n" +
-                        "•  Plus Jakarta Sans font (SIL Open Font License 1.1)")
+                        "•  Roboto font (SIL Open Font License 1.1)")
                 }
             },
             confirmButton = { Button(onClick = { licences = false }) { Text("Done") } },

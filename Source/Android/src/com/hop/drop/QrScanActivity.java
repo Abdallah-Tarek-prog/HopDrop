@@ -788,7 +788,8 @@ public final class QrScanActivity extends Activity implements TextureView.Surfac
         view.setText(value);
         view.setTextColor(Color.WHITE);
         view.setTextSize(sizeSp);
-        view.setTypeface(getResources().getFont(bold ? R.font.jakarta_bold : R.font.jakarta_medium));
+        view.setTypeface(getResources().getFont(R.font.roboto));
+        view.setFontVariationSettings(bold ? "'wght' 700" : "'wght' 500");
         view.setShadowLayer(dp(4), 0, dp(1), 0x99000000);
         return view;
     }

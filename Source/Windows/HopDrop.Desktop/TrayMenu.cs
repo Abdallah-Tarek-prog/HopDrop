@@ -8,7 +8,6 @@ using Color = System.Windows.Media.Color;
 using TextBlock = System.Windows.Controls.TextBlock;
 using Orientation = System.Windows.Controls.Orientation;
 using KeyEventArgs = System.Windows.Input.KeyEventArgs;
-using FontFamily = System.Windows.Media.FontFamily;
 using Cursors = System.Windows.Input.Cursors;
 
 namespace HopDrop.Desktop;
@@ -28,7 +27,7 @@ internal sealed class TrayMenu : Window
     private bool _closing;
     private readonly SolidColorBrush _hover;
 
-    private static bool UseDark()
+    internal static bool UseDark()
     {
         string theme = Preferences.Theme;
         if (theme != "system") return theme == "dark";
@@ -50,7 +49,7 @@ internal sealed class TrayMenu : Window
         WindowStyle = WindowStyle.None; AllowsTransparency = true; Background = Brushes.Transparent;
         ResizeMode = ResizeMode.NoResize; ShowInTaskbar = false; Topmost = true; ShowActivated = true;
         SizeToContent = SizeToContent.WidthAndHeight; Title = "HopDrop";
-        FontFamily = new FontFamily("Segoe UI Variable Text, Segoe UI"); FontSize = 14;
+        FontFamily = Ui.Font; FontSize = 14;
 
         var list = new StackPanel { MinWidth = 236 };
         var header = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(12, 6, 12, 6) };

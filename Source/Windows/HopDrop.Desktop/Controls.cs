@@ -11,34 +11,43 @@ using TextBlock = System.Windows.Controls.TextBlock;
 using Orientation = System.Windows.Controls.Orientation;
 using HorizontalAlignment = System.Windows.HorizontalAlignment;
 using Color = System.Windows.Media.Color;
+using FontFamily = System.Windows.Media.FontFamily;
 
 namespace HopDrop.Desktop;
 
 /// <summary>HopDrop's semantic colors for the current theme (the Android app's "HopDrop" colour theme).</summary>
 internal static class Palette
 {
-    public static bool Dark => ApplicationThemeManager.GetAppTheme() == ApplicationTheme.Dark;
-    /// <summary>HopDrop orange: buttons, links and the selected page. White text on it passes the 4.5:1 contrast rule.</summary>
-    public static Color Brand => Color.FromRgb(0xC2, 0x41, 0x0C);
+    private static bool? _dark;
+    /// <summary>
+    /// The theme being shown. Set from the user's choice (or Windows' app mode for "system") whenever the theme is applied:
+    /// WPF-UI's GetAppTheme still reports the previous theme right after a switch, which gave each theme the other's orange.
+    /// </summary>
+    public static bool Dark => _dark ?? ApplicationThemeManager.GetAppTheme() == ApplicationTheme.Dark;
+    internal static void Follow(bool dark) => _dark = dark;
+    /// <summary>Dark ink on bright orange in dark mode; white on deeper orange in light mode.</summary>
+    public static Color Brand => Dark ? Color.FromRgb(0xFF, 0x7A, 0x2E) : Color.FromRgb(0xC2, 0x41, 0x0C);
     private static SolidColorBrush Brush(uint light, uint dark)
     {
         uint v = Dark ? dark : light;
         var brush = new SolidColorBrush(Color.FromRgb((byte)(v >> 16), (byte)(v >> 8), (byte)v)); brush.Freeze(); return brush;
     }
-    public static SolidColorBrush Primary => Brush(0xC2410C, 0xFFB693);
+    public static SolidColorBrush Primary => Brush(0xC2410C, 0xFF7A2E);
+    public static SolidColorBrush OnAccent => Brush(0xFFFFFF, 0x24150D);
+    public static SolidColorBrush Text => Brush(0x20242B, 0xF3F5F8);
     public static SolidColorBrush PrimaryBg => Brush(0xFFE4D6, 0x3E2216);
     public static SolidColorBrush OnPrimaryBg => Brush(0x8A3208, 0xFFB693);
-    public static SolidColorBrush Success => Brush(0x15803D, 0x4ADE80);
+    public static SolidColorBrush Success => Brush(0x166534, 0x4ADE80);
     public static SolidColorBrush SuccessBg => Brush(0xDCF5E4, 0x123222);
     public static SolidColorBrush Danger => Brush(0xC62828, 0xF87171);
     public static SolidColorBrush DangerBg => Brush(0xFCE4E4, 0x3A1A1E);
     public static SolidColorBrush Amber => Brush(0x8A5300, 0xFCD68A);
     public static SolidColorBrush AmberBg => Brush(0xFDF1D8, 0x3A2C11);
-    public static SolidColorBrush Muted => Brush(0x485266, 0xA3ADBE);
+    public static SolidColorBrush Muted => Brush(0x485266, 0xB9C1CF);
     public static SolidColorBrush Border => Brush(0xDFE3EB, 0x2D3542);
-    public static SolidColorBrush Surface => Brush(0xF7F8FB, 0x0D121B);
-    public static SolidColorBrush CardBg => Brush(0xFFFFFF, 0x161C27);
-    public static SolidColorBrush SurfaceAlt => Brush(0xEBEEF4, 0x1A202B);
+    public static SolidColorBrush Surface => Brush(0xF5F6F8, 0x202020);
+    public static SolidColorBrush CardBg => Brush(0xFFFFFF, 0x2B2B2B);
+    public static SolidColorBrush SurfaceAlt => Brush(0xEBEEF4, 0x343434);
 }
 
 /// <summary>Short, one-shot motion. Clocks belong to their element and are removed on completion or hiding.</summary>
@@ -216,18 +225,19 @@ internal static class Motion
 /// <summary>Code-built building blocks so every page has the same spacing, type scale and states.</summary>
 internal static class Ui
 {
+    public static FontFamily Font { get; } = new("Segoe UI Variable Text, Segoe UI Variable, Segoe UI");
     public static TextBlock Label(string text, double size = 14, bool bold = false) => new()
-    { Text = text, FontSize = size, FontWeight = bold ? FontWeights.SemiBold : FontWeights.Normal, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
-    public static TextBlock Subtle(string text, double size = 13) => new()
-    { Text = text, FontSize = size, Foreground = Palette.Muted, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) };
-    public static TextBlock Section(string text) { var t = Label(text, 18, true); t.Margin = new Thickness(0, 22, 0, 10); return t; }
-    public static TextBlock Colored(string text, Brush brush, double size = 13, bool bold = false) { var t = Label(text, size, bold); t.Foreground = brush; return t; }
+    { Text = text, FontFamily = Font, FontSize = size, Foreground = Palette.Text, FontWeight = bold ? FontWeights.SemiBold : FontWeights.Normal, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
+    public static TextBlock Subtle(string text, double size = 14) => new()
+    { Text = text, FontFamily = Font, FontSize = size, Foreground = Palette.Muted, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) };
+    public static TextBlock Section(string text) { var t = Label(text, 20, true); t.Margin = new Thickness(0, 22, 0, 10); return t; }
+    public static TextBlock Colored(string text, Brush brush, double size = 14, bool bold = false) { var t = Label(text, size, bold); t.Foreground = brush; return t; }
 
     /// <summary>A page: title, one-line purpose, then content, centred with a readable maximum width.</summary>
     public static StackPanel Page(string title, string subtitle)
     {
         var panel = new StackPanel { Margin = new Thickness(32, 20, 32, 32), MaxWidth = 980 };
-        panel.Children.Add(Label(title, 30, true));
+        panel.Children.Add(Label(title, 28, true));
         var sub = Subtle(subtitle, 14); sub.Margin = new Thickness(0, 2, 0, 8); panel.Children.Add(sub);
         return panel;
     }
@@ -238,7 +248,7 @@ internal static class Ui
     public static FrameworkElement Scroll(FrameworkElement child) => child;
 
     public static Card Card(UIElement content, double padding = 18, double bottom = 10) =>
-        new() { Content = content, Padding = new Thickness(padding), Margin = new Thickness(0, 0, 0, bottom) };
+        new() { Content = content, Padding = new Thickness(padding), Margin = new Thickness(0, 0, 0, bottom), Background = Palette.CardBg, BorderBrush = Palette.Border };
 
     /// <summary>Windows 11 Settings-style row: icon, title and description on the left, a control on the right.</summary>
     public static Card SettingRow(SymbolRegular icon, string title, string description, UIElement? control, UIElement? below = null)
@@ -263,11 +273,11 @@ internal static class Ui
     {
         var b = new Button
         {
-            Content = text, Padding = new Thickness(14, 7, 14, 7), Margin = new Thickness(0, 0, 8, 0), MinHeight = 34,
+            Content = text, Padding = new Thickness(14, 7, 14, 7), Margin = new Thickness(0, 0, 8, 0), MinHeight = 34, FontFamily = Font, FontSize = 14,
             Appearance = primary ? ControlAppearance.Primary : ControlAppearance.Secondary
         };
         if (icon is not null) b.Icon = new SymbolIcon(icon.Value);
-        if (primary) b.Foreground = Brushes.White;
+        if (primary) b.Foreground = Palette.OnAccent;
         b.Click += (_, _) => action(); return b;
     }
     public static Button IconButton(SymbolRegular icon, string tooltip, Action action)
@@ -292,7 +302,7 @@ internal static class Ui
     {
         var line = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 3, 0, 0) };
         line.Children.Add(new System.Windows.Shapes.Ellipse { Width = 8, Height = 8, Fill = color, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) });
-        line.Children.Add(new TextBlock { Text = text, FontSize = 13, Foreground = color, VerticalAlignment = VerticalAlignment.Center });
+        line.Children.Add(new TextBlock { Text = text, FontSize = 14, Foreground = color, VerticalAlignment = VerticalAlignment.Center });
         return line;
     }
 
@@ -305,7 +315,7 @@ internal static class Ui
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.Children.Add(leading);
         var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(14, 0, 12, 0) };
-        var name = Label(title, 15, true); name.TextTrimming = TextTrimming.CharacterEllipsis; name.TextWrapping = TextWrapping.NoWrap;
+        var name = Label(title, 14, true); name.TextTrimming = TextTrimming.CharacterEllipsis; name.TextWrapping = TextWrapping.NoWrap;
         text.Children.Add(name);
         if (subtitle is not null) text.Children.Add(Subtle(subtitle));
         Grid.SetColumn(text, 1); grid.Children.Add(text);
@@ -320,7 +330,7 @@ internal static class Ui
     {
         var stack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 14, 0, 14) };
         var badge = Badge(icon, Palette.OnPrimaryBg, Palette.PrimaryBg, 52); badge.HorizontalAlignment = HorizontalAlignment.Center; stack.Children.Add(badge);
-        var t = Label(title, 16, true); t.HorizontalAlignment = HorizontalAlignment.Center; t.TextAlignment = TextAlignment.Center; t.Margin = new Thickness(0, 10, 0, 0); stack.Children.Add(t);
+        var t = Label(title, 20, true); t.HorizontalAlignment = HorizontalAlignment.Center; t.TextAlignment = TextAlignment.Center; t.Margin = new Thickness(0, 10, 0, 0); stack.Children.Add(t);
         var d = Subtle(detail); d.HorizontalAlignment = HorizontalAlignment.Center; d.TextAlignment = TextAlignment.Center; d.MaxWidth = 460; stack.Children.Add(d);
         if (action is FrameworkElement a) { a.HorizontalAlignment = HorizontalAlignment.Center; a.Margin = new Thickness(0, 12, 0, 0); stack.Children.Add(a); }
         return new Border { Child = stack };

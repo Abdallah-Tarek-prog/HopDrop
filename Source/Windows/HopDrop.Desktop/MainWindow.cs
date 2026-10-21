@@ -38,6 +38,7 @@ public sealed partial class MainWindow : FluentWindow
         _devices = devices ?? (peer is null ? SampleDevices() : []);
         _history = history ?? [];
         Title = "HopDrop";
+        FontFamily = Ui.Font; FontSize = 14;
         WindowBackdropType = WindowBackdropType.None;
         var work = SystemParameters.WorkArea;
         Width = Math.Min(1120, work.Width * 0.9); Height = Math.Min(800, work.Height * 0.92);
@@ -73,7 +74,7 @@ public sealed partial class MainWindow : FluentWindow
             ApplyTheme();
             _navigation.Navigate(InitialPage(_devices.Count > 0 || _peer is null) == "devices" ? typeof(DevicesPage) : typeof(SendPage));
         };
-        _themeChanged = (_, _) => Dispatcher.InvokeAsync(() => { ApplyBrandAccent(); RenderCurrent(); RenderLive(); });
+        _themeChanged = (_, _) => Dispatcher.InvokeAsync(() => { Palette.Follow(TrayMenu.UseDark()); ApplyBrandAccent(); RenderCurrent(); RenderLive(); });
         ApplicationThemeManager.Changed += _themeChanged;
         _updatesChanged = () => Dispatcher.InvokeAsync(() => { if (On("settings")) RenderCurrent(); });
         Updates.Changed += _updatesChanged;
@@ -151,6 +152,9 @@ public sealed partial class MainWindow : FluentWindow
     internal void ApplyTheme()
     {
         string theme = Preferences.Theme;
+        Palette.Follow(TrayMenu.UseDark());
+        // WPF-UI builds the theme's accent brushes from the accent set before the switch: set it first as well as after.
+        ApplyBrandAccent();
         if (theme == "system")
         {
             SystemThemeWatcher.Watch(this, WindowBackdropType.None, updateAccents: false);
@@ -162,7 +166,7 @@ public sealed partial class MainWindow : FluentWindow
             ApplicationThemeManager.Apply(theme == "dark" ? ApplicationTheme.Dark : ApplicationTheme.Light, WindowBackdropType.None, updateAccent: false);
         }
         ApplyBrandAccent();
-        // A solid themed background: Mica is see-through and renders washed out on some PCs and in screenshots.
+        // A solid tinted base keeps the same contrast on Windows 10 and when transparency is off.
         SetResourceReference(BackgroundProperty, "ApplicationBackgroundBrush");
     }
     private static void ApplyBrandAccent()
@@ -170,9 +174,40 @@ public sealed partial class MainWindow : FluentWindow
         Color brand = Palette.Brand;
         ApplicationAccentColorManager.Apply(brand, brand, brand, brand);
         var resources = System.Windows.Application.Current.Resources;
-        resources["TextOnAccentFillColorPrimary"] = Colors.White;
-        resources["NavigationViewSelectionIndicatorForeground"] = new SolidColorBrush(Palette.Dark ? Color.FromRgb(0xFF, 0xB6, 0x93) : brand);
+        // Pinned at the application level so a theme switch (ours or Windows') can never leave last theme's orange behind.
+        // Hover moves away from the text colour, so contrast only grows: lighter under dark text, darker under white.
+        Color hover = Palette.Dark ? Shade(brand, 1.10) : Shade(brand, 0.92), pressed = Shade(brand, Palette.Dark ? 0.90 : 0.84);
+        resources["AccentButtonBackground"] = Frozen(brand);
+        resources["AccentButtonBackgroundPointerOver"] = Frozen(hover);
+        resources["AccentButtonBackgroundPressed"] = Frozen(pressed);
+        resources["AccentFillColorDefaultBrush"] = Frozen(brand);
+        resources["AccentFillColorSecondaryBrush"] = Frozen(hover);
+        resources["AccentFillColorTertiaryBrush"] = Frozen(pressed);
+        resources["TextOnAccentFillColorPrimary"] = Palette.OnAccent.Color;
+        resources["TextOnAccentFillColorPrimaryBrush"] = Palette.OnAccent;
+        resources["AccentButtonForeground"] = Palette.OnAccent;
+        resources["AccentButtonForegroundPointerOver"] = Palette.OnAccent;
+        resources["AccentButtonForegroundPressed"] = Palette.OnAccent;
+        resources["TextOnAccentFillColorSecondary"] = Palette.OnAccent.Color;
+        resources["CheckBoxCheckGlyphForeground"] = Palette.OnAccent;
+        resources["NavigationViewSelectionIndicatorForeground"] = Palette.Primary;
+        resources["ApplicationBackgroundBrush"] = Palette.Surface;
+        resources["LayerFillColorDefaultBrush"] = Palette.CardBg;
+        resources["CardStrokeColorDefaultBrush"] = Palette.Border;
+        resources["TextFillColorPrimaryBrush"] = Palette.Text;
+        resources["TextFillColorSecondaryBrush"] = Palette.Muted;
+        resources["TextPlaceholderColorBrush"] = Palette.Muted;
+        resources["NavigationViewContentBackground"] = Palette.Surface;
+        resources["NavigationViewContentGridBorderBrush"] = Palette.Border;
+        resources["BodyFontFamily"] = Ui.Font;
+        resources["ControlContentThemeFontSize"] = 14d;
     }
+    private static SolidColorBrush Frozen(Color c) { var b = new SolidColorBrush(c); b.Freeze(); return b; }
+    /// <summary>The same hue, lighter (factor above 1) or darker (below 1), for hover and pressed states.</summary>
+    private static Color Shade(Color c, double f) => Color.FromRgb(
+        (byte)Math.Clamp(Math.Round(f > 1 ? c.R + (255 - c.R) * (f - 1) : c.R * f), 0, 255),
+        (byte)Math.Clamp(Math.Round(f > 1 ? c.G + (255 - c.G) * (f - 1) : c.G * f), 0, 255),
+        (byte)Math.Clamp(Math.Round(f > 1 ? c.B + (255 - c.B) * (f - 1) : c.B * f), 0, 255));
 
     /// <summary>Lets the window close for good: drops every timer and hook that would keep it alive.</summary>
     internal void Detach()
@@ -384,6 +419,9 @@ public sealed partial class MainWindow : FluentWindow
     }
     private void BindLiveRow(LiveRow row, LiveItem item)
     {
+        row.Title.Foreground = row.Amount.Foreground = Palette.Text;
+        row.Detail.Foreground = row.Speed.Foreground = Palette.Muted;
+        row.Bar.Foreground = Palette.Primary;
         bool active = !item.Finished;
         if (item.Finished && !row.Finished) Motion.Pop(row.Badge);
         row.Finished = item.Finished;

@@ -507,8 +507,8 @@ Copy rule: the title says what is happening and with whom, the collapsed line ho
 - Share sheet (`SEND`, `SEND_MULTIPLE`) opens the Send tab with the files added (or sends at once through a device's target). Shared text, and text typed in the Send tab's **Text** dialog, becomes a cached `.txt` served by a small in-app `ContentProvider` — no `file://` URIs leave the app; when sending, it travels as text (3.9.5) to devices that can show it. Its name is the text's first line, cut at a word to about 40 characters ("Link.txt" for a URL, "Text.txt" when nothing usable is left); `FileNames.forText` / `FileNames.ForText` apply the same rule on both platforms.
 - Bluetooth (R10): pick the `ACTION_SEND` target whose package name contains `bluetooth`; if none, open the system chooser.
   Each use first explains: on the laptop click HopDrop → Receive via Bluetooth (it waits and saves into its receive folder), then pick the laptop in Android's list; much slower than Wi-Fi.
-- **Look:** Material 3, flat cards on navy-tinted neutrals, Plus Jakarta Sans. Colour themes (Settings → Colour): **HopDrop** (orange
-  `#C2410C` on light, `#FFB693` on dark, navy secondary), **Ocean**, **Forest**, **Berry**, **Midnight**, and **Wallpaper** (Material You,
+- **Look:** Material 3, flat white cards on light navy-tinted neutrals, Roboto (bundled variable font). Colour themes (Settings → Colour): **HopDrop** (orange
+  `#C2410C` under white text on light, bright `#FF812E` under dark text on dark, navy secondary), **Ocean**, **Forest**, **Berry**, **Midnight**, and **Wallpaper** (Material You,
   Android 12+), each in light and dark; with System / Light / Dark they apply instantly. Primary text and buttons meet 4.5:1 contrast.
   Subtitles stay short (one line, only where the title isn't enough). 48 dp touch targets, edge-to-edge, short (150–260 ms) motion.
 - Permissions: INTERNET, ACCESS_NETWORK_STATE, ACCESS_WIFI_STATE, CHANGE_WIFI_MULTICAST_STATE, CHANGE_NETWORK_STATE and CHANGE_WIFI_STATE
@@ -534,8 +534,8 @@ Copy rule: the title says what is happening and with whom, the collapsed line ho
 - `HopDrop.Desktop` (net10.0-windows, WPF): the app.
 - `HopDrop.Tests`: automated tests (xUnit if NuGet is allowed, otherwise a console test runner that exits non-zero on failure).
 
-**Desktop UI** (Windows 11 Fluent look, solid themed background, rounded cards; **System / Light / Dark** in Settings; HopDrop orange
-accent, including the navigation highlight; the window opens at a size that fits the screen's work area; with no paired device it opens
+**Desktop UI** (Windows 11 Fluent look, Segoe UI Variable, solid themed background, rounded cards; **System / Light / Dark** in Settings; HopDrop orange
+accent (`#C2410C` under white text on light, bright `#FF7A2E` under dark text on dark), including the navigation highlight; the window opens at a size that fits the screen's work area; with no paired device it opens
 on Devices, with the pairing code first):
 - **Live transfers bar (all pages, bottom of the window):** one row per transfer in either direction (R13): direction icon, "Receiving 3 files
   from …", file and k of N, progress bar, amount and percent, speed and time left, **Cancel**; outcome shown for a few seconds after.
@@ -634,6 +634,9 @@ Approved by the owner on 2026-09-29, from official registries only (nuget.org, M
 - NuGet: `WPF-UI` (Fluent controls), `H.NotifyIcon.Wpf` or WinForms `NotifyIcon` (tray), `CommunityToolkit.WinUI.Notifications` or equivalent (toasts), `QRCoder` (QR images), `xunit` (tests), the .NET runtime packs needed for a self-contained publish, and for Stage 6 a Bluetooth library if needed (e.g. `InTheHand.Net.Bluetooth`) or the Windows SDK projection.
 - Maven: `com.google.zxing:core` (QR scan/encode on Android, Apache-2.0) — the jar goes in `Source/Android/libs/` with its license.
 - NuGet `Velopack` (installer and automatic updates, MIT), approved by the owner on 2026-10-03.
+- Font **Roboto** (variable, `Source/Android/res/font/roboto.ttf`, SIL Open Font License 1.1, licence in
+  `Source/Android/libs/Roboto-OFL.txt`), downloaded from github.com/google/fonts (`ofl/roboto`), approved by the owner on
+  2026-10-19; it replaces Plus Jakarta Sans in the phone app. The Windows app uses the system's Segoe UI Variable.
 Keep dependencies few; record every package and version in the stage report.
 
 ---

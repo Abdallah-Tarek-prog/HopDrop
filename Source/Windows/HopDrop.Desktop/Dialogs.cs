@@ -21,7 +21,7 @@ public sealed class NumberMatchDialog : FluentWindow
         body.Children.Add(new TextBlock { Text = request.Code, FontSize = 49, FontWeight = FontWeights.Bold, TextAlignment = TextAlignment.Center, Margin = new Thickness(0, 0, 0, 16) });
         body.Children.Add(new TextBlock { Text = "Does " + request.PeerName + " show the same number?", TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap, FontSize = 15, Margin = new Thickness(0, 0, 0, 26) });
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
-        var yes = new Button { Content = "They match", Appearance = ControlAppearance.Primary, Foreground = System.Windows.Media.Brushes.White, Padding = new Thickness(22, 10, 22, 10), Margin = new Thickness(0, 0, 12, 0) };
+        var yes = new Button { Content = "They match", Appearance = ControlAppearance.Primary, Foreground = Palette.OnAccent, Padding = new Thickness(22, 10, 22, 10), Margin = new Thickness(0, 0, 12, 0) };
         yes.Click += (_, _) => { request.Match(); DialogResult = true; Close(); };
         var no = new Button { Content = "Cancel", Padding = new Thickness(22, 10, 22, 10) };
         no.Click += (_, _) => { request.Cancel(); DialogResult = false; Close(); };

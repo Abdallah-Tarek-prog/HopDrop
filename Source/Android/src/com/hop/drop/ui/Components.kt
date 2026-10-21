@@ -44,6 +44,7 @@ import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Upload
 import androidx.compose.material3.Icon
+import androidx.compose.material3.contentColorFor
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -132,7 +133,7 @@ fun DeviceAvatar(platform: Platform, online: Boolean, size: Dp = 44.dp, containe
             Icon(
                 if (platform == Platform.Windows) Icons.Rounded.Laptop else Icons.Rounded.PhoneAndroid,
                 contentDescription = if (platform == Platform.Windows) "PC" else "Phone",
-                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                tint = contentColorFor(container),
                 modifier = Modifier.size(size * 0.5f),
             )
         }

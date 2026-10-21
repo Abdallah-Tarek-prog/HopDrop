@@ -19,8 +19,18 @@ function ConvertTo-VectorPng([string]$Path, [int]$Size, [string]$Tile) {
         $dark = ($tileColour.R + $tileColour.G + $tileColour.B) -lt 384
         $edge = [System.Windows.Media.Pen]::new($colours.ConvertFromString($(if ($dark) { '#FF3A3A3A' } else { '#FFDDE1E7' })), [math]::Max(1, $Size / 64))
         $inset = $edge.Thickness / 2
-        $context.DrawRoundedRectangle($colours.ConvertFromString($Tile), $(if ($Size -ge 24) { $edge } else { $null }),
-            [System.Windows.Rect]::new($inset, $inset, $Size - 2 * $inset, $Size - 2 * $inset), $Size * 0.22, $Size * 0.22)
+        # Four smoothly joining curves give the tile the phone launcher's rounded-square silhouette at every size.
+        $tileShape = [System.Windows.Media.StreamGeometry]::new()
+        $tileContext = $tileShape.Open()
+        $tileContext.BeginFigure([System.Windows.Point]::new(0.5, 0), $true, $true)
+        $tileContext.BezierTo([System.Windows.Point]::new(0.92, 0), [System.Windows.Point]::new(1, 0.08), [System.Windows.Point]::new(1, 0.5), $true, $false)
+        $tileContext.BezierTo([System.Windows.Point]::new(1, 0.92), [System.Windows.Point]::new(0.92, 1), [System.Windows.Point]::new(0.5, 1), $true, $false)
+        $tileContext.BezierTo([System.Windows.Point]::new(0.08, 1), [System.Windows.Point]::new(0, 0.92), [System.Windows.Point]::new(0, 0.5), $true, $false)
+        $tileContext.BezierTo([System.Windows.Point]::new(0, 0.08), [System.Windows.Point]::new(0.08, 0), [System.Windows.Point]::new(0.5, 0), $true, $false)
+        $tileContext.Close()
+        $tileSide = $Size - 2 * $inset
+        $tileShape.Transform = [System.Windows.Media.MatrixTransform]::new($tileSide, 0, 0, $tileSide, $inset, $inset)
+        $context.DrawGeometry($colours.ConvertFromString($Tile), $(if ($Size -ge 24) { $edge } else { $null }), $tileShape)
         # Bolder outline in logo units: about 3 % of the logo's width, 6 % at 32 px and below (taskbar and tray).
         $bold = if ($Size -le 32) { 6 } else { 3 }
         $bounds = [System.Windows.Rect]::Empty
