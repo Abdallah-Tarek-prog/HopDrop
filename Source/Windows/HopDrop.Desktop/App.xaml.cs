@@ -20,6 +20,8 @@ public partial class App : System.Windows.Application
     internal static MainWindow? WindowInstance { get; private set; }
     internal static HopDropPeer Peer => ((App)Current)._peer!;
     internal static bool SnapshotMode { get; private set; }
+    /// <summary>--render-scale 1.25 draws the --render-pages pictures as on a 125 % display (sharp, for Store screenshots).</summary>
+    internal static double RenderScale { get; private set; } = 1;
     internal static string DataDirectory { get; private set; } = "";
 
     protected override async void OnStartup(StartupEventArgs e)
@@ -30,6 +32,7 @@ public partial class App : System.Windows.Application
             var args = Program.Arguments.ToList();
             string? render = Take(args, "--render-pages");
             SnapshotMode = render is not null;
+            if (Take(args, "--render-scale") is { } scale) RenderScale = double.Parse(scale, System.Globalization.CultureInfo.InvariantCulture);
             string? data = Take(args, "--data");
             DataDirectory = Path.GetFullPath(data ?? HopDropPaths.Default.DataDirectory);
             // Store version started at sign-in: the tray, or the hidden receiver when only "Receive in the background" is on.

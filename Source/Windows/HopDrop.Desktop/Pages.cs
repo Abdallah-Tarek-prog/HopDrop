@@ -118,6 +118,8 @@ public sealed partial class MainWindow
         try { await App.Instance.Queue.SendTextAsync(dialog.DeviceId, dialog.Text); }
         catch (Exception ex) { ShowError(Platform.ExplainException(ex, _devices.First(d => d.Id == dialog.DeviceId).Name)); }
     }
+    /// <summary>The folder shown under a picked item; --render-pages pictures show a neutral sample location, not where the samples were written.</summary>
+    private static string ShownFolder(string? folder) => App.SnapshotMode ? @"C:\Users\Sam\Desktop" : folder ?? "";
     private void AddFiles(IEnumerable<string> paths)
     {
         int previousCount = _files.Count;
@@ -171,7 +173,7 @@ public sealed partial class MainWindow
                 RefreshFiles();
             });
             var row = Ui.ListRow(Ui.Badge(SymbolRegular.Folder24, Palette.Amber, Palette.AmberBg, 36), name,
-                $"Folder · {Fmt.Files(folder.Count())} · {Fmt.Size(size)} · {Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(root)) ?? ""}", remove);
+                $"Folder · {Fmt.Files(folder.Count())} · {Fmt.Size(size)} · {ShownFolder(Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(root)))}", remove);
             row.ToolTip = root;
             _fileHost.Children.Add(row);
             Appear(row, added is not null && folder.Any(item => added.Contains(item.Path)));
@@ -181,7 +183,7 @@ public sealed partial class MainWindow
         {
             string path = item.Path;
             var remove = Ui.IconButton(SymbolRegular.Dismiss24, "Remove " + Path.GetFileName(path), () => { _files.Remove(item); RefreshFiles(); });
-            var row = Ui.ListRow(Ui.Badge(Ui.FileIcon(path), Palette.OnPrimaryBg, Palette.PrimaryBg, 36), Path.GetFileName(path), $"{Fmt.Size(SizeOf(path))} · {(Path.GetDirectoryName(path) ?? "")}", remove);
+            var row = Ui.ListRow(Ui.Badge(Ui.FileIcon(path), Palette.OnPrimaryBg, Palette.PrimaryBg, 36), Path.GetFileName(path), $"{Fmt.Size(SizeOf(path))} · {ShownFolder(Path.GetDirectoryName(path))}", remove);
             row.ToolTip = path;
             _fileHost.Children.Add(row);
             Appear(row, added?.Contains(path) == true);

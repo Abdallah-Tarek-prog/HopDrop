@@ -48,7 +48,7 @@ Suggested listing text (version 1.2.0):
   - Folders with thousands of small files arrive about twice as fast.
   - Works with the coming Linux app.
 - **Search terms:** file transfer, send files to phone, Android, share, Wi-Fi Direct, clipboard, QR pairing.
-- **Screenshots:** `HopDrop.exe --data <empty folder> --render-pages <folder>` draws Send, Devices, Activity and Settings in light and dark (`send-queued`, `send-multi` and the text dialog too). The Store wants at least 1366×768: maximise the real window and press Win+Shift+S if the rendered pictures are smaller.
+- **Screenshots:** `HopDrop.exe --data <empty folder> --render-pages <folder> --render-scale 1.25` draws Send, Devices, Activity and Settings in light and dark (`send-queued`, `send-multi` and the text dialog too) at 1375×975, sharp, from sample data (the Send list shows a neutral `C:\Users\Sam\Desktop`). The Store wants at least 1366×768; without `--render-scale` the pictures are 1100×780. Settings pictures show the real backup folder, so leave them out of the Store. The 1.2.0 listing uses Send, Devices, `send-multi` (dark) and Activity (dark); every choice made for that submission is in `Submission-1.2.0.md`.
 - **Capabilities:** nothing new for 1.2.0. The direct link (`WiFiDirectAdvertisementPublisher`) needs no extra capability according to Microsoft's API page, and works from the local Store test copy. It can't run while Windows' Mobile hotspot is on; HopDrop then says so in Settings → Direct connection.
 
 ## 4. Every release

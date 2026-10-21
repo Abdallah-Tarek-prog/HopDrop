@@ -502,7 +502,9 @@ public sealed partial class MainWindow : FluentWindow
             RenderLive();
             foreach (string page in new[] { "send", "devices", "activity", "settings" })
             {
-                Navigate(page); await Task.Delay(700); RenderCurrent(); await Task.Delay(300);
+                Navigate(page); await Task.Delay(700); RenderCurrent();
+                foreach (var scroller in Descendants<ScrollViewer>(this)) scroller.ScrollToTop(); // the Send pictures scroll down; start each page at its top
+                await Task.Delay(300);
                 SaveVisual(this, Path.Combine(folder, $"{page}-{theme}.png"));
                 if (page == "send")
                 {
@@ -555,8 +557,9 @@ public sealed partial class MainWindow : FluentWindow
     private static void SaveVisual(FrameworkElement visual, string path)
     {
         visual.UpdateLayout();
-        int width = Math.Max(1, (int)visual.ActualWidth), height = Math.Max(1, (int)visual.ActualHeight);
-        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32); bitmap.Render(visual);
+        double scale = App.RenderScale;
+        int width = Math.Max(1, (int)Math.Ceiling(visual.ActualWidth * scale)), height = Math.Max(1, (int)Math.Ceiling(visual.ActualHeight * scale));
+        var bitmap = new RenderTargetBitmap(width, height, 96 * scale, 96 * scale, PixelFormats.Pbgra32); bitmap.Render(visual);
         var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
         using var file = File.Create(path); encoder.Save(file);
     }
