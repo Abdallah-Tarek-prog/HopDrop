@@ -95,7 +95,7 @@ public sealed partial class HopDropPeer : IAsyncDisposable
     private const int MaxConnections = 32;
     /// <summary>Protocol extensions this build understands; peers use one only when both list it in their hello (absent = baseline v2).</summary>
     internal static readonly string[] Features = ["consent", "folders", "pages", "resume", "text", "pipeline", "merge", "backup"];
-    public const string AppVersion = "1.1.0";
+    public const string AppVersion = "1.2.0";
     /// <summary>This device's direct link (a PC's Wi-Fi Direct network), told to paired devices in hello and put in pairing QR codes. Null when off.</summary>
     public DirectLinkInfo? DirectLink { get; set; }
     private volatile bool _foreground, _pairingVisible;
@@ -329,13 +329,13 @@ public sealed partial class HopDropPeer : IAsyncDisposable
             }
         }
     }
-    private static (string Name, string Platform, IReadOnlySet<string> Features) ValidateHello(JsonElement obj, string certId, IReadOnlyList<string> supported)
+    internal static (string Name, string Platform, IReadOnlySet<string> Features) ValidateHello(JsonElement obj, string certId, IReadOnlyList<string> supported)
     {
         if (Messages.Type(obj) != "hello") throw new HopDropException("protocol_error", "Expected hello");
         if (Messages.Long(obj, "proto") != 2) throw new HopDropException("unsupported_version", "Protocol version 2 required");
         if (Messages.String(obj, "id") != certId) throw new HopDropException("identity_mismatch", "Hello id differs from certificate");
         string name = Messages.String(obj, "name"), platform = Messages.String(obj, "platform");
-        if (name.Length is < 1 or > 40 || platform is not ("windows" or "android")) throw new HopDropException("protocol_error", "Invalid hello");
+        if (name.Length is < 1 or > 40 || !DevicePlatform.IsValid(platform)) throw new HopDropException("protocol_error", "Invalid hello");
         var features = new HashSet<string>();
         if (obj.TryGetProperty("features", out var list) && list.ValueKind == JsonValueKind.Array)
             foreach (var item in list.EnumerateArray().Take(32))

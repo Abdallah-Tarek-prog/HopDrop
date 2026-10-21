@@ -12,7 +12,20 @@ import androidx.compose.ui.graphics.ImageBitmap
 
 enum class Tab(val label: String) { Send("Send"), Activity("Activity"), Devices("Devices") }
 
-enum class Platform { Windows, Android }
+data class Platform(val label: String) {
+    companion object {
+        val Windows = Platform("Windows")
+        val Android = Platform("Android")
+        val Linux = Platform("Linux")
+
+        fun from(value: String?) = when (value) {
+            "windows" -> Windows
+            "android" -> Android
+            "linux" -> Linux
+            else -> Platform(value ?: "Computer")
+        }
+    }
+}
 
 data class PickedFile(val uri: Uri, val name: String, val size: Long, val mime: String?)
 

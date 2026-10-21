@@ -1,6 +1,7 @@
 ﻿using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using HopDrop.Core;
 using Xunit;
 
@@ -97,6 +98,55 @@ public class ProtocolTests
         Assert.Throws<FormatException>(() => PairUri.Parse(example.Replace("p=7410", "p=0")));
         Assert.Throws<FormatException>(() => PairUri.Parse(example.Replace("&t=AAECAwQFBgcICQoLDA0ODw", "&t=bad")));
         Assert.Throws<FormatException>(() => PairUri.Parse("https://pair"));
+    }
+    [Theory]
+    [InlineData("windows")]
+    [InlineData("android")]
+    [InlineData("linux")]
+    [InlineData("future9")]
+    [InlineData("a")]
+    [InlineData("12345678901234567890")]
+    public void PlatformParsingAcceptsKnownAndFutureNames(string platform)
+    {
+        string id = new('a', 64);
+        var qr = new PairUri(id, "Computer", platform, 7410, [IPAddress.Parse("192.168.1.5")], new byte[16]);
+        Assert.Equal(platform, PairUri.Parse(qr.ToString()).Platform);
+        Assert.Null(PairUri.Parse(qr.ToString()).Link);
+        using var hello = JsonDocument.Parse(JsonSerializer.Serialize(new { type = "hello", proto = 2, id, name = "Computer", platform, app = HopDropPeer.AppVersion, paired = false }));
+        Assert.Equal(platform, HopDropPeer.ValidateHello(hello.RootElement, id, HopDropPeer.Features).Platform);
+        foreach (string type in new[] { "announce", "query", "bye" })
+        {
+            var discovery = new DiscoveryMessage(2, type, id, type == "bye" ? "" : "Computer", platform, 7410, type != "bye");
+            Assert.Equal(discovery, DiscoveryMessage.Parse(discovery.Encode()));
+        }
+    }
+    [Theory]
+    [InlineData("")]
+    [InlineData("Linux")]
+    [InlineData("future-os")]
+    [InlineData("future_os")]
+    [InlineData("future os")]
+    [InlineData("é")]
+    [InlineData("aaaaaaaaaaaaaaaaaaaaa")]
+    [InlineData("linux\n")]
+    public void PlatformParsingRejectsMalformedNames(string platform)
+    {
+        string id = new('a', 64);
+        var qr = new PairUri(id, "Computer", platform, 7410, [IPAddress.Parse("192.168.1.5")], new byte[16]);
+        Assert.Throws<FormatException>(() => PairUri.Parse(qr.ToString()));
+        using var hello = JsonDocument.Parse(JsonSerializer.Serialize(new { type = "hello", proto = 2, id, name = "Computer", platform, app = HopDropPeer.AppVersion, paired = false }));
+        Assert.Equal("protocol_error", Assert.Throws<HopDropException>(() => HopDropPeer.ValidateHello(hello.RootElement, id, HopDropPeer.Features)).Code);
+        var discovery = new DiscoveryMessage(2, "announce", id, "Computer", platform, 7410, true);
+        Assert.Equal("protocol_error", Assert.Throws<HopDropException>(() => DiscoveryMessage.Parse(discovery.Encode())).Code);
+    }
+    [Fact]
+    public void LinuxHelloStillChecksIdentityAndProtocol()
+    {
+        string id = new('a', 64);
+        using var hello = JsonDocument.Parse(JsonSerializer.Serialize(new { type = "hello", proto = 2, id, name = "Computer", platform = "linux", app = HopDropPeer.AppVersion, paired = false }));
+        Assert.Equal("identity_mismatch", Assert.Throws<HopDropException>(() => HopDropPeer.ValidateHello(hello.RootElement, new string('b', 64), HopDropPeer.Features)).Code);
+        using var newer = JsonDocument.Parse(JsonSerializer.Serialize(new { type = "hello", proto = 3, id, name = "Computer", platform = "linux", app = HopDropPeer.AppVersion, paired = false }));
+        Assert.Equal("unsupported_version", Assert.Throws<HopDropException>(() => HopDropPeer.ValidateHello(newer.RootElement, id, HopDropPeer.Features)).Code);
     }
     [Fact]
     public void TokenExpiresAndIsSingleUse()

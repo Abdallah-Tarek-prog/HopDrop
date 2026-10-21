@@ -34,7 +34,7 @@ object Preview {
         s.tab = tab
         s.settingsOpen = settings
         s.phone = PhoneUi("Realme 6 Pro", true, listOf(AddressUi("Wi-Fi", "192.168.8.24"), AddressUi("Hotspot", "10.82.199.70")),
-            "59eb3cb130074f7b1ddb99c8fe14f27e1dbca735bb3da82e1ff0305340a32419", "1.1.0")
+            "59eb3cb130074f7b1ddb99c8fe14f27e1dbca735bb3da82e1ff0305340a32419", "1.2.0")
         if (qr) {
             val matrix = MultiFormatWriter().encode("hopdrop://pair?preview=1", BarcodeFormat.QR_CODE, 41, 41)
             val pixels = IntArray(matrix.width * matrix.height) { i ->

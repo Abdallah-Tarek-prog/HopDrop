@@ -131,8 +131,8 @@ fun DeviceAvatar(platform: Platform, online: Boolean, size: Dp = 44.dp, containe
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                if (platform == Platform.Windows) Icons.Rounded.Laptop else Icons.Rounded.PhoneAndroid,
-                contentDescription = if (platform == Platform.Windows) "PC" else "Phone",
+                if (platform == Platform.Android) Icons.Rounded.PhoneAndroid else Icons.Rounded.Laptop,
+                contentDescription = platform.label,
                 tint = contentColorFor(container),
                 modifier = Modifier.size(size * 0.5f),
             )

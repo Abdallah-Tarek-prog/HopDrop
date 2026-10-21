@@ -84,12 +84,12 @@ class ScreenshotTests {
         tour(5, name = "tour-6-large-text-light")
     }
     @Test fun whatsNew() {
-        show(state().apply { whatsNewVersion = 2 })
+        show(state().apply { whatsNewVersion = 3 })
         compose.mainClock.advanceTimeBy(250)
         screen("modal-whats-new-light")
     }
     @Test fun whatsNewDark() {
-        show(state().apply { whatsNewVersion = 2 }, ThemeMode.Dark)
+        show(state().apply { whatsNewVersion = 3 }, ThemeMode.Dark)
         compose.mainClock.advanceTimeBy(250)
         screen("modal-whats-new-dark")
     }

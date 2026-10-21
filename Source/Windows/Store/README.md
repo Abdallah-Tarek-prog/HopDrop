@@ -40,18 +40,16 @@ The Store version is the same Windows app, packed as an **MSIX package**: a file
    - **Submission options → restricted capabilities:** explain *runFullTrust*: "HopDrop is a desktop app. It receives files in the background, shows a tray icon and notifications, and listens on the local network."
 6. **Submit.** Certification usually takes one to three working days; you get an email either way.
 
-Suggested listing text (version 1.1):
+Suggested listing text (version 1.2.0):
 - **Short description:** Send files, folders and text between your phone and PC, straight from one to the other. Private, fast, no cloud.
-- **Description:** HopDrop moves files, whole folders and text between your Windows PCs and Android phones, straight from one device to the other: no account, no cloud, no mobile data. Pair once by scanning a QR code. Your phone doesn't even need to be on the same Wi-Fi: HopDrop connects to your PC directly. Right-click any file → Share → HopDrop, or drag files in. Links and text arrive ready to copy, and your clipboard is one click away. If a device is away, your send waits and goes by itself when it's back. Everything is encrypted, and only devices you paired can send to you.
-- **What's new in this version (1.1):**
-  - Works without a shared Wi-Fi: your phone connects to your PC directly.
-  - Text and links arrive as text, ready to copy. Send your clipboard from the tray.
-  - A send to a device that's away waits and goes by itself when it's back.
-  - Send to several devices at once.
-  - (Add "Faster with many small files" only once the speed test in the project TODO confirms it.)
+- **Description:** HopDrop moves files, whole folders and text between your Windows PCs and Android phones, straight from one device to the other: no account, no cloud, no mobile data. It's ready to work with the coming Linux app too. Pair once by scanning a QR code. Your phone doesn't even need to be on the same Wi-Fi: HopDrop connects to your Windows PC directly. Right-click any file → Share → HopDrop, or drag files in. Folders with thousands of small files now arrive about twice as fast. Links and text arrive ready to copy, and your clipboard is one click away. If a device is away, your send waits and goes by itself when it's back. Everything is encrypted, and only devices you paired can send to you.
+- **What's new in this version (1.2.0):**
+  - A fresh look: brighter orange in dark mode, cleaner whites and a new font.
+  - Folders with thousands of small files arrive about twice as fast.
+  - Works with the coming Linux app.
 - **Search terms:** file transfer, send files to phone, Android, share, Wi-Fi Direct, clipboard, QR pairing.
 - **Screenshots:** `HopDrop.exe --data <empty folder> --render-pages <folder>` draws Send, Devices, Activity and Settings in light and dark (`send-queued`, `send-multi` and the text dialog too). The Store wants at least 1366×768: maximise the real window and press Win+Shift+S if the rendered pictures are smaller.
-- **Capabilities:** nothing new for 1.1. The direct link (`WiFiDirectAdvertisementPublisher`) needs no extra capability according to Microsoft's API page, and works from the local Store test copy. It can't run while Windows' Mobile hotspot is on; HopDrop then says so in Settings → Direct connection.
+- **Capabilities:** nothing new for 1.2.0. The direct link (`WiFiDirectAdvertisementPublisher`) needs no extra capability according to Microsoft's API page, and works from the local Store test copy. It can't run while Windows' Mobile hotspot is on; HopDrop then says so in Settings → Direct connection.
 
 ## 4. Every release
 

@@ -50,10 +50,10 @@ public sealed record PairUri(string Id, string Name, string Platform, int Port, 
         + (Link is { Valid: true } l ? $"&ws={Uri.EscapeDataString(l.Ssid)}&wk={Uri.EscapeDataString(l.Key)}&wa={l.Address}" : "");
     public static PairUri Parse(string uri)
     {
-        if (!Uri.TryCreate(uri, UriKind.Absolute, out var value) || value.Scheme != "hopdrop" || value.Host != "pair") throw new FormatException("Invalid pair URI");
+        if (uri.Any(char.IsControl) || !Uri.TryCreate(uri, UriKind.Absolute, out var value) || value.Scheme != "hopdrop" || value.Host != "pair") throw new FormatException("Invalid pair URI");
         var parts = value.Query.TrimStart('?').Split('&').Select(s => s.Split('=', 2)).ToDictionary(s => s[0], s => s.Length == 2 ? s[1] : "", StringComparer.Ordinal);
         if (!parts.TryGetValue("v", out string? version) || version != "2" || !parts.TryGetValue("id", out string? id) || !Identity.IsId(id)
-            || !parts.TryGetValue("n", out string? rawName) || !parts.TryGetValue("pl", out string? pl) || pl is not ("android" or "windows")
+            || !parts.TryGetValue("n", out string? rawName) || !parts.TryGetValue("pl", out string? pl) || !DevicePlatform.IsValid(pl)
             || !parts.TryGetValue("p", out string? rawPort) || !int.TryParse(rawPort, out int port) || port < 1 || port > 65535
             || !parts.TryGetValue("a", out string? rawAddresses) || !parts.TryGetValue("t", out string? rawToken)) throw new FormatException("Invalid pair URI");
         string name = Uri.UnescapeDataString(rawName);

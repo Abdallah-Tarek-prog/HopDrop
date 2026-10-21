@@ -159,7 +159,7 @@ private fun PairedRow(device: DeviceUi, now: Long, modifier: Modifier, onClick: 
             DeviceAvatar(device.platform, device.online)
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                 Text(device.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text((if (device.platform == Platform.Windows) "Windows" else "Android") + "  ·  " +
+                Text(device.platform.label + "  ·  " +
                     if (device.direct) "Connected directly" else presence(device.online, device.lastSeen, now),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -214,7 +214,7 @@ fun DeviceDetailsScreen(device: DeviceUi, actions: HopActions, onDismiss: () -> 
                 DeviceAvatar(device.platform, device.online, size = 56.dp)
                 Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
                     Text(device.name, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text((if (device.platform == Platform.Windows) "Windows" else "Android") + "  ·  " + presence(device.online, device.lastSeen, now),
+                    Text(device.platform.label + "  ·  " + presence(device.online, device.lastSeen, now),
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 IconButton(onClick = { renaming = true }) { Icon(Icons.Rounded.Edit, contentDescription = "Rename") }

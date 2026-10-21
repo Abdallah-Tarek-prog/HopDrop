@@ -352,6 +352,7 @@ internal static class Ui
 /// <summary>Human-readable sizes, speeds and durations (same wording as the Android app).</summary>
 internal static class Fmt
 {
+    public static string PlatformName(string platform) => platform switch { "windows" => "Windows", "android" => "Android", "linux" => "Linux", _ => platform };
     public static string Size(long bytes) => bytes < 0 ? "Unknown size" : bytes < 1024 ? $"{bytes} B" : bytes < 1024 * 1024 ? $"{bytes / 1024d:0.0} KB"
         : bytes < 1024L * 1024 * 1024 ? $"{bytes / 1048576d:0.0} MB" : $"{bytes / 1073741824d:0.00} GB";
     public static string Speed(double bytesPerSecond) => Size((long)bytesPerSecond) + "/s";

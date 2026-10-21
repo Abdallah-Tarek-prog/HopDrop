@@ -32,7 +32,7 @@ public final class PairUri {
             String id = q.get("id"), name = URLDecoder.decode(q.get("n"), "UTF-8"), pl = q.get("pl"), token = q.get("t");
             int port = Integer.parseInt(q.get("p")); List<String> addresses = new ArrayList<>();
             for (String address : q.get("a").split(",")) { if (!address.matches("[0-9.]+") || !validIpv4(address)) throw new IllegalArgumentException("Invalid address"); addresses.add(address); }
-            if (!"2".equals(q.get("v")) || id == null || !id.matches("[0-9a-f]{64}") || name.length() < 1 || name.length() > 40 || !(pl.equals("android") || pl.equals("windows")) || port < 1 || port > 65535 || addresses.isEmpty() || token.length() != 22 || Base64.getUrlDecoder().decode(token).length != 16) throw new IllegalArgumentException("Invalid pair URI");
+            if (!"2".equals(q.get("v")) || id == null || !id.matches("[0-9a-f]{64}") || name.length() < 1 || name.length() > 40 || !Protocol.validPlatform(pl) || port < 1 || port > 65535 || addresses.isEmpty() || token.length() != 22 || Base64.getUrlDecoder().decode(token).length != 16) throw new IllegalArgumentException("Invalid pair URI");
             // Optional (1.1+): the direct link. A malformed one is left out rather than failing the scan.
             String ws = q.get("ws"), wk = q.get("wk"), wa = q.get("wa");
             if (ws != null && wk != null && wa != null) {

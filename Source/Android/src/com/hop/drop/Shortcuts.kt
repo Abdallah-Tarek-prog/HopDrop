@@ -37,7 +37,7 @@ object Shortcuts {
                 ShortcutInfoCompat.Builder(context, PREFIX + d.id)
                     .setShortLabel(d.label())
                     .setLongLabel("Send to " + d.label())
-                    .setIcon(icon(context, if (d.platform == "windows") R.drawable.ic_glyph_laptop else R.drawable.ic_glyph_phone))
+                    .setIcon(icon(context, if (d.platform == "android") R.drawable.ic_glyph_phone else R.drawable.ic_glyph_laptop))
                     .setIntent(Intent(context, MainActivity::class.java).setAction(Intent.ACTION_VIEW).putExtra("device", d.id))
                     .setCategories(setOf(SHARE_TARGET))
                     .setLongLived(true)

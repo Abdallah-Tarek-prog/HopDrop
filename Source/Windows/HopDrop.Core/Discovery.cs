@@ -94,7 +94,7 @@ public sealed record DiscoveryMessage(int Hopdrop, string Type, string Id, strin
             var message = new DiscoveryMessage(checked((int)Messages.Long(o, "hopdrop")), Messages.Type(o), Messages.String(o, "id"),
                 Messages.String(o, "name"), Messages.String(o, "pl"), checked((int)Messages.Long(o, "p")), Messages.Bool(o, "rx"));
             if (message.Hopdrop != 2 || message.Type is not ("announce" or "query" or "bye") || !Identity.IsId(message.Id)
-                || message.Name.Length > 40 || message.Platform is not ("windows" or "android") || message.Port is < 1 or > 65535)
+                || message.Name.Length > 40 || !DevicePlatform.IsValid(message.Platform) || message.Port is < 1 or > 65535)
                 throw new HopDropException("protocol_error", "Invalid discovery message");
             return message;
         }

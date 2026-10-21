@@ -38,6 +38,33 @@ public final class CoreTests {
         check(Protocol.message(new ByteArrayInputStream(out.toByteArray())).get("type").equals("ping"),"read frame");
         for(byte[] wrong:new byte[][]{{3,0,0,0,1,0},{1,0,0,0,0},{2,0,16,0,1},{1,0,0,0,2,123}}){try{Protocol.read(new ByteArrayInputStream(wrong));throw new AssertionError("Bad frame accepted");}catch(IOException expected){count++;}}
         byte[] data=new byte[Protocol.MAX_DATA];Protocol.write(out,2,data);check(Protocol.read(new ByteArrayInputStream(Arrays.copyOfRange(out.toByteArray(),exact.length,out.size()))).body.length==data.length,"max data");}
+    private static void platforms()throws Exception{
+        String id="a".repeat(64),token="AAECAwQFBgcICQoLDA0ODw";
+        for(String platform:new String[]{"windows","android","linux","future9","a","12345678901234567890"}){
+            String uri=new PairUri(id,"Computer",platform,7410,Arrays.asList("192.168.1.5"),token).toString();
+            PairUri qr=PairUri.parse(uri);check(qr.platform.equals(platform)&&qr.linkSsid==null,"QR platform "+platform);
+            check(PairUri.parse(qr.toString()).platform.equals(platform),"QR platform round trip "+platform);
+            ByteArrayOutputStream out=new ByteArrayOutputStream();Protocol.hello(out,id,"Computer",platform,false);
+            Map<String,Object> hello=Protocol.checkHello(Protocol.message(new ByteArrayInputStream(out.toByteArray())),id);
+            check(Json.str(hello,"platform").equals(platform)&&Json.num(hello,"proto")==2,"hello platform "+platform);
+            check(!hello.containsKey("link"),"no implied direct link "+platform);
+            for(String type:new String[]{"announce","query","bye"}){
+                Map<String,Object> message=Protocol.discovery(Json.string(Json.obj("hopdrop",2,"type",type,"id",id,"name",type.equals("bye")?"":"Computer","pl",platform,"p",7410,"rx",!type.equals("bye"))));
+                check(Json.str(message,"pl").equals(platform),"discovery "+type+" platform "+platform);
+            }
+        }
+        for(String platform:new String[]{"","Linux","future-os","future_os","future os","é","a".repeat(21),"linux\n"}){
+            String uri=new PairUri(id,"Computer",platform,7410,Arrays.asList("192.168.1.5"),token).toString();
+            try{PairUri.parse(uri);throw new AssertionError("Bad QR platform accepted: "+platform);}catch(IllegalArgumentException expected){count++;}
+            Map<String,Object> hello=Json.obj("type","hello","proto",2,"id",id,"name","Computer","platform",platform,"app",Protocol.APP,"paired",false);
+            try{Protocol.checkHello(Json.parseObject(Json.string(hello)),id);throw new AssertionError("Bad hello platform accepted: "+platform);}catch(IOException expected){check(expected.getMessage().startsWith("protocol_error"),"invalid hello platform error");}
+            try{Protocol.discovery(Json.string(Json.obj("hopdrop",2,"type","announce","id",id,"name","Computer","pl",platform,"p",7410,"rx",true)));throw new AssertionError("Bad discovery platform accepted: "+platform);}catch(IllegalArgumentException expected){count++;}
+        }
+        Map<String,Object> hello=Json.obj("type","hello","proto",2,"id",id,"name","Computer","platform","linux");
+        try{Protocol.checkHello(hello,"b".repeat(64));throw new AssertionError("Linux identity mismatch accepted");}catch(IOException expected){check(expected.getMessage().startsWith("identity_mismatch"),"Linux identity still checked");}
+        hello.put("proto",3);
+        try{Protocol.checkHello(hello,id);throw new AssertionError("Linux protocol 3 accepted");}catch(IOException expected){check(expected.getMessage().startsWith("unsupported_version"),"Linux protocol still checked");}
+    }
     private static void meter(){long s=1_000_000_000L;TransferMeter m=new TransferMeter(100L*1024*1024,0);check(m.secondsLeft(0,0)==-1,"meter unknown at start");
         m.update(10L*1024*1024,s);check(Math.abs(m.speed(10L*1024*1024,s)-10L*1024*1024)<1,"meter first sample");check(m.secondsLeft(10L*1024*1024,s)==9,"meter eta");
         m.update(12L*1024*1024,2*s);double smoothed=m.speed(12L*1024*1024,2*s);check(smoothed<10L*1024*1024&&smoothed>2L*1024*1024,"meter smoothing");
@@ -62,5 +89,5 @@ public final class CoreTests {
         check(BackupRules.oldSentFile("abcdef").equals("backup-sent-abcdef.txt"),"legacy sent list name");
         check(BackupRules.sentFile("legacy","abcdef").equals(BackupRules.oldSentFile("abcdef")),"migration reuses old sent list");
     }
-    public static void main(String[] args)throws Exception{sas();qr();names();json();framing();meter();backup();System.out.println("PASS core tests: "+count+" checks");}
+    public static void main(String[] args)throws Exception{sas();qr();platforms();names();json();framing();meter();backup();System.out.println("PASS core tests: "+count+" checks");}
 }

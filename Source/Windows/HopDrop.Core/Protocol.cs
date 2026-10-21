@@ -5,6 +5,12 @@ using System.Text.Json;
 
 namespace HopDrop.Core;
 
+internal static class DevicePlatform
+{
+    public static bool IsValid(string value) => value.Length is >= 1 and <= 20
+        && value.All(c => c is >= 'a' and <= 'z' or >= '0' and <= '9');
+}
+
 public sealed class HopDropException(string code, string message) : Exception(message)
 {
     public string Code { get; } = code;

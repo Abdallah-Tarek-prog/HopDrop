@@ -166,12 +166,19 @@ private class TourPage(
 
 private class TourBullet(val icon: ImageVector, val lead: String, val rest: String)
 
-private val whatsNew = mapOf(2 to listOf(
-    TourBullet(Icons.Rounded.WifiTethering, "Connect directly", " without shared Wi-Fi."),
-    TourBullet(Icons.Rounded.ContentPaste, "Send text and clipboard", " both ways."),
-    TourBullet(Icons.Rounded.CheckCircle, "Sends wait", " until an away device returns."),
-    TourBullet(Icons.Rounded.TouchApp, "Share faster", " from any app or the Quick Settings tile."),
-))
+private val whatsNew = mapOf(
+    2 to listOf(
+        TourBullet(Icons.Rounded.WifiTethering, "Connect directly", " without shared Wi-Fi."),
+        TourBullet(Icons.Rounded.ContentPaste, "Send text and clipboard", " both ways."),
+        TourBullet(Icons.Rounded.CheckCircle, "Sends wait", " until an away device returns."),
+        TourBullet(Icons.Rounded.TouchApp, "Share faster", " from any app or the Quick Settings tile."),
+    ),
+    3 to listOf(
+        TourBullet(Icons.Rounded.Image, "A fresh look.", " Brighter orange in dark mode, cleaner whites and a new font."),
+        TourBullet(Icons.Rounded.Folder, "Big folders arrive faster.", " Thousands of small files now arrive about twice as fast."),
+        TourBullet(Icons.Rounded.Laptop, "Ready for Linux.", " Works with the coming Linux app."),
+    ),
+)
 
 internal fun hasWhatsNew(version: Int): Boolean = whatsNew.containsKey(version)
 

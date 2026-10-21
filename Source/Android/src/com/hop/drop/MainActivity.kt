@@ -303,7 +303,7 @@ class MainActivity : ComponentActivity(), HopActions {
         state.devices = all.map { d ->
             val direct = joined != null && joined == d.linkSsid
             DeviceUi(
-                id = d.id, name = d.label(), platform = platform(d.platform), online = d.id.lowercase(Locale.ROOT) in online || direct,
+                id = d.id, name = d.label(), platform = Platform.from(d.platform), online = d.id.lowercase(Locale.ROOT) in online || direct,
                 lastSeen = d.lastSeen, pairedAt = d.pairedAt, trusted = d.trusted, address = d.addresses.firstOrNull(),
                 outgoing = live.lastOrNull { !it.incoming && it.peer == d.label() },
                 waiting = waiting.count { it.deviceId.equals(d.id, ignoreCase = true) }, hasLink = d.hasLink(), direct = direct,
@@ -312,10 +312,8 @@ class MainActivity : ComponentActivity(), HopActions {
         state.directTo = all.firstOrNull { joined != null && joined == it.linkSsid }?.id
         // Devices that hide their name only show once paired; paired ones are already in the list above.
         state.nearby = nearby.filter { it.name.isNotEmpty() && book.get(it.id) == null }
-            .map { NearbyUi(it.id, it.name, platform(it.platform), it.address, it.port) }
+            .map { NearbyUi(it.id, it.name, Platform.from(it.platform), it.address, it.port) }
     }
-
-    private fun platform(value: String?) = if (value == "windows") Platform.Windows else Platform.Android
 
     private fun toLive(item: Live.Item): LiveUi {
         val p = item.progress

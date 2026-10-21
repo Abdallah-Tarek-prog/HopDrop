@@ -172,7 +172,7 @@ class QuickSendActivity : ComponentActivity() {
                 exit = fadeOut(tween(if (motion) 120 else 0)) + scaleOut(tween(if (motion) 120 else 0), targetScale = 0.92f)) {
                 val clip = clipText
                 QuickSendCard(
-                    devices = devices.map { QuickSendDevice(it.id, it.label(), if (it.platform == "windows") Platform.Windows else Platform.Android) },
+                    devices = devices.map { QuickSendDevice(it.id, it.label(), Platform.from(it.platform)) },
                     selected = target,
                     clipboardDetail = clip?.lineSequence()?.firstOrNull()?.take(60) ?: if (clipUri != null) "A copied file" else "Nothing copied",
                     clipboardAvailable = clip != null || clipUri != null,

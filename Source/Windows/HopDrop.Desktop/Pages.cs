@@ -394,7 +394,7 @@ public sealed partial class MainWindow
                 if (answer == System.Windows.MessageBoxResult.OK) await _peer.UnpairAsync(d.Id);
             }, icon: SymbolRegular.Delete24);
             remove.Margin = new Thickness(0);
-            string subtitle = $"{(d.Platform == "android" ? "Android" : "Windows")} · paired {d.PairedAt.LocalDateTime:MMM d, yyyy}" + (d.LastAddresses.Count > 0 ? $" · {d.LastAddresses[0]}" : "");
+            string subtitle = $"{Fmt.PlatformName(d.Platform)} · paired {d.PairedAt.LocalDateTime:MMM d, yyyy}" + (d.LastAddresses.Count > 0 ? $" · {d.LastAddresses[0]}" : "");
             var row = Ui.ListRow(Ui.Badge(d.Platform == "android" ? SymbolRegular.Phone24 : SymbolRegular.Laptop24, Palette.OnPrimaryBg, Palette.PrimaryBg, 44), d.Alias ?? d.Name, subtitle, rename, remove);
             Ui.TextOf(row).Children.Add(Ui.Status(online ? "Online now" : $"Offline · seen {Fmt.Ago(d.LastSeen)}", online ? Palette.Success : Palette.Muted));
             var trust = new ToggleSwitch
@@ -429,7 +429,7 @@ public sealed partial class MainWindow
             UIElement action = paired ? Ui.Chip("Paired", Palette.Success, Palette.SuccessBg) : Ui.Button("Pair", () => _ = PairSasAsync(n.Address, n.Port), true, SymbolRegular.Link24);
             var badge = Ui.Badge(n.Platform == "android" ? SymbolRegular.Phone24 : SymbolRegular.Laptop24, paired ? Palette.Success : Palette.OnPrimaryBg, paired ? Palette.SuccessBg : Palette.PrimaryBg, 44);
             string shown = n.Name.Length > 0 ? n.Name : _devices.First(d => d.Id == n.Id) is var known ? known.Alias ?? known.Name : "";
-            var row = Ui.ListRow(badge, shown, $"{(n.Platform == "android" ? "Android" : "Windows")} · {n.Address}" + (paired ? " · ready to send" : " · pair by comparing a 6-digit number"), action);
+            var row = Ui.ListRow(badge, shown, $"{Fmt.PlatformName(n.Platform)} · {n.Address}" + (paired ? " · ready to send" : " · pair by comparing a 6-digit number"), action);
             _nearbyHost.Children.Add(Motion.Hover(Ui.Card(row, 14, 8)));
         }
     }

@@ -142,8 +142,8 @@ fun SendScreen(state: HopUiState, actions: HopActions, padding: PaddingValues) {
             onDismissRequest = { bluetoothAsk = false }, paneTitle = "Send with Bluetooth",
             icon = { Icon(Icons.Rounded.Bluetooth, contentDescription = null) },
             title = { Text("Send with Bluetooth") },
-            text = { Text("Much slower than Wi-Fi, and rarely needed: HopDrop reaches your PC directly even without a shared Wi-Fi. " +
-                "On the PC, click Receive via Bluetooth first, then pick the PC in the list.") },
+            text = { Text("Much slower than Wi-Fi. A PC that offers a direct link can connect without shared Wi-Fi. " +
+                "First enable Bluetooth file receiving on the other device (Receive via Bluetooth in HopDrop on Windows), then pick it in the list.") },
             confirmButton = { Button(onClick = { bluetoothAsk = false; actions.bluetooth() }) { Text("Continue") } },
             dismissButton = { TextButton(onClick = { bluetoothAsk = false }) { Text("Cancel") } },
         )

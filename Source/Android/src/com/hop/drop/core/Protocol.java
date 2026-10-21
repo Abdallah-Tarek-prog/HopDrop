@@ -19,7 +19,7 @@ import java.util.Set;
 
 public final class Protocol {
     public static final int MAX_DATA = 1048576, MAX_JSON = 65536;
-    public static final String APP = "1.1.0";
+    public static final String APP = "1.2.0";
     /** Protocol extensions this build understands; a peer uses one only when both list it in their hello (absent = baseline v2). */
     public static final List<String> FEATURES = Collections.unmodifiableList(Arrays.asList("consent", "folders", "pages", "resume", "text", "pipeline", "merge", "backup"));
     private Protocol() { }
@@ -103,6 +103,13 @@ public final class Protocol {
     }
     public static byte[] random(int length) { byte[] b = new byte[length]; new SecureRandom().nextBytes(b); return b; }
     public static boolean equal(byte[] a, byte[] b) { return MessageDigest.isEqual(a, b); }
+    public static boolean validPlatform(String value) { return value != null && value.matches("[a-z0-9]{1,20}"); }
+    /** Parses a discovery message (spec 3.8); unknown, well-formed platforms are accepted. */
+    public static Map<String,Object> discovery(String json) {
+        Map<String,Object> m = Json.parseObject(json);
+        if (!validPlatform(Json.str(m,"pl"))) throw new IllegalArgumentException("Invalid discovery platform");
+        return m;
+    }
     public static void hello(OutputStream out, String id, String name, String platform, boolean paired) throws IOException {
         if (name.length() < 1 || name.length() > 40) throw new IOException("Invalid device name");
         send(out, "type","hello","proto",2,"id",id,"name",name,"platform",platform,"app",APP,"paired",paired,"features",FEATURES);
@@ -118,7 +125,7 @@ public final class Protocol {
         if (Json.num(m,"proto") != 2) throw new IOException("unsupported_version: protocol 2 required");
         if (!Json.str(m,"id").equalsIgnoreCase(certificateId)) throw new IOException("identity_mismatch: hello differs from certificate");
         String name = Json.str(m,"name"), platform = Json.str(m,"platform");
-        if (name.length() < 1 || name.length() > 40 || !(platform.equals("android") || platform.equals("windows"))) throw new IOException("protocol_error: invalid hello");
+        if (name.length() < 1 || name.length() > 40 || !validPlatform(platform)) throw new IOException("protocol_error: invalid hello");
         return m;
     }
 }

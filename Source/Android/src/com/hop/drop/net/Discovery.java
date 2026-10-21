@@ -6,6 +6,7 @@ import android.os.SystemClock;
 import android.util.Log;
 import com.hop.drop.core.Json;
 import com.hop.drop.core.Peer;
+import com.hop.drop.core.Protocol;
 import java.net.DatagramPacket;
 import java.net.Inet4Address;
 import java.net.InetAddress;
@@ -173,7 +174,9 @@ public final class Discovery implements AutoCloseable {
     }
 
     void handle(String json, InetAddress from) {
-        Map<String, Object> m = Json.parseObject(json);
+        Map<String, Object> m;
+        try { m = Protocol.discovery(json); }
+        catch (IllegalArgumentException invalid) { return; }
         if (Json.num(m, "hopdrop") != 2) return;
         String id = Json.str(m, "id");
         if (id.equalsIgnoreCase(this.id)) return;
@@ -187,7 +190,8 @@ public final class Discovery implements AutoCloseable {
         Nearby next = new Nearby(id, Json.str(m, "name"), Json.str(m, "pl"), address, (int) Json.num(m, "p"));
         Nearby prior = nearby.put(id, next);
         if (socket != null && (type.equals("query") || prior == null)) sendTo("announce", from);
-        if (prior == null || !prior.name.equals(next.name) || !prior.address.equals(next.address)) changed.run();
+        if (prior == null || !prior.name.equals(next.name) || !prior.platform.equals(next.platform)
+                || !prior.address.equals(next.address)) changed.run();
     }
 
     /** Runs on its own thread: Android forbids network calls on the main thread, where start() is called. */

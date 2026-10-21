@@ -111,7 +111,7 @@ internal static class AgentBridge
         foreach (var d in devices.OrderBy(d => d.Alias ?? d.Name, StringComparer.OrdinalIgnoreCase))
             list.Add(new JsonObject
             {
-                ["name"] = d.Alias ?? d.Name, ["id"] = d.Id, ["platform"] = d.Platform == "android" ? "Android phone" : "Windows PC",
+                ["name"] = d.Alias ?? d.Name, ["id"] = d.Id, ["platform"] = d.Platform == "android" ? "Android phone" : Fmt.PlatformName(d.Platform) + " PC",
                 ["online"] = nearby.Any(n => n.Id == d.Id), ["trusted"] = d.Trusted, ["lastSeen"] = d.LastSeen.ToString("o")
             });
         return new JsonObject { ["thisComputer"] = peer.Name, ["receiveFolder"] = peer.ReceiveDirectory, ["devices"] = list };

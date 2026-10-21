@@ -91,6 +91,7 @@ Phone (Kotlin UI, Java engine)       Laptop (.NET 10)
 - On first run each installation creates an **EC P-256 key pair and a self-signed X.509 v3 certificate** (CN=HopDrop, ~30-year validity, random serial).
 - **Device ID** = lowercase hex SHA-256 of the certificate's DER encoding (64 chars). Short form for display: first 8 hex chars, uppercase, as `AB12 CD34`.
 - **Device name**: user-editable, 1–40 chars. Default: phone → `Settings.Global.DEVICE_NAME`, else `Build.MANUFACTURER + " " + Build.MODEL`; Windows → the computer name.
+- **Platform**: known values are `windows`, `android` and `linux`. Unknown values of 1–20 lowercase ASCII letters or digits (`[a-z0-9]{1,20}`) MUST also be accepted; malformed values are rejected. Show Linux as **Linux** with a computer/laptop icon, and unknown platforms with their original name and a generic computer icon.
 - Android: prefer an AndroidKeyStore key (alias `hopdrop_identity_v2`, PURPOSE_SIGN|VERIFY, digests NONE/SHA-256/SHA-384/SHA-512); the auto-generated self-signed cert is the identity cert. If this cannot do TLS client+server on the test phone, fall back to a software key + self-signed cert in app-private storage and document why.
 - Windows: `CertificateRequest.CreateSelfSigned`, saved as `%APPDATA%\HopDrop\identity.pfx`; its random password is protected with DPAPI (CurrentUser) in `identity.key`. Note: SChannel cannot use `EphemeralKeySet` keys for a TLS server.
 
@@ -106,11 +107,13 @@ Phone (Kotlin UI, Java engine)       Laptop (.NET 10)
 
 ### 3.3 Hello (both directions, first message after TLS)
 ```json
-{"type":"hello","proto":2,"id":"<64 hex>","name":"LOQ Laptop","platform":"windows","app":"1.1.0","paired":true,
+{"type":"hello","proto":2,"id":"<64 hex>","name":"LOQ Laptop","platform":"windows","app":"1.2.0","paired":true,
  "features":["consent","folders","pages","resume","text","pipeline","merge","backup"],"link":{"ssid":"DIRECT-HopDrop-7K2Q","key":"…","ip":"192.168.137.1"}}
 ```
+- `platform`: `windows`, `android`, `linux`, or an unknown value matching `[a-z0-9]{1,20}` (accepted as in 3.1).
 - `link` (optional, 1.1+): the sender's direct link (3.10). Sent **only when `paired` is true** (the sender has the receiver paired), so
   the passphrase never reaches strangers on the network. Receivers that know the sender as paired store it with the device.
+  Linux and future platforms are shown as PCs, but their platform alone never implies a direct link: it must be advertised in `link`.
 - `features` (optional) lists the protocol extensions this build understands (3.9). A connection uses an extension only when
   **both** hellos list it; a missing list means none (the baseline below), so older peers keep working unchanged.
 - The **client** sends hello first. The **server** replies with its own hello. `paired` = whether the sender of this hello has the peer in its paired list.
@@ -148,8 +151,9 @@ side sends a best-effort `unpair` to the other.
 - The **shower** opens "Pair with QR". It creates a one-time **token** (16 random bytes, base64url without padding, 22 chars), valid **5 minutes**, single use. Only one active token at a time. Closing the QR screen invalidates it. The QR is refreshed automatically on expiry.
 - QR payload (a URI):
   ```
-  hopdrop://pair?v=2&id=<64 lowercase hex>&n=<percent-encoded UTF-8 name>&pl=<android|windows>&p=<tcp port>&a=<ipv4>,<ipv4>...&t=<token>
+  hopdrop://pair?v=2&id=<64 lowercase hex>&n=<percent-encoded UTF-8 name>&pl=<windows|android|linux>&p=<tcp port>&a=<ipv4>,<ipv4>...&t=<token>
   ```
+  `pl` also accepts unknown values matching `[a-z0-9]{1,20}`; malformed values are rejected (3.1).
   `a` = all of the shower's local private IPv4 addresses, best first (Wi-Fi/Ethernet with a gateway, then hotspot, then others).
   1.1+: a PC with its direct link up appends `&ws=<percent-encoded SSID>&wk=<percent-encoded passphrase>&wa=<its IPv4 on the link>`.
   Parsers ignore unknown parameters, and a malformed `ws`/`wk`/`wa` is ignored rather than failing the scan.
@@ -252,8 +256,9 @@ receive folder. The first part (the sent folder) gets a new name when it already
 
 ### 3.8 Discovery (UDP 7410)
 - Message (UTF-8 JSON, ≤ 1200 bytes):
-  `{"hopdrop":2,"type":"announce"|"query"|"bye","id":"<64 hex>","name":"…","pl":"android|windows","p":7410,"rx":true|false}`
+  `{"hopdrop":2,"type":"announce"|"query"|"bye","id":"<64 hex>","name":"…","pl":"windows|android|linux","p":7410,"rx":true|false}`
   (`rx` = currently able to receive).
+- `pl` also accepts unknown values matching `[a-z0-9]{1,20}`; malformed values are rejected (3.1).
 - Send `announce` at start, on every network change, and periodically: every **5 s while HopDrop is on screen**, otherwise every
   **15 s (Windows)** or **20 s (Android)**. Send to multicast `239.255.74.10:7410` (TTL 1) on each local interface, plus
   `255.255.255.255:7410` and each interface's directed broadcast. The list of network interfaces is read once per network change
@@ -517,7 +522,7 @@ Copy rule: the title says what is happening and with whom, the collapsed line ho
   Latest photo, asked when first used), CAMERA (QR scanning), REQUEST_IGNORE_BATTERY_OPTIMIZATIONS (background receiving),
   REQUEST_INSTALL_PACKAGES (updates), RECEIVE_BOOT_COMPLETED.
 - Build: Gradle (Android plugin 9.4, Kotlin 2.4, Compose BOM 2026.09), `compileSdk` 37, `targetSdk` 36, `minSdk` 26; release shrunk with R8 (about 2 MB).
-  Version: versionCode 2, versionName 1.1.0. Output `HopDrop.apk` at the repo root, signed with the release key (CN=HopDrop) so updates install in place.
+  Version: versionCode 3, versionName 1.2.0. Output `HopDrop.apk` at the repo root, signed with the release key (CN=HopDrop) so updates install in place.
 - Activity keeps the first 1,000 file names of a transfer (and the real count), and looks up where the first 50 were saved.
 
 ---
