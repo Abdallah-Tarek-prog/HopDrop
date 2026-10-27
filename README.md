@@ -3,6 +3,8 @@
 Send files, whole folders and text between your phones and PCs, straight from one to the other: over your Wi-Fi, or directly when there's no shared Wi-Fi. No cloud, no accounts, no mobile data.
 
 - **Android** (8 or newer) and **Windows** (10 or 11, x64 and ARM).
+- A separate **Linux desktop test build** supports local transfers, queued sends, backups, Arabic, and local AI agents, with hotspot/Bluetooth integration pending physical Mint tests; see [Linux installation](Source/Linux/README.md) and [feature parity](Source/Linux/FEATURE_PARITY.md).
+- **English is the default**, with **العربية** available in Settings → Language in the updated builds.
 - Every device can send and receive: phone ↔ PC, PC ↔ PC, phone ↔ phone.
 - Free and open source (GPL-3.0).
 
@@ -12,6 +14,7 @@ From the [Releases page](https://github.com/Abdallah-Tarek-prog/HopDrop/releases
 - `HopDrop.apk` — the Android app. It checks this page once a day and offers new versions (Android asks you to confirm the install).
 - `HopDrop-win-Setup.exe` — Windows installer (no admin needed; updates itself). `HopDrop-win-arm64-Setup.exe` for ARM laptops.
 - `HopDrop.exe` — the same Windows app without installing (it doesn't update itself).
+- **Linux Mint testing:** get the `.deb` or portable archive from the [Linux preview](https://github.com/Abdallah-Tarek-prog/HopDrop/releases/tag/v1.3.0-linux-preview.1). It includes Dark, Light and Follow system modes; see [installation and test notes](Source/Linux/README.md).
 - A Microsoft Store version is on its way. It puts HopDrop in Windows' **Share** window (right-click files → **Share**), next to apps like Phone Link.
 
 ## First use
@@ -44,7 +47,7 @@ From the [Releases page](https://github.com/Abdallah-Tarek-prog/HopDrop/releases
 - **Folders arrive as folders**, with their subfolders. Thousands of files go in one transfer.
 - **If Wi-Fi drops mid-transfer**, the sender reconnects and continues where it stopped. Nothing is sent twice.
 - **Live progress on both ends:** file, amount, speed, time left and **Cancel**, in the app and in notifications.
-- **Activity:** every transfer, grouped by day, with search, a Sent / Received filter and photo previews. Tap one to see its files, one per line; tap a file to open it, long-press to share it.
+- **Activity:** transfers show the connection used: local network, direct link or Bluetooth. Older entries keep an unknown connection method. On the phone, transfers are grouped by day, with search, a Sent / Received filter and photo previews. Tap one to see its files, one per line; tap a file to open it, long-press to share it.
 - **The receiver decides where files go:** Settings → Receive folder (default `Downloads\HopDrop` on Windows, `Download/HopDrop` on Android).
 - **Receiving in the background:** the phone receives with the app closed (Settings → Receive in the background, on by default). The PC receives while HopDrop runs in the tray; turn on Settings → Receive in the background to keep receiving after quitting.
 - **Ask before receiving** (off by default): files wait for your **Accept**. Devices you trust skip the question.
@@ -79,7 +82,7 @@ Good apps already move files between devices. Here is where HopDrop is different
 - **Small and focused.** The Android app is about 2 MB, does one job, and keeps receiving in the background.
 
 **Where others are better**
-- **More platforms:** LocalSend and [KDE Connect](https://kdeconnect.org/) also run on iPhone, Mac and Linux. HopDrop is Android and Windows only for now.
+- **More platforms:** LocalSend and [KDE Connect](https://kdeconnect.org/) support additional platforms. HopDrop has Android and Windows apps and a new Linux desktop build for testing.
 - **Nothing to install on the phone:** Quick Share is built into many Android phones.
 - **More than files:** KDE Connect also shares notifications and works as a remote control (HopDrop does files, text and the clipboard).
 

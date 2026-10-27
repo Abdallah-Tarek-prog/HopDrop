@@ -25,19 +25,19 @@ import androidx.compose.ui.unit.sp
 import com.hop.drop.R
 
 /** Light, dark, or whatever the phone uses. Stored as 0 / 1 / 2 ("theme" in settings). */
-enum class ThemeMode(val label: String) { System("System"), Light("Light"), Dark("Dark") }
+enum class ThemeMode(val label: Int) { System(R.string.ui_system), Light(R.string.ui_light), Dark(R.string.ui_dark) }
 
 /**
  * The colour themes people can pick in Settings. Every theme has a light and a dark version that share HopDrop's
  * navy-tinted neutrals; only the accent family changes. [Wallpaper] follows the phone's wallpaper (Android 12+).
  */
-enum class Palette(val key: String, val label: String, val swatch: Color) {
-    Ember("ember", "HopDrop", Color(0xFFF2602B)),
-    Ocean("ocean", "Ocean", Color(0xFF1F6FD1)),
-    Forest("forest", "Forest", Color(0xFF2E8B57)),
-    Berry("berry", "Berry", Color(0xFFB03A9C)),
-    Midnight("midnight", "Midnight", Color(0xFF2B3A5C)),
-    Wallpaper("wallpaper", "Wallpaper", Color(0xFF7C8BA8));
+enum class Palette(val key: String, val label: Int, val swatch: Color) {
+    Ember("ember", R.string.app_name, Color(0xFFF2602B)),
+    Ocean("ocean", R.string.ui_ocean, Color(0xFF1F6FD1)),
+    Forest("forest", R.string.ui_forest, Color(0xFF2E8B57)),
+    Berry("berry", R.string.ui_berry, Color(0xFFB03A9C)),
+    Midnight("midnight", R.string.ui_midnight, Color(0xFF2B3A5C)),
+    Wallpaper("wallpaper", R.string.ui_wallpaper, Color(0xFF7C8BA8));
 
     companion object {
         fun of(key: String?): Palette = entries.firstOrNull { it.key == key } ?: Ember

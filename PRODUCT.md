@@ -6,9 +6,10 @@
 
 adaptive
 
-Two native apps that share one brand and one protocol, each following its own OS's conventions: Android (Kotlin, Jetpack
+Native apps share one brand and one protocol, each following its own OS's conventions: Android (Kotlin, Jetpack
 Compose, Material 3; Android 8+) in `Source/Android`, and Windows (WPF on .NET 10, Windows 10 and 11, x64 and ARM; installer
-and Microsoft Store builds) in `Source/Windows`. A Linux desktop app is planned next (owner, 2026-10-19). There is no iOS app.
+and Microsoft Store builds) in `Source/Windows`. The Linux frontend in `Source/Linux` uses Avalonia and the shared .NET engine;
+Linux Mint is the intended physical test target, with WSL Ubuntu for development checks. There is no iOS app.
 
 ## Users
 
@@ -71,10 +72,9 @@ is `Source/SPEC.md` (requirements R1–R23, sections 6 and 7). In short:
   at once; direct link on/off; backups received; Bluetooth handoff to Windows' own wizard; AI agents (MCP / command line, off by
   default); start with Windows, receive in the background.
 - Protocol and behaviour don't change in a redesign: pairing rules, trust, file names, notifications' content.
-- Language: English only for now; **Arabic (right-to-left) comes after the redesign** with the Linux version, so layouts must be
-  mirror-ready from the start.
+- Language: **English by default**, with persisted **Arabic** selection, translated text and right-to-left layout.
 - Size and disk matter to the owner; no heavy new libraries without asking.
-- Undecided: tablet / large-screen layout for the phone app; the Linux toolkit.
+- Undecided: tablet / large-screen layout for the phone app.
 
 ## Brand Commitments
 

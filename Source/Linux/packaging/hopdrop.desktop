@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=HopDrop
+Comment=Send files and text to nearby devices
+Exec=/opt/hopdrop/HopDrop.Linux
+Icon=hopdrop
+Terminal=false
+Categories=Network;FileTransfer;
+StartupNotify=true

@@ -72,11 +72,15 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
+import com.hop.drop.R
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(state: HopUiState, actions: HopActions, snackbar: SnackbarHostState, onBack: () -> Unit) {
     val s = state.settings
+    val deviceIdLabel = stringResource(R.string.ui_device_id)
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
     var renaming by remember { mutableStateOf(false) }
     var licences by remember { mutableStateOf(false) }
@@ -84,8 +88,8 @@ fun SettingsScreen(state: HopUiState, actions: HopActions, snackbar: SnackbarHos
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
         topBar = {
             LargeTopAppBar(
-                title = { Text("Settings") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") } },
+                title = { Text(stringResource(R.string.ui_settings)) },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.ui_back)) } },
                 scrollBehavior = scroll,
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface,
                     scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer),
@@ -99,79 +103,88 @@ fun SettingsScreen(state: HopUiState, actions: HopActions, snackbar: SnackbarHos
                 bottom = padding.calculateBottomPadding() + 32.dp),
         ) {
             item(key = "phone") {
-                Group("This phone") {
-                    SettingRow(clickable = { renaming = true }, icon = Icons.Rounded.PhoneAndroid, title = "Name", detail = state.phone.name)
+                Group(stringResource(R.string.ui_this_phone)) {
+                    SettingRow(clickable = { renaming = true }, icon = Icons.Rounded.PhoneAndroid, title = stringResource(R.string.ui_name), detail = state.phone.name)
                 }
             }
             item(key = "receiving") {
-                Group("Receiving") {
+                Group(stringResource(R.string.ui_receiving)) {
                     SettingRow(
-                        clickable = actions::chooseReceiveFolder, icon = Icons.Rounded.Folder, title = "Receive folder", detail = s.folderName,
-                        trailing = if (s.customFolder) ({ TextButton(onClick = actions::resetReceiveFolder) { Text("Reset") } }) else null,
+                        clickable = actions::chooseReceiveFolder, icon = Icons.Rounded.Folder, title = stringResource(R.string.ui_receive_folder), detail = s.folderName,
+                        trailing = if (s.customFolder) ({ TextButton(onClick = actions::resetReceiveFolder) { Text(stringResource(R.string.ui_reset)) } }) else null,
                     )
-                    SwitchRow("Receive in the background", "Even when HopDrop is closed", s.background, actions::setBackground)
+                    SwitchRow(stringResource(R.string.ui_receive_in_the_background), stringResource(R.string.ui_even_when_hopdrop_is_closed), s.background, actions::setBackground)
                     if (s.background && s.batteryRestricted) {
-                        SettingRow(clickable = actions::allowBackground, icon = Icons.Rounded.BatteryAlert, title = "Allow background activity",
-                            detail = "So files arrive with the screen off", accent = true)
+                        SettingRow(clickable = actions::allowBackground, icon = Icons.Rounded.BatteryAlert, title = stringResource(R.string.ui_allow_background_activity),
+                            detail = stringResource(R.string.ui_so_files_arrive_with_the_screen_off), accent = true)
                     }
                     if (s.background && s.autoStartHint) {
-                        SettingRow(clickable = actions::openAppSettings, icon = Icons.Rounded.RocketLaunch, title = "Allow auto-launch",
-                            detail = "This phone's brand needs it to receive after a restart")
+                        SettingRow(clickable = actions::openAppSettings, icon = Icons.Rounded.RocketLaunch, title = stringResource(R.string.ui_allow_auto_launch),
+                            detail = stringResource(R.string.ui_this_phone_s_brand_needs_it_to_receive_after_a_restart))
                     }
-                    SwitchRow("Ask before receiving", "Trusted devices skip this", s.ask, actions::setAsk)
+                    SwitchRow(stringResource(R.string.ui_ask_before_receiving), stringResource(R.string.ui_trusted_devices_skip_this), s.ask, actions::setAsk)
                 }
             }
             item(key = "clipboard") {
-                Group("Clipboard and quick send") {
-                    SwitchRow("Copy text from my devices", "When a PC shares what it copied, it lands on this phone's clipboard", s.clipAuto, actions::setClipAuto)
-                    SettingRow(clickable = actions::addTile, icon = Icons.Rounded.Dashboard, title = "Add the quick send tile",
-                        detail = "Send your clipboard or latest photo from the quick settings")
+                Group(stringResource(R.string.ui_clipboard_and_quick_send)) {
+                    SwitchRow(stringResource(R.string.ui_copy_text_from_my_devices), stringResource(R.string.ui_when_a_pc_shares_what_it_copied_it_lands_on_this_phone_), s.clipAuto, actions::setClipAuto)
+                    SettingRow(clickable = actions::addTile, icon = Icons.Rounded.Dashboard, title = stringResource(R.string.ui_add_the_quick_send_tile),
+                        detail = stringResource(R.string.ui_send_your_clipboard_or_latest_photo_from_the_quick_sett))
                 }
             }
             item(key = "backup") {
-                Group("Backups") {
+                Group(stringResource(R.string.ui_backups)) {
                     val on = s.backups.count { it.on }
-                    SettingRow(clickable = { state.backupsOpen = true }, icon = Icons.Rounded.Backup, title = "Auto-backup",
+                    SettingRow(clickable = { state.backupsOpen = true }, icon = Icons.Rounded.Backup, title = stringResource(R.string.ui_auto_backup),
                         detail = when {
-                            s.backups.isEmpty() -> "Back up a folder to one of your devices"
-                            on == 0 -> "Off"
-                            else -> if (on == 1) "1 backup on" else "$on backups on"
+                            s.backups.isEmpty() -> stringResource(R.string.ui_back_up_a_folder_to_one_of_your_devices)
+                            on == 0 -> stringResource(R.string.ui_off)
+                            else -> pluralStringResource(R.plurals.enabled_backups, on, on)
                         })
-                    SettingRow(clickable = { state.receivedBackupsOpen = true }, icon = Icons.Rounded.Folder, title = "Backups received",
-                        detail = "From your other devices, saved in ${s.backupPlace}")
+                    SettingRow(clickable = { state.receivedBackupsOpen = true }, icon = Icons.Rounded.Folder, title = stringResource(R.string.ui_backups_received),
+                        detail = stringResource(R.string.backup_received_from, ltr(s.backupPlace)))
                 }
             }
             item(key = "privacy") {
-                Group("Privacy") {
-                    Text("Who can see this phone", style = MaterialTheme.typography.titleSmall,
+                Group(stringResource(R.string.ui_privacy)) {
+                    Text(stringResource(R.string.ui_who_can_see_this_phone), style = MaterialTheme.typography.titleSmall,
                         modifier = Modifier.padding(start = 16.dp, top = 14.dp, bottom = 10.dp))
                     SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                         SegmentedButton(selected = !s.pairedOnly, onClick = { actions.setPairedOnly(false) },
-                            shape = SegmentedButtonDefaults.itemShape(0, 2), label = { Text("Everyone") })
+                            shape = SegmentedButtonDefaults.itemShape(0, 2), label = { Text(stringResource(R.string.ui_everyone)) })
                         SegmentedButton(selected = s.pairedOnly, onClick = { actions.setPairedOnly(true) },
-                            shape = SegmentedButtonDefaults.itemShape(1, 2), label = { Text("Paired only") })
+                            shape = SegmentedButtonDefaults.itemShape(1, 2), label = { Text(stringResource(R.string.ui_paired_only)) })
                     }
                     Text(
-                        if (s.pairedOnly) "Hidden from other devices, except while the Devices tab is open." else "Devices on the same Wi-Fi can see its name.",
+                        if (s.pairedOnly) stringResource(R.string.ui_hidden_from_other_devices_except_while_the_devices_tab_) else stringResource(R.string.ui_devices_on_the_same_wi_fi_can_see_its_name),
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
                     )
                 }
             }
             item(key = "appearance") {
-                Group("Appearance") {
-                    Text("Theme", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 16.dp, top = 14.dp, bottom = 10.dp))
+                Group(stringResource(R.string.ui_appearance)) {
+                    Text(stringResource(R.string.language), style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(start = 16.dp, top = 14.dp, bottom = 10.dp))
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                        for ((i, language) in listOf("en", "ar").withIndex()) {
+                            SegmentedButton(selected = s.language == language, onClick = { actions.setLanguage(language) },
+                                shape = SegmentedButtonDefaults.itemShape(i, 2),
+                                label = { Text(if (language == "en") "English" else "العربية") })
+                        }
+                    }
+                    Text(stringResource(R.string.ui_theme), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 16.dp, top = 14.dp, bottom = 10.dp))
                     SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                         ThemeMode.entries.forEachIndexed { i, mode ->
                             SegmentedButton(
                                 selected = s.theme == mode,
                                 onClick = { actions.setTheme(mode) },
                                 shape = SegmentedButtonDefaults.itemShape(i, ThemeMode.entries.size),
-                                label = { Text(mode.label) },
+                                label = { Text(stringResource(mode.label)) },
                             )
                         }
                     }
-                    Text("Colour", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 16.dp, top = 18.dp, bottom = 10.dp))
+                    Text(stringResource(R.string.ui_colour), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 16.dp, top = 18.dp, bottom = 10.dp))
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
@@ -181,33 +194,33 @@ fun SettingsScreen(state: HopUiState, actions: HopActions, snackbar: SnackbarHos
                 }
             }
             item(key = "about") {
-                Group("About") {
+                Group(stringResource(R.string.ui_about)) {
                     ListItem(
                         headlineContent = { Text("HopDrop " + state.phone.version) },
-                        supportingContent = { Text("No cloud. No accounts.") },
+                        supportingContent = { Text(stringResource(R.string.ui_no_cloud_no_accounts)) },
                         leadingContent = { LogoMark(36.dp) },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     )
                     if (s.updatesSupported) {
-                        SwitchRow("Check for updates", "Looks at GitHub once a day", s.updateChecks, actions::setUpdateChecks)
+                        SwitchRow(stringResource(R.string.ui_check_for_updates), stringResource(R.string.ui_looks_at_github_once_a_day), s.updateChecks, actions::setUpdateChecks)
                         SettingRow(
                             clickable = actions::checkForUpdates, icon = Icons.Rounded.SystemUpdate,
-                            title = state.update?.let { "Update to ${it.version}" } ?: "Check now",
+                            title = state.update?.let { stringResource(R.string.update_to, it.version) } ?: stringResource(R.string.ui_check_now),
                             detail = when {
-                                state.checkingUpdates -> "Checking…"
-                                state.update != null -> "Tap to download and install"
-                                else -> "Look for a newer version now"
+                                state.checkingUpdates -> stringResource(R.string.ui_checking)
+                                state.update != null -> stringResource(R.string.ui_tap_to_download_and_install)
+                                else -> stringResource(R.string.ui_look_for_a_newer_version_now)
                             },
                         )
                     }
-                    SettingRow(clickable = actions::showTour, icon = Icons.Rounded.School, title = "Show the tour again", detail = "What each part of HopDrop does")
+                    SettingRow(clickable = actions::showTour, icon = Icons.Rounded.School, title = stringResource(R.string.ui_show_the_tour_again), detail = stringResource(R.string.ui_what_each_part_of_hopdrop_does))
                     SettingRow(clickable = { actions.openLink("https://github.com/Abdallah-Tarek-prog/HopDrop") }, icon = Icons.Rounded.Code,
-                        title = "Source code", detail = "github.com/Abdallah-Tarek-prog/HopDrop")
+                        title = stringResource(R.string.ui_source_code), detail = "github.com/Abdallah-Tarek-prog/HopDrop")
                     SettingRow(clickable = { actions.openLink("https://github.com/Abdallah-Tarek-prog/HopDrop/blob/main/PRIVACY.md") },
-                        icon = Icons.Rounded.PrivacyTip, title = "Privacy policy", detail = "HopDrop collects nothing")
-                    SettingRow(clickable = { licences = true }, icon = Icons.Rounded.Gavel, title = "Licences", detail = "GPL-3.0 and open-source parts")
+                        icon = Icons.Rounded.PrivacyTip, title = stringResource(R.string.ui_privacy_policy), detail = stringResource(R.string.ui_hopdrop_collects_nothing))
+                    SettingRow(clickable = { licences = true }, icon = Icons.Rounded.Gavel, title = stringResource(R.string.ui_licences), detail = "GPL-3.0 and open-source parts")
                     if (state.phone.deviceId.isNotEmpty()) {
-                        SettingRow(clickable = { actions.copy("Device ID", state.phone.deviceId) }, icon = null, title = "Device ID",
+                        SettingRow(clickable = { actions.copy(deviceIdLabel, state.phone.deviceId) }, icon = null, title = deviceIdLabel,
                             detail = state.phone.deviceId.chunked(4).take(2).joinToString(" ").uppercase())
                     }
                 }
@@ -216,26 +229,22 @@ fun SettingsScreen(state: HopUiState, actions: HopActions, snackbar: SnackbarHos
     }
     if (renaming) {
         TextInputDialog(
-            title = "This phone's name", initial = state.phone.name, label = "Name",
-            help = "Other devices see this name.",
+            title = stringResource(R.string.ui_this_phone_s_name), initial = state.phone.name, label = stringResource(R.string.ui_name),
+            help = stringResource(R.string.ui_other_devices_see_this_name),
             onDismiss = { renaming = false },
             onSave = { name -> actions.setPhoneName(name).also { if (it == null) renaming = false } },
         )
     }
     if (licences) {
         HopModal(
-            onDismissRequest = { licences = false }, paneTitle = "Licences",
-            title = { Text("Licences") },
+            onDismissRequest = { licences = false }, paneTitle = stringResource(R.string.ui_licences),
+            title = { Text(stringResource(R.string.ui_licences)) },
             text = {
                 Column {
-                    Text("HopDrop is free software under the GNU General Public License, version 3.\n\n" +
-                        "It includes:\n" +
-                        "•  ZXing, for reading QR codes (Apache License 2.0)\n" +
-                        "•  Jetpack Compose and AndroidX (Apache License 2.0)\n" +
-                        "•  Roboto font (SIL Open Font License 1.1)")
+                    Text(stringResource(R.string.licences_body))
                 }
             },
-            confirmButton = { Button(onClick = { licences = false }) { Text("Done") } },
+            confirmButton = { Button(onClick = { licences = false }) { Text(stringResource(R.string.ui_done)) } },
         )
     }
 }
@@ -275,6 +284,8 @@ private fun SwitchRow(title: String, detail: String, checked: Boolean, onChange:
 
 @Composable
 private fun Swatch(palette: Palette, selected: Boolean, onClick: () -> Unit) {
+    val label = stringResource(palette.label)
+    val description = stringResource(R.string.palette_colour, label)
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(64.dp)) {
         val ring = if (selected) MaterialTheme.colorScheme.onSurface else Color.Transparent
         Box(
@@ -284,12 +295,12 @@ private fun Swatch(palette: Palette, selected: Boolean, onClick: () -> Unit) {
                     else Brush.linearGradient(listOf(palette.swatch, palette.swatch))
                 )
                 .clickable(role = Role.RadioButton, onClick = onClick)
-                .semantics { this.selected = selected; contentDescription = palette.label + " colour" },
+                .semantics { this.selected = selected; contentDescription = description },
             contentAlignment = Alignment.Center,
         ) {
             if (selected) Icon(Icons.Rounded.Check, contentDescription = null, tint = Color.White)
         }
         Spacer(Modifier.height(6.dp))
-        Text(palette.label, style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center, maxLines = 1)
+        Text(label, style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center, maxLines = 1)
     }
 }

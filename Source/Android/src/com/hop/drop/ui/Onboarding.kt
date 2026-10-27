@@ -1,5 +1,9 @@
 package com.hop.drop.ui
 
+import com.hop.drop.R
+
+import androidx.compose.ui.res.stringResource
+
 import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -114,7 +118,7 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun Onboarding(state: HopUiState, actions: HopActions) {
-    val pages = remember(state.devices.isEmpty()) { tourPages(firstTime = state.devices.isEmpty()) }
+    val pages = tourPages(firstTime = state.devices.isEmpty())
     val pager = rememberPagerState(pageCount = { pages.size })
     val scope = rememberCoroutineScope()
     val last = pager.currentPage == pages.lastIndex
@@ -126,7 +130,7 @@ fun Onboarding(state: HopUiState, actions: HopActions) {
                 LogoMark(26.dp)
                 Spacer(Modifier.width(8.dp))
                 Text("HopDrop", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                if (!last) TextButton(onClick = { actions.finishOnboarding(false) }) { Text("Skip") }
+                if (!last) TextButton(onClick = { actions.finishOnboarding(false) }) { Text(stringResource(R.string.ui_skip)) }
             }
             HorizontalPager(pager, modifier = Modifier.weight(1f).fillMaxWidth()) { index ->
                 TourPage(pages[index], index == pager.currentPage)
@@ -138,14 +142,14 @@ fun Onboarding(state: HopUiState, actions: HopActions) {
                     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                         if (end) {
                             Button(onClick = { actions.finishOnboarding(state.devices.isEmpty()) }, modifier = Modifier.fillMaxWidth().height(56.dp)) {
-                                Text(if (state.devices.isEmpty()) "Pair my first device" else "Start sending", style = MaterialTheme.typography.titleMedium)
+                                Text(if (state.devices.isEmpty()) stringResource(R.string.ui_pair_my_first_device) else stringResource(R.string.ui_start_sending), style = MaterialTheme.typography.titleMedium)
                             }
                             if (state.devices.isEmpty()) TextButton(onClick = { actions.finishOnboarding(false) }, modifier = Modifier.padding(top = 4.dp)) {
-                                Text("I'll do it later")
+                                Text(stringResource(R.string.ui_i_ll_do_it_later))
                             }
                         } else {
                             Button(onClick = { scope.launch { pager.animateScrollToPage(pager.currentPage + 1) } }, modifier = Modifier.fillMaxWidth().height(56.dp)) {
-                                Text("Next", style = MaterialTheme.typography.titleMedium)
+                                Text(stringResource(R.string.ui_next), style = MaterialTheme.typography.titleMedium)
                                 Spacer(Modifier.width(8.dp))
                                 Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, modifier = Modifier.size(20.dp))
                             }
@@ -166,80 +170,83 @@ private class TourPage(
 
 private class TourBullet(val icon: ImageVector, val lead: String, val rest: String)
 
-private val whatsNew = mapOf(
-    2 to listOf(
-        TourBullet(Icons.Rounded.WifiTethering, "Connect directly", " without shared Wi-Fi."),
-        TourBullet(Icons.Rounded.ContentPaste, "Send text and clipboard", " both ways."),
-        TourBullet(Icons.Rounded.CheckCircle, "Sends wait", " until an away device returns."),
-        TourBullet(Icons.Rounded.TouchApp, "Share faster", " from any app or the Quick Settings tile."),
-    ),
-    3 to listOf(
-        TourBullet(Icons.Rounded.Image, "A fresh look.", " Brighter orange in dark mode, cleaner whites and a new font."),
-        TourBullet(Icons.Rounded.Folder, "Big folders arrive faster.", " Thousands of small files now arrive about twice as fast."),
-        TourBullet(Icons.Rounded.Laptop, "Ready for Linux.", " Works with the coming Linux app."),
-    ),
-)
+internal fun hasWhatsNew(version: Int): Boolean = version == 2 || version == 3
 
-internal fun hasWhatsNew(version: Int): Boolean = whatsNew.containsKey(version)
+@Composable
+private fun whatsNew(version: Int): List<TourBullet> = when (version) {
+    2 -> listOf(
+        TourBullet(Icons.Rounded.WifiTethering, stringResource(R.string.tour_direct), ""),
+        TourBullet(Icons.Rounded.ContentPaste, stringResource(R.string.tour_text_clipboard), ""),
+        TourBullet(Icons.Rounded.CheckCircle, stringResource(R.string.tour_wait), ""),
+        TourBullet(Icons.Rounded.TouchApp, stringResource(R.string.tour_share_faster), ""),
+    )
+    3 -> listOf(
+        TourBullet(Icons.Rounded.Image, stringResource(R.string.tour_fresh_look), ""),
+        TourBullet(Icons.Rounded.Folder, stringResource(R.string.tour_faster_folders), ""),
+        TourBullet(Icons.Rounded.Laptop, stringResource(R.string.tour_linux), ""),
+    )
+    else -> emptyList()
+}
 
 @Composable
 internal fun WhatsNew(state: HopUiState, actions: HopActions) {
     val version = state.whatsNewVersion ?: return
-    val title = "What's new in " + state.phone.version.split('.').take(2).joinToString(".")
+    val title = stringResource(R.string.whats_new_in, state.phone.version.split('.').take(2).joinToString("."))
     HopModal(
         onDismissRequest = { actions.dismissWhatsNew(false) }, paneTitle = title,
         title = { Text(title) },
-        text = { BulletList(whatsNew[version].orEmpty()) },
-        confirmButton = { Button(onClick = { actions.dismissWhatsNew(false) }) { Text("Got it") } },
-        dismissButton = { TextButton(onClick = { actions.dismissWhatsNew(true) }) { Text("Show the tour") } },
+        text = { BulletList(whatsNew(version)) },
+        confirmButton = { Button(onClick = { actions.dismissWhatsNew(false) }) { Text(stringResource(R.string.ui_got_it)) } },
+        dismissButton = { TextButton(onClick = { actions.dismissWhatsNew(true) }) { Text(stringResource(R.string.ui_show_the_tour)) } },
     )
 }
 
+@Composable
 private fun tourPages(firstTime: Boolean): List<TourPage> = listOf(
     TourPage(
-        "Phone to PC in a hop",
-        listOf(TourBullet(Icons.Rounded.Laptop, "Send", " photos and files between your devices."),
-            TourBullet(Icons.Rounded.Lock, "Keep it private.", " No cloud or account.")),
+        stringResource(R.string.ui_phone_to_pc_in_a_hop),
+        listOf(TourBullet(Icons.Rounded.Laptop, stringResource(R.string.tour_send_files), ""),
+            TourBullet(Icons.Rounded.Lock, stringResource(R.string.tour_private), "")),
     ) { active, height -> HopIllustration(active, height) },
     TourPage(
-        "Pair once with a scan",
-        listOf(TourBullet(Icons.Rounded.QrCode2, "Scan", " the code on your PC once."),
-            TourBullet(Icons.Rounded.WifiTethering, "Any network works.", " Your phone can connect directly.")),
+        stringResource(R.string.ui_pair_once_with_a_scan),
+        listOf(TourBullet(Icons.Rounded.QrCode2, stringResource(R.string.tour_scan_once), ""),
+            TourBullet(Icons.Rounded.WifiTethering, stringResource(R.string.tour_any_network), "")),
     ) { _, height -> PairIllustration(height) },
     TourPage(
-        "Send in two taps",
-        listOf(TourBullet(Icons.Rounded.Folder, "Pick", " what to send."),
-            TourBullet(Icons.AutoMirrored.Rounded.ArrowForward, "Tap Send", " beside your device."),
-            TourBullet(Icons.Rounded.Laptop, "Select several", " to send to more devices.")),
+        stringResource(R.string.ui_send_in_two_taps),
+        listOf(TourBullet(Icons.Rounded.Folder, stringResource(R.string.tour_pick), ""),
+            TourBullet(Icons.AutoMirrored.Rounded.ArrowForward, stringResource(R.string.tour_tap_send), ""),
+            TourBullet(Icons.Rounded.Laptop, stringResource(R.string.tour_select_several), "")),
     ) { active, height ->
-        PhoneMock(height, Preview.state(selected = true), spotlight = Spot(0.044f, 0.678f, 0.912f, 0.106f, "Tap Send next to a device"), active = active)
+        PhoneMock(height, Preview.state(selected = true), spotlight = Spot(0.044f, 0.678f, 0.912f, 0.106f, stringResource(R.string.ui_tap_send_next_to_a_device)), active = active)
     },
     TourPage(
-        "Share from any app",
-        listOf(TourBullet(Icons.Rounded.Image, "In your gallery, tap Share.", ""),
-            TourBullet(Icons.Rounded.Laptop, "Tap your PC icon.", " No icon? Tap HopDrop, then Send."),
-            TourBullet(Icons.Rounded.CheckCircle, "It's sent.", " The PC icon sends without opening HopDrop.")),
+        stringResource(R.string.ui_share_from_any_app),
+        listOf(TourBullet(Icons.Rounded.Image, stringResource(R.string.tour_gallery_share), ""),
+            TourBullet(Icons.Rounded.Laptop, stringResource(R.string.tour_pc_icon), ""),
+            TourBullet(Icons.Rounded.CheckCircle, stringResource(R.string.tour_sent), "")),
     ) { active, height -> ShareSheetIllustration(active, height) },
     TourPage(
-        "The Quick Settings tile",
-        listOf(TourBullet(Icons.Rounded.TouchApp, "Pull down", " quick settings and tap HopDrop."),
-            TourBullet(Icons.Rounded.ContentPaste, "Send", " your clipboard or latest photo. Pick files too."),
-            TourBullet(Icons.Rounded.CheckCircle, "Add the tile:", if (Build.VERSION.SDK_INT >= 33) " Settings → Add the quick send tile." else " Edit quick settings and drag HopDrop in.")),
+        stringResource(R.string.ui_the_quick_settings_tile),
+        listOf(TourBullet(Icons.Rounded.TouchApp, stringResource(R.string.tour_pull_down), ""),
+            TourBullet(Icons.Rounded.ContentPaste, stringResource(R.string.tour_send_clipboard), ""),
+            TourBullet(Icons.Rounded.CheckCircle, stringResource(if (Build.VERSION.SDK_INT >= 33) R.string.tour_add_tile else R.string.tour_edit_tiles), "")),
     ) { active, height -> QuickTileIllustration(active, height) },
     TourPage(
-        "Everything lands in Activity",
-        listOf(TourBullet(Icons.Rounded.Folder, "Files", " save in Download/HopDrop, even when HopDrop is closed."),
-            TourBullet(Icons.Rounded.ContentPaste, "Links and text", " are ready to copy."),
-            TourBullet(Icons.Rounded.CheckCircle, "Away device?", " Your send waits until it's back.")),
+        stringResource(R.string.ui_everything_lands_in_activity),
+        listOf(TourBullet(Icons.Rounded.Folder, stringResource(R.string.tour_files_saved), ""),
+            TourBullet(Icons.Rounded.ContentPaste, stringResource(R.string.tour_links), ""),
+            TourBullet(Icons.Rounded.CheckCircle, stringResource(R.string.tour_away), "")),
     ) { active, height ->
-        PhoneMock(height, Preview.state(tab = Tab.Activity, text = true), spotlight = Spot(0.044f, 0.348f, 0.912f, 0.213f, "Copy or open it in one tap"), active = active)
+        PhoneMock(height, Preview.state(tab = Tab.Activity, text = true), spotlight = Spot(0.044f, 0.348f, 0.912f, 0.213f, stringResource(R.string.ui_copy_or_open_it_in_one_tap)), active = active)
     },
     TourPage(
-        if (firstTime) "Ready when you are" else "You're all set",
-        if (firstTime) listOf(TourBullet(Icons.Rounded.Laptop, "Install HopDrop", " on your PC from Microsoft Store or github.com/Abdallah-Tarek-prog/HopDrop."),
-            TourBullet(Icons.Rounded.QrCode2, "Scan", " the code shown on your PC."))
-        else listOf(TourBullet(Icons.Rounded.CheckCircle, "Your devices are paired.", ""),
-            TourBullet(Icons.AutoMirrored.Rounded.ArrowForward, "Start sending", " whenever you're ready.")),
+        if (firstTime) stringResource(R.string.ui_ready_when_you_are) else stringResource(R.string.ui_you_re_all_set),
+        if (firstTime) listOf(TourBullet(Icons.Rounded.Laptop, stringResource(R.string.tour_install), ""),
+            TourBullet(Icons.Rounded.QrCode2, stringResource(R.string.tour_scan_pc), ""))
+        else listOf(TourBullet(Icons.Rounded.CheckCircle, stringResource(R.string.ui_your_devices_are_paired), ""),
+            TourBullet(Icons.AutoMirrored.Rounded.ArrowForward, stringResource(R.string.tour_start), "")),
     ) { active, height -> ReadyIllustration(active, height) },
 )
 
@@ -296,7 +303,8 @@ private fun BulletList(bullets: List<TourBullet>) {
 
 @Composable
 private fun Dots(count: Int, current: Int, modifier: Modifier) {
-    Row(modifier.semantics { contentDescription = "Page ${current + 1} of $count" }, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    val pageDescription = stringResource(R.string.tour_page_count, current + 1, count)
+    Row(modifier.semantics { contentDescription = pageDescription }, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         repeat(count) { i ->
             val width by animateDpAsState(if (i == current) 22.dp else 8.dp, tween(220), label = "dot")
             val color by animateColorAsState(if (i == current) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, label = "dot-colour")
@@ -319,6 +327,7 @@ private val MockHeight = 760.dp
  */
 @Composable
 private fun PhoneMock(height: Dp, state: HopUiState, spotlight: Spot?, active: Boolean) {
+    val pictureDescription = stringResource(R.string.ui_picture_of_hopdrop)
     val bezel = 7.dp
     val scale = (height - bezel * 2) / MockHeight
     val width = MockWidth * scale + bezel * 2
@@ -330,7 +339,7 @@ private fun PhoneMock(height: Dp, state: HopUiState, spotlight: Spot?, active: B
     Box(
         Modifier.size(width, height).shadow(20.dp, RoundedCornerShape(frameCorner)).clip(RoundedCornerShape(frameCorner))
             .background(Color(0xFF16171B)).border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(frameCorner)).padding(bezel)
-            .clearAndSetSemantics { contentDescription = "Picture of HopDrop" },
+            .clearAndSetSemantics { contentDescription = pictureDescription },
     ) {
         Box(Modifier.fillMaxSize().clip(RoundedCornerShape(screenCorner)).background(MaterialTheme.colorScheme.surface)) {
             Box(Modifier.wrapContentSize(unbounded = true, align = Alignment.TopStart)
@@ -439,8 +448,8 @@ private fun PairIllustration(height: Dp) {
                         Icon(Icons.Rounded.QrCode2, contentDescription = null, tint = Color.Black, modifier = Modifier.fillMaxSize())
                     }
                     Column(Modifier.padding(start = 12.dp)) {
-                        Text("Scan with HopDrop on your phone", style = MaterialTheme.typography.labelLarge, maxLines = 3)
-                        Text("Devices page", style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+                        Text(stringResource(R.string.tour_scan_mock), style = MaterialTheme.typography.labelLarge, maxLines = 3)
+                        Text(stringResource(R.string.tour_devices_mock), style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
                     }
                 }
             }
@@ -455,12 +464,12 @@ private fun PairIllustration(height: Dp) {
                 }
             }
         }
-        // "No shared Wi-Fi needed".
+        // stringResource(R.string.ui_no_shared_wi_fi_needed).
         Surface(shape = CircleShape, color = scheme.secondaryContainer, shadowElevation = 2.dp, modifier = Modifier.align(Alignment.BottomStart).padding(bottom = 18.dp)) {
             Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Rounded.WifiTethering, contentDescription = null, tint = scheme.onSecondaryContainer, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Any network", style = MaterialTheme.typography.labelLarge, color = scheme.onSecondaryContainer)
+                Text(stringResource(R.string.ui_any_network), style = MaterialTheme.typography.labelLarge, color = scheme.onSecondaryContainer)
             }
         }
     }
@@ -494,20 +503,20 @@ private fun ShareSheetIllustration(active: Boolean, height: Dp) {
                     Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(Brush.linearGradient(listOf(Color(0xFF6FA8DC), Color(0xFF3D6FA8)))))
                         Column(Modifier.padding(start = 12.dp)) {
-                            Text("Sharing 3 photos", style = MaterialTheme.typography.titleSmall)
-                            Text("Gallery", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                            Text(stringResource(R.string.tour_sharing_mock), style = MaterialTheme.typography.titleSmall)
+                            Text(stringResource(R.string.ui_gallery), style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
                         }
                     }
                     Row(Modifier.padding(top = 18.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         ShareTarget("LOQ Laptop", Icons.Rounded.Laptop, highlight = true, ring = if (active) ring else -1f)
                         ShareTarget("Galaxy Tab", Icons.Rounded.PhoneAndroid)
-                        ShareTarget("Messages", null, Color(0xFF5BB974))
-                        ShareTarget("Email", null, Color(0xFFE8705F))
+                        ShareTarget(stringResource(R.string.ui_messages), null, Color(0xFF5BB974))
+                        ShareTarget(stringResource(R.string.ui_email), null, Color(0xFFE8705F))
                     }
                     Spacer(Modifier.height(14.dp))
                     Box(Modifier.fillMaxWidth().height(1.dp).background(scheme.outlineVariant))
                     Row(Modifier.padding(top = 14.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        for ((name, color) in listOf("Drive" to Color(0xFFF2C14E), "HopDrop" to Color(0xFF121212), "Notes" to Color(0xFF8E7CC3), "Copy" to Color(0xFF9AA0A6))) {
+                        for ((name, color) in listOf(stringResource(R.string.ui_drive) to Color(0xFFF2C14E), "HopDrop" to Color(0xFF121212), stringResource(R.string.ui_notes) to Color(0xFF8E7CC3), stringResource(R.string.ui_copy) to Color(0xFF9AA0A6))) {
                             ShareTarget(name, null, color, highlight = name == "HopDrop", ring = if (active && name == "HopDrop") ring else -1f,
                                 logo = name == "HopDrop")
                         }
@@ -530,7 +539,7 @@ private fun QuickTileIllustration(active: Boolean, height: Dp) {
                 Text("9:41", color = Color.White, style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    for (name in listOf("Internet", "Bluetooth")) {
+                    for (name in listOf(stringResource(R.string.ui_internet), stringResource(R.string.ui_bluetooth))) {
                         Surface(shape = RoundedCornerShape(18.dp), color = Color(0xFF454851), modifier = Modifier.weight(1f)) {
                             Text(name, color = Color.White, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(16.dp))
                         }
@@ -554,17 +563,17 @@ private fun QuickTileIllustration(active: Boolean, height: Dp) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         LogoMark(22.dp)
                         Spacer(Modifier.width(8.dp))
-                        Text("Quick send", style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.ui_quick_send), style = MaterialTheme.typography.titleMedium)
                     }
-                    Text("Send to", style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant,
+                    Text(stringResource(R.string.ui_send_to), style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 10.dp, bottom = 5.dp))
                     Surface(shape = CircleShape, color = scheme.primaryContainer) {
                         Text("LOQ Laptop", style = MaterialTheme.typography.labelMedium, color = scheme.onPrimaryContainer,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp))
                     }
                     Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        for ((icon, label) in listOf(Icons.Rounded.ContentPaste to "Clipboard", Icons.Rounded.Image to "Latest photo",
-                            Icons.AutoMirrored.Rounded.InsertDriveFile to "Files")) {
+                        for ((icon, label) in listOf(Icons.Rounded.ContentPaste to stringResource(R.string.ui_clipboard), Icons.Rounded.Image to stringResource(R.string.ui_latest_photo),
+                            Icons.AutoMirrored.Rounded.InsertDriveFile to stringResource(R.string.ui_files))) {
                             Surface(shape = RoundedCornerShape(14.dp), color = scheme.surfaceContainerHighest, modifier = Modifier.weight(1f)) {
                                 Column(Modifier.padding(vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                     Icon(icon, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(24.dp))

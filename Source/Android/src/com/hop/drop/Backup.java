@@ -61,7 +61,7 @@ final class Backup {
         if(tree==null||device==null){p.edit().putBoolean("migrated",true).commit();return;}
         String id="legacy";
         String folder=old.getString("folder_name",null);
-        Map<String,Object> entry=BackupRules.legacy(id,old.getBoolean("on",false),tree,folder==null?"Folder":folder,device,
+        Map<String,Object> entry=BackupRules.legacy(id,old.getBoolean("on",false),tree,folder==null?Language.text(c,R.string.ui_folder):folder,device,
                 old.getBoolean("charging",false),old.getString("status",null),old.getLong("last_run",0));
         p.edit().putString("entries",Json.string(Json.obj("entries",java.util.Collections.singletonList(entry)))).putBoolean("migrated",true).commit();
     }
@@ -85,7 +85,7 @@ final class Backup {
     }
     static void activate(HopApp app,String id,boolean existing){Entry e=get(app,id);if(e==null)return;
         new Thread(()->{if(!existing&&!snapshot(app,id,Uri.parse(e.tree),e.device,e.kinds)){
-            status(app,id,"Couldn't read the folder. Pick it again in Settings.");return;}setOn(app,id,true);},"HopDrop backup add").start();}
+            status(app,id,"read_error");return;}setOn(app,id,true);},"HopDrop backup add").start();}
     static void setOn(HopApp app,String id,boolean on){change(app,id,"on",on);if(on)check(app,true);}
     static void setKinds(HopApp app,String id,int kinds){change(app,id,"kinds",kinds);check(app,true);}
     static void setCharging(HopApp app,String id,boolean on){change(app,id,"charging",on);check(app,true);}
@@ -93,7 +93,7 @@ final class Backup {
     static void setDevice(HopApp app,String id,String device){Entry before=get(app,id);if(before==null||device.equals(before.device))return;
         change(app,id,"device",device);Entry e=get(app,id);if(e.on)new Thread(()->{
             if(!sentFile(app,id,device).exists()&&!snapshot(app,id,Uri.parse(e.tree),device,e.kinds)){
-                setOn(app,id,false);status(app,id,"Couldn't read the folder. Pick it again in Settings.");return;}
+                setOn(app,id,false);status(app,id,"read_error");return;}
             check(app,true);},"HopDrop backup device").start();}
     static synchronized void setFolder(HopApp app,String id,Uri tree,String folder,boolean existing){List<Map<String,Object>> list=maps(app);for(Map<String,Object> m:list)if(id.equals(m.get("id"))){m.put("tree",tree.toString());m.put("folder",folder);m.put("status",null);m.put("lastCheck",0);break;}save(app,list);app.changed();
         if("legacy".equals(id)){for(Peer.Device device:app.book().all())sentFile(app,id,device.id).delete();}
@@ -102,12 +102,31 @@ final class Backup {
     static synchronized void remove(HopApp app,String id){List<Map<String,Object>> list=maps(app);list.removeIf(m->id.equals(m.get("id")));save(app,list);app.changed();}
 
     static boolean snapshot(HopApp app,String id,Uri tree,String device,int kinds){try(FileOutputStream out=new FileOutputStream(sentFile(app,id,device),true)){
-        for(FolderScan.Item f:FolderScan.files(app.getContentResolver(),tree))if(BackupRules.kind(kinds,f.mime,f.name))out.write((key(f)+"\n").getBytes(StandardCharsets.UTF_8));}
+        for(FolderScan.Item f:FolderScan.files(app,tree))if(BackupRules.kind(kinds,f.mime,f.name))out.write((key(f)+"\n").getBytes(StandardCharsets.UTF_8));}
         catch(Exception ignored){return false;}return true;
     }
     static void deviceSeen(HopApp app,String id){for(Entry e:entries(app))if(id.equalsIgnoreCase(e.device)&&e.on){check(app,true);break;}}
-    static void waiting(HopApp app,Sends.Job job,String label){status(app,job.backupId,"Waiting for "+label);}
+    static void waiting(HopApp app,Sends.Job job,String label){status(app,job.backupId,"waiting_for",label);}
     private static void status(HopApp app,String id,String text){if(id!=null)change(app,id,"status",text);}
+    private static void status(HopApp app,String id,String code,String arg){status(app,id,code+"|"+arg);}
+    static String displayStatus(Context context,String value){
+        if(value==null)return null;
+        int split=value.indexOf('|');String code=split<0?value:value.substring(0,split),arg=split<0?"":value.substring(split+1);
+        try{switch(code){
+            case "read_error":return Language.text(context,R.string.backup_read_error);
+            case "waiting_for":return Language.text(context,R.string.backup_waiting_for,Language.ltr(context,arg));
+            case "waiting_charger":return Language.text(context,R.string.backup_waiting_charger);
+            case "waiting_time":return Language.text(context,R.string.backup_waiting_time);
+            case "pick_device":return Language.text(context,R.string.backup_pick_device);
+            case "pick_folder":return Language.text(context,R.string.backup_pick_folder);
+            case "up_to_date":return Language.text(context,R.string.backup_up_to_date);
+            case "backing_up":{int second=arg.indexOf('|');return second<0?null:Language.text(context,R.string.backup_backing_up,
+                    Language.fileObjects(context,Integer.parseInt(arg.substring(0,second))),Language.ltr(context,arg.substring(second+1)));}
+            case "save_error":return Language.text(context,R.string.backup_save_error);
+            case "backed_up":return Language.text(context,R.string.backup_backed_up,Language.files(context,Integer.parseInt(arg)));
+            default:return null;
+        }}catch(NumberFormatException badStatus){return null;}
+    }
     private static boolean plugged(Context c){Intent battery=c.registerReceiver(null,new IntentFilter(Intent.ACTION_BATTERY_CHANGED));return battery!=null&&battery.getIntExtra(BatteryManager.EXTRA_PLUGGED,0)!=0;}
 
     /** Regular checks obey every rule; a manual check ignores only the time window. */
@@ -124,25 +143,25 @@ final class Backup {
         int minute=LocalTime.now().getHour()*60+LocalTime.now().getMinute();
         boolean isPlugged=plugged(app);
         if(!BackupRules.allowed(e.on,e.charging,isPlugged,e.timed&&!manual,minute,e.from,e.to)){
-            status(app,e.id,e.charging&&!isPlugged?"Waiting for the charger":"Waiting for the backup time");return;}
-        Peer.Device device=app.book().get(e.device);if(device==null){status(app,e.id,"Pick a device");return;}
-        if(e.tree==null){status(app,e.id,"Pick a folder");return;}
+            status(app,e.id,e.charging&&!isPlugged?"waiting_charger":"waiting_time");return;}
+        Peer.Device device=app.book().get(e.device);if(device==null){status(app,e.id,"pick_device");return;}
+        if(e.tree==null){status(app,e.id,"pick_folder");return;}
         change(app,e.id,"lastCheck",now);
         try{Set<String> sent=sent(app,e.id,e.device);List<String[]> picked=new ArrayList<>();
-            for(FolderScan.Item f:FolderScan.files(app.getContentResolver(),Uri.parse(e.tree))){
+            for(FolderScan.Item f:FolderScan.files(app,Uri.parse(e.tree))){
                 if(!BackupRules.kind(e.kinds,f.mime,f.name)||sent.contains(key(f)))continue;
                 if(picked.size()<ROUND)picked.add(new String[]{f.uri.toString(),f.name,f.folder,String.valueOf(f.size),key(f)});
             }
-            if(picked.isEmpty()){status(app,e.id,"Up to date");return;}
-            Sends.Job job=new Sends.Job(device.id,Format.files(picked.size())+" to back up");job.listed.addAll(picked);job.backup=true;job.merge=true;job.backupId=e.id;job.backupFolder=e.folder;
-            sending.add(e.id);status(app,e.id,"Backing up "+Format.files(picked.size())+" to "+device.label());
+            if(picked.isEmpty()){status(app,e.id,"up_to_date");return;}
+            Sends.Job job=new Sends.Job(device.id,Language.text(app,R.string.backup_files_to_back_up,Language.files(app,picked.size())));job.listed.addAll(picked);job.backup=true;job.merge=true;job.backupId=e.id;job.backupFolder=e.folder;
+            sending.add(e.id);status(app,e.id,"backing_up",picked.size()+"|"+device.label());
             Sends.submit(device.id,()->Sends.run(app,job,false));
-        }catch(Exception ex){status(app,e.id,"Couldn't read the folder. Pick it again in Settings.");}
+        }catch(Exception ex){status(app,e.id,"read_error");}
     }
     static synchronized void sent(HopApp app,Sends.Job job){try(FileOutputStream out=new FileOutputStream(sentFile(app,job.backupId,job.deviceId),true)){
         for(String[] item:job.listed)out.write((item[4]+"\n").getBytes(StandardCharsets.UTF_8));}catch(Exception error){
-            change(app,job.backupId,"on",false);status(app,job.backupId,"Couldn't save backup history");return;}
-        List<Map<String,Object>> list=maps(app);for(Map<String,Object> m:list)if(job.backupId.equals(m.get("id"))){m.put("lastRun",System.currentTimeMillis());m.put("status","Backed up "+Format.files(job.listed.size()));break;}save(app,list);app.changed();again.add(job.backupId);
+            change(app,job.backupId,"on",false);status(app,job.backupId,"save_error");return;}
+        List<Map<String,Object>> list=maps(app);for(Map<String,Object> m:list)if(job.backupId.equals(m.get("id"))){m.put("lastRun",System.currentTimeMillis());m.put("status","backed_up|"+job.listed.size());break;}save(app,list);app.changed();again.add(job.backupId);
     }
     static void ended(HopApp app,Sends.Job job){sending.remove(job.backupId);if(again.remove(job.backupId))check(app,true);}
     private static File sentFile(Context c,String id,String device){return new File(c.getFilesDir(),BackupRules.sentFile(id,device));}

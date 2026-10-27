@@ -15,6 +15,8 @@ import android.provider.MediaStore;
 import com.hop.drop.core.FileNames;
 import com.hop.drop.core.Json;
 import com.hop.drop.core.Peer;
+import com.hop.drop.Language;
+import com.hop.drop.R;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -57,8 +59,10 @@ public final class ReceiveStorage implements Peer.Storage {
     private Uri tree(String key){String s=settings.getString(key,null);if(s==null)return null;Uri u=Uri.parse(s);
         for(android.content.UriPermission p:resolver.getPersistedUriPermissions())if(p.getUri().equals(u)&&p.isWritePermission())return u;
         settings.edit().remove(key).apply();android.app.NotificationManager manager=context.getSystemService(android.app.NotificationManager.class);
-        manager.notify(440,((com.hop.drop.HopApp)context.getApplicationContext()).notification("results",key.equals("folder")?"Receive folder unavailable":"Backup folder unavailable",
-            key.equals("folder")?"Saving to Download/HopDrop instead":"Saving to Download/HopDrop/Backups instead",false,-1).build());return null;}
+        boolean backup=key.equals("backup_folder");
+        manager.notify(440,((com.hop.drop.HopApp)context.getApplicationContext()).notification("results",
+            Language.text(context,backup?R.string.backup_folder_unavailable:R.string.receive_folder_unavailable),
+            Language.text(context,R.string.receive_folder_fallback,Language.ltr(context,backup?"Download/HopDrop/Backups":"Download/HopDrop")),false,-1).build());return null;}
     public String folder(){Uri t=tree();return t==null?"Download/HopDrop":t.getLastPathSegment();}
     public String backupFolder(){Uri t=tree("backup_folder");if(t==null)return "Download/HopDrop/Backups";
         try(Cursor c=resolver.query(DocumentsContract.buildDocumentUriUsingTree(t,DocumentsContract.getTreeDocumentId(t)),

@@ -2,6 +2,7 @@ package com.hop.drop
 
 import android.Manifest
 import android.content.ClipboardManager
+import android.content.Context
 import android.content.ContentUris
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -56,6 +57,7 @@ import com.hop.drop.ui.QuickSendDevice
  * clipboard, the latest photo or screenshot, or files. Two taps from anywhere, and it closes itself.
  */
 class QuickSendActivity : ComponentActivity() {
+    override fun attachBaseContext(newBase: Context) = super.attachBaseContext(Language.wrap(newBase))
     private var clipText by mutableStateOf<String?>(null)
     private var clipUri by mutableStateOf<Uri?>(null)
     private var latest by mutableStateOf<Uri?>(null)
@@ -81,7 +83,7 @@ class QuickSendActivity : ComponentActivity() {
         enableEdgeToEdge()
         val devices = app.book().all()
         if (devices.isEmpty()) {
-            Toast.makeText(this, "Pair a device in HopDrop first.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, R.string.quick_pair_first, Toast.LENGTH_SHORT).show()
             finish()
             return
         }
@@ -115,7 +117,7 @@ class QuickSendActivity : ComponentActivity() {
                 clipText != null -> send(announce = true) { it.texts.add(clipText!!); it.clip = true }
                 clipUri != null -> send(announce = true) { it.files.add(clipUri!!) }
                 else -> {
-                    Toast.makeText(this, "Nothing copied", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, R.string.quick_nothing_copied, Toast.LENGTH_SHORT).show()
                     finish()
                 }
             }
@@ -140,14 +142,14 @@ class QuickSendActivity : ComponentActivity() {
         val device = target?.let { app.book().get(it) } ?: return finish()
         val ready = Sends.Job(device.id, "")
         fill(ready)
-        ready.summary = if (ready.files.isEmpty()) "your clipboard" else Format.files(ready.files.size)
+        ready.summary = if (ready.files.isEmpty()) getString(R.string.your_clipboard) else Language.files(this, ready.files.size)
         prefs.edit().putString("last_device", device.id).apply()
         try {
             startForegroundService(ready.intent(this))
             Shortcuts.used(this, device.id)
-            if (announce || !ready.textOnly()) Toast.makeText(this, "Sending to " + device.label(), Toast.LENGTH_SHORT).show()
+            if (announce || !ready.textOnly()) Toast.makeText(this, getString(R.string.quick_sending_to, Language.ltr(this, device.label())), Toast.LENGTH_SHORT).show()
         } catch (e: RuntimeException) {
-            Toast.makeText(this, "HopDrop couldn't start sending. Open HopDrop and try again.", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, R.string.quick_send_unavailable, Toast.LENGTH_LONG).show()
         }
         finish()
     }
@@ -174,9 +176,9 @@ class QuickSendActivity : ComponentActivity() {
                 QuickSendCard(
                     devices = devices.map { QuickSendDevice(it.id, it.label(), Platform.from(it.platform)) },
                     selected = target,
-                    clipboardDetail = clip?.lineSequence()?.firstOrNull()?.take(60) ?: if (clipUri != null) "A copied file" else "Nothing copied",
+                    clipboardDetail = clip?.lineSequence()?.firstOrNull()?.take(60) ?: getString(if (clipUri != null) R.string.quick_copied_file else R.string.quick_nothing_copied),
                     clipboardAvailable = clip != null || clipUri != null,
-                    photoDetail = if (photosAllowed) (if (latest != null) "Tap to send" else "No photos") else "Allow photos",
+                    photoDetail = getString(if (!photosAllowed) R.string.quick_allow_photos else if (latest != null) R.string.quick_tap_to_send else R.string.quick_no_photos),
                     photoAvailable = !photosAllowed || latest != null,
                     photoPreview = latest,
                     onSelect = { target = it },

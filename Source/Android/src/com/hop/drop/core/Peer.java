@@ -24,7 +24,10 @@ public final class Peer implements AutoCloseable {
     /** Idle read timeout for connections (spec 3.6: 30 s). Tests lower it to exercise slow transfers quickly. */
     public static volatile int idleTimeoutMs=30000;
     public interface Book { Device get(String id); List<Device> all(); void put(Device d); void remove(String id); }
-    public interface Sockets { Socket connect(String address,int port) throws IOException; boolean localServerAddress(InetAddress address); }
+    public interface Sockets { Socket connect(String address,int port) throws IOException; boolean localServerAddress(InetAddress address);
+        /** The actual local interface of a connected socket; desktop adapters may leave this unknown. */
+        default String transport(InetAddress local) { return "unknown"; }
+    }
     public interface Storage { long freeBytes(); String folder(); Output begin(String name) throws IOException;
         /** Saves into a folder inside the receive folder ("Photos/2024"); null means the receive folder itself. {@link Output#finish} then returns "Photos/2024/name". */
         default Output begin(String folder,String name) throws IOException { return begin(name); }
@@ -55,11 +58,13 @@ public final class Peer implements AutoCloseable {
     }
     /** How a transfer ended. {@code error} is null on success; {@code files} are the files that were saved. */
     public static final class Result {
-        public final String transferId,peer,folder,error,deviceId; public final boolean incoming; public final List<String> files; public final int offered; public final long bytes,millis;
+        public final String transferId,peer,folder,error,deviceId,transport; public final boolean incoming; public final List<String> files; public final int offered; public final long bytes,millis;
         public Result(String transferId,boolean incoming,String peer,List<String> files,int offered,String folder,String error,long bytes,long millis){
             this(transferId,incoming,peer,files,offered,folder,error,bytes,millis,null);}
         public Result(String transferId,boolean incoming,String peer,List<String> files,int offered,String folder,String error,long bytes,long millis,String deviceId){
-            this.transferId=transferId;this.incoming=incoming;this.peer=peer;this.files=files;this.offered=offered;this.folder=folder;this.error=error;this.bytes=bytes;this.millis=millis;this.deviceId=deviceId;}
+            this(transferId,incoming,peer,files,offered,folder,error,bytes,millis,deviceId,"unknown");}
+        public Result(String transferId,boolean incoming,String peer,List<String> files,int offered,String folder,String error,long bytes,long millis,String deviceId,String transport){
+            this.transferId=transferId;this.incoming=incoming;this.peer=peer;this.files=files;this.offered=offered;this.folder=folder;this.error=error;this.bytes=bytes;this.millis=millis;this.deviceId=deviceId;this.transport=transport;}
     }
     /** Files offered by a device that isn't trusted while "Ask before receiving" is on. */
     public static final class Offer {
@@ -80,6 +85,8 @@ public final class Peer implements AutoCloseable {
         default void offerClosed(Offer offer) { }
         /** A paired device sent text. {@code clip}: it was copied there (clipboard sharing). */
         default void text(Device from,String text,boolean clip) { }
+        default void text(Device from,String text,boolean clip,String transport) { text(from,text,clip); }
+        default void textSent(Device to,String text,String transport) { }
         /** A paired device just connected to this phone, so it's reachable now (at its first address). */
         default void contacted(Device d) { }
     }
@@ -227,7 +234,7 @@ public final class Peer implements AutoCloseable {
         if(paired){learnLink(peerId,hello);if(type.equals("ping")||type.equals("offer")||type.equals("text"))contact(peerId,address);}
         switch(type){case "ping":Protocol.send(s.getOutputStream(),"type","pong");break;
             case "text":{String text=Json.str(req,"text");if(text.isEmpty()||text.length()>Protocol.MAX_JSON){error(s,"protocol_error","Invalid text");return;}
-                Protocol.send(s.getOutputStream(),"type","ok");Device from=book.get(peerId);events.text(from,text,Boolean.TRUE.equals(req.get("clip")));break;}case "unpair":book.remove(peerId);events.unpaired(peerId);Protocol.send(s.getOutputStream(),"type","ok");break;
+                Protocol.send(s.getOutputStream(),"type","ok");Device from=book.get(peerId);events.text(from,text,Boolean.TRUE.equals(req.get("clip")),sockets.transport(s.getLocalAddress()));break;}case "unpair":book.remove(peerId);events.unpaired(peerId);Protocol.send(s.getOutputStream(),"type","ok");break;
             case "pair_qr":String result=consumeQr(Json.str(req,"token"));if(!result.equals("pair_ok")){error(s,result,"QR code expired or invalid");return;}
                 Device q=fresh(peerId,peerName,platform,address);book.put(q);Protocol.send(s.getOutputStream(),"type","pair_ok");events.paired(q);break;
             case "pair_sas":respondSas(s,peerId,peerName,platform,address);break;case "offer":receiving.incrementAndGet();incomingSockets.add(s);try{Device known=book.get(peerId);receive(s,req,peerId,known==null?peerName:known.label(),peerName,known!=null&&known.trusted,features);}finally{incomingSockets.remove(s);cancelledSockets.remove(s);receiving.decrementAndGet();}break;default:error(s,"protocol_error","Unknown request");}}
@@ -282,11 +289,11 @@ public final class Peer implements AutoCloseable {
 
     /** What a receiver keeps of an incoming transfer whose connection dropped, so the sender can continue it. */
     private static final class Interrupted {
-        final String transferId,peerName,folder;final int offered;final boolean trusted;final long startedNanos;
+        final String transferId,peerName,folder,transport;final int offered;final boolean trusted;final long startedNanos;
         final List<Offered> completedFiles;final List<String> completedNames;final Map<String,String> folders;long bytes;
         Offered partial;Storage.Output partialOutput;MessageDigest partialHash;long partialWritten;ScheduledFuture<?> expiry;
-        Interrupted(String transferId,String peerName,String folder,int offered,boolean trusted,long startedNanos,List<Offered> completedFiles,List<String> completedNames,Map<String,String> folders,long bytes){
-            this.transferId=transferId;this.peerName=peerName;this.folder=folder;this.offered=offered;this.trusted=trusted;this.startedNanos=startedNanos;
+        Interrupted(String transferId,String peerName,String folder,int offered,boolean trusted,long startedNanos,List<Offered> completedFiles,List<String> completedNames,Map<String,String> folders,long bytes,String transport){
+            this.transferId=transferId;this.peerName=peerName;this.folder=folder;this.offered=offered;this.trusted=trusted;this.startedNanos=startedNanos;this.transport=transport;
             this.completedFiles=completedFiles;this.completedNames=completedNames;this.folders=folders;this.bytes=bytes;}
         void dropPartial(){if(partialOutput!=null)partialOutput.abort();partialOutput=null;partialHash=null;partial=null;partialWritten=0;}
     }
@@ -338,7 +345,7 @@ public final class Peer implements AutoCloseable {
     public boolean sendText(Device device,String text,boolean clip)throws Exception{if(text==null||text.isEmpty())throw new IOException("Type some text first");
         if(text.length()<=MAX_TEXT&&Json.string(Json.obj("type","text","text",text,"clip",clip)).getBytes(java.nio.charset.StandardCharsets.UTF_8).length<=60000){
             try(Link l=connectAny(device.addresses,device.port,device.id)){rememberAddress(l,device);
-                if(l.features.contains("text")){Protocol.send(l.out,"type","text","text",text,"clip",clip);Protocol.expect(Protocol.message(l.in),"ok");return true;}
+                if(l.features.contains("text")){Protocol.send(l.out,"type","text","text",text,"clip",clip);Protocol.expect(Protocol.message(l.in),"ok");events.textSent(device,text,sockets.transport(l.s.getLocalAddress()));return true;}
                 // An older HopDrop: end this connection politely (it expects a request), then send a file instead.
                 try{Protocol.send(l.out,"type","ping");Protocol.message(l.in);}catch(Exception ignored){}}}
         byte[] bytes=text.getBytes(java.nio.charset.StandardCharsets.UTF_8);
@@ -359,18 +366,20 @@ public final class Peer implements AutoCloseable {
             for(Offered o:offered){if(o.size<0){total=-1;break;}total+=o.size;}}
         catch(Exception e){closeQuietly(l);throw e;}
         taken[0]=offered.size();String transferId=UUID.randomUUID().toString();Outgoing state=new Outgoing(offered.size());TransferMeter meter=new TransferMeter(total,System.nanoTime());
+        String transport=sockets.transport(l.s.getLocalAddress());
         try{for(int attempt=0;;attempt++){
-                try{if(l==null){Device latest=book.get(device.id);if(latest==null)latest=device;l=connectAny(latest.addresses,latest.port,latest.id);rememberAddress(l,latest);}
+                try{if(l==null){Device latest=book.get(device.id);if(latest==null)latest=device;l=connectAny(latest.addresses,latest.port,latest.id);rememberAddress(l,latest);
+                        transport=Transport.combine(transport,sockets.transport(l.s.getLocalAddress()));}
                     sendFiles(l,transferId,offered,items,state,peerName,total,meter,merge,backupFolder);break;}
                 catch(Exception e){if(!resume||attempt>=RECONNECTS||cancelled(device.id)||e instanceof InterruptedException||!retryable(e))throw e;
                     // The connection dropped (Wi-Fi blip, switching networks): reconnect and continue where it stopped.
                     closeQuietly(l);l=null;events.progress(new Progress(transferId,false,peerName,"",0,offered.size(),state.done,total,0,-1,false,true,device.id));Thread.sleep(2000L<<attempt);}}}
         catch(Exception e){if(l!=null)try{Protocol.send(l.out,"type","cancel");}catch(Exception ignored){}
             String error=e instanceof InterruptedException||cancelled(device.id)?"cancelled: Transfer cancelled":e.getMessage()==null?"io_error":e.getMessage();
-            events.finished(new Result(transferId,false,peerName,state.saved(),offered.size(),state.folder,error,state.done,meter.elapsedMillis(System.nanoTime()),device.id));
+            events.finished(new Result(transferId,false,peerName,state.saved(),offered.size(),state.folder,error,state.done,meter.elapsedMillis(System.nanoTime()),device.id,transport));
             if(cancelled(device.id)&&!(e instanceof InterruptedException))throw new IOException(error,e);throw e;}
         finally{closeQuietly(l);}
-        events.finished(new Result(transferId,false,peerName,state.saved(),offered.size(),state.folder,null,state.done,meter.elapsedMillis(System.nanoTime()),device.id));return state.saved();}
+        events.finished(new Result(transferId,false,peerName,state.saved(),offered.size(),state.folder,null,state.done,meter.elapsedMillis(System.nanoTime()),device.id,transport));return state.saved();}
     /** Sends the offer, split over "offer_more" messages when the list doesn't fit in one (receivers that list "pages"). */
     private static void writeOffer(Link l,String transferId,List<Offered> offered,long total,boolean merge,String backupFolder)throws IOException{List<List<Object>> pages=new ArrayList<>();pages.add(new ArrayList<>());int size=0;
         for(Offered o:offered){int b=o.bytes();if(size+b>OFFER_BUDGET&&!pages.get(pages.size()-1).isEmpty()){pages.add(new ArrayList<>());size=0;}pages.get(pages.size()-1).add(o.entry());size+=b;}
@@ -482,6 +491,8 @@ public final class Peer implements AutoCloseable {
         String senderFolder=backup?FileNames.sanitize(senderName):null;
         // The same transfer coming back after a dropped connection: skip what's saved, continue the half-received file.
         Interrupted earlier=interrupted.remove(key);if(earlier!=null){if(earlier.expiry!=null)earlier.expiry.cancel(false);trusted=earlier.trusted;}
+        String transport=sockets.transport(s.getLocalAddress());
+        if(earlier!=null)transport=Transport.combine(earlier.transport,transport);
         if(earlier==null&&total>=0&&(backup?storage.backupFreeBytes():storage.freeBytes())<total+16777216L){error(s,"no_space","Not enough free space");return;}
         Future<Map<String,Object>> first=null;
         if(earlier==null&&askBeforeReceiving&&!trusted){List<String> names=new ArrayList<>();for(Offered f:files)names.add(f.folder==null?f.name:f.folder+"/"+f.name);
@@ -517,7 +528,7 @@ public final class Peer implements AutoCloseable {
                 Storage.Output whole=current;current=null;currentFile=null;received++;finisher.add(file,i,whole);}
             finisher.drain();Protocol.expect(Protocol.message(s.getInputStream()),"done");Protocol.send(s.getOutputStream(),"type","done_ok","saved",saved.size());
             if(backup)storage.backupReceived(peerId,senderName,backupName,saved.size());
-            events.finished(new Result(transferId,true,peerName,saved,offeredCount,folder,null,done,(System.nanoTime()-started)/1000000));}
+            events.finished(new Result(transferId,true,peerName,saved,offeredCount,folder,null,done,(System.nanoTime()-started)/1000000,null,transport));}
         catch(Exception e){
             // Files that arrived whole still get their names and file_ok before anything else is decided or sent.
             finisher.close();
@@ -525,15 +536,15 @@ public final class Peer implements AutoCloseable {
             if(earlier!=null&&earlier.partialOutput!=null&&current==null){current=earlier.partialOutput;currentFile=earlier.partial;hash=earlier.partialHash;written=earlier.partialWritten;earlier.partialOutput=null;earlier.partialHash=null;}
             if(canResume&&!cancelledSockets.contains(s)&&retryable(e)){
                 // The connection dropped: keep what arrived (and the open half-received file) for the sender to continue.
-                Interrupted kept=new Interrupted(transferId,peerName,folder,offeredCount,trusted,started,completedFiles,saved,tops,done);
+                Interrupted kept=new Interrupted(transferId,peerName,folder,offeredCount,trusted,started,completedFiles,saved,tops,done,transport);
                 if(current!=null){kept.partial=currentFile;kept.partialOutput=current;kept.partialHash=hash;kept.partialWritten=written;current=null;}
                 interrupted.put(key,kept);kept.expiry=timers.schedule(()->expire(key,kept),keepInterruptedMs,TimeUnit.MILLISECONDS);
                 events.progress(new Progress(transferId,true,peerName,currentFile==null?"":currentFile.name,saved.size()+1,offeredCount,done,total,0,-1,false,true));return;}
             if(current!=null)current.abort();String msg=cancelledSockets.contains(s)?"cancelled: You cancelled the transfer":e.getMessage()==null?"io_error: Transfer stopped":e.getMessage();String code=msg.contains(":")?msg.substring(0,msg.indexOf(':')):"io_error";error(s,code,msg);
-            events.finished(new Result(transferId,true,peerName,saved,offeredCount,folder,msg,done,(System.nanoTime()-started)/1000000));}}
+            events.finished(new Result(transferId,true,peerName,saved,offeredCount,folder,msg,done,(System.nanoTime()-started)/1000000,null,transport));}}
     /** Gives up on an interrupted incoming transfer the sender didn't come back for. */
     private void expire(String key,Interrupted kept){if(!interrupted.remove(key,kept))return;kept.dropPartial();
-        events.finished(new Result(kept.transferId,true,kept.peerName,kept.completedNames,kept.offered,kept.folder,"disconnected: The sender didn't come back",kept.bytes,(System.nanoTime()-kept.startedNanos)/1000000));}
+        events.finished(new Result(kept.transferId,true,kept.peerName,kept.completedNames,kept.offered,kept.folder,"disconnected: The sender didn't come back",kept.bytes,(System.nanoTime()-kept.startedNanos)/1000000,null,kept.transport));}
     public void stop(){running=false;try{if(listener!=null)listener.close();}catch(IOException ignored){}}
     public void close(){stop();workers.shutdownNow();timers.shutdownNow();for(Interrupted kept:interrupted.values())kept.dropPartial();interrupted.clear();}
 }

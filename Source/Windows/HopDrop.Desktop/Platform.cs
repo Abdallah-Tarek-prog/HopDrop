@@ -33,6 +33,7 @@ internal static class Preferences
     public static bool CloseToTray { get => Current.CloseToTray; set => Save(Current with { CloseToTray = value }); }
     /// <summary>"system", "light" or "dark".</summary>
     public static string Theme { get => Current.Theme ?? "system"; set => Save(Current with { Theme = value }); }
+    public static string Language { get => Current.Language == "ar" ? "ar" : "en"; set => Save(Current with { Language = value == "ar" ? "ar" : "en" }); }
     /// <summary>Quitting leaves a hidden receiver running (no window, no tray icon); it also starts hidden at sign-in.</summary>
     public static bool BackgroundReceive { get => Current.BackgroundReceive; set => Save(Current with { BackgroundReceive = value }); }
     /// <summary>The one-time "still receiving" notice has been shown.</summary>
@@ -50,7 +51,7 @@ internal static class Preferences
     private static string RandomChars(int count, string alphabet) => new(Enumerable.Range(0, count).Select(_ => alphabet[System.Security.Cryptography.RandomNumberGenerator.GetInt32(alphabet.Length)]).ToArray());
     private sealed record DesktopSettings(bool CloseToTray, string? Theme, bool BackgroundReceive = false, bool BackgroundNoticeShown = false, bool Agents = false,
         bool StartWithWindows = false, bool DirectLink = true, bool PutReceivedTextOnClipboard = true, bool ShareCopiedText = false,
-        string? DirectSsid = null, string? DirectKey = null, string? LastDevice = null);
+        string? DirectSsid = null, string? DirectKey = null, string? LastDevice = null, string Language = "en");
 }
 
 internal static class Platform
@@ -85,7 +86,7 @@ internal static class Platform
     /// <summary>The Store version signs in through its startup task; Windows may refuse (turned off in Task Manager).</summary>
     private static async Task ApplyStoreStartupAsync()
     {
-        if (await Store.UpdateStartupAsync() is { } problem) Notify("HopDrop can't start at sign-in", problem);
+        if (await Store.UpdateStartupAsync() is { } problem) Notify(L.T("HopDropCanTStartAtSignIn"), problem);
     }
     private static void SetSignIn(string? mode)
     {
@@ -149,7 +150,7 @@ internal static class Platform
         dynamic shell = Activator.CreateInstance(shellType)!;
         dynamic shortcut = shell.CreateShortcut(SendToPath);
         shortcut.TargetPath = Exe; shortcut.Arguments = "--data \"" + App.DataDirectory + "\" --send";
-        shortcut.IconLocation = Exe + ",0"; shortcut.Description = "Send files with HopDrop"; shortcut.Save();
+        shortcut.IconLocation = Exe + ",0"; shortcut.Description = L.T("SendFilesWithHopDrop"); shortcut.Save();
         Marshal.FinalReleaseComObject(shortcut); Marshal.FinalReleaseComObject(shell);
     }
     public static void OpenFolder(string path)
@@ -236,10 +237,10 @@ internal static class Platform
                 foreach (var old in Directory.EnumerateFiles(App.DataDirectory, "toast-text-*.txt").Where(p => File.GetCreationTimeUtc(p) < DateTime.UtcNow.AddDays(-7)))
                     File.Delete(old);
             }
-            var toast = new ToastContentBuilder().AddText((copied ? "Copied from " : "Text from ") + name)
+            var toast = new ToastContentBuilder().AddText(L.T(copied ? "CopiedFrom" : "TextFrom", name))
                 .AddText(text.Length > 200 ? text[..200] + "…" : text);
-            if (!copied) toast.AddButton(new ToastButton().SetContent("Copy").AddArgument("action", "textcopy:" + id));
-            if (link) toast.AddButton(new ToastButton().SetContent("Open link").AddArgument("action", "textopen:" + id));
+            if (!copied) toast.AddButton(new ToastButton().SetContent(L.T("Copy_e21f935f")).AddArgument("action", "textcopy:" + id));
+            if (link) toast.AddButton(new ToastButton().SetContent(L.T("OpenLink")).AddArgument("action", "textopen:" + id));
             toast.Show();
         }
         catch (Exception ex) { Debug.WriteLine(ex); }
@@ -252,7 +253,7 @@ internal static class Platform
     }
     public static void PairingToast(string name)
     {
-        try { new ToastContentBuilder().AddText($"{name} wants to pair").AddText("Compare the 6-digit number on both screens.").AddButton(new ToastButton().SetContent("Show number").AddArgument("action", "pair")).Show(); }
+        try { new ToastContentBuilder().AddText(L.T("0WantsToPair", name)).AddText(L.T("CompareThe6DigitNumberOnBothScreens")).AddButton(new ToastButton().SetContent(L.T("ShowNumber")).AddArgument("action", "pair")).Show(); }
         catch (Exception e) { Debug.WriteLine(e); }
     }
 
@@ -268,13 +269,13 @@ internal static class Platform
             {
                 ProgressToasts[p.TransferId] = (DateTime.UtcNow, 1);
                 new ToastContentBuilder()
-                    .AddText($"{(p.Incoming ? "Receiving" : "Sending")} {Fmt.Files(p.FileCount)} {(p.Incoming ? "from" : "to")} {p.PeerName}")
+                    .AddText(L.T(p.Incoming ? "ReceivingFilesFrom" : "SendingFilesTo", Fmt.Files(p.FileCount), p.PeerName))
                     .AddVisualChild(new AdaptiveProgressBar
                     {
                         Title = new BindableString("file"), Value = new BindableProgressBarValue("value"),
                         ValueStringOverride = new BindableString("amount"), Status = new BindableString("status")
                     })
-                    .AddButton(new ToastButton().SetContent("Cancel").AddArgument("action", "cancel:" + p.TransferId))
+                    .AddButton(new ToastButton().SetContent(L.T("Cancel")).AddArgument("action", "cancel:" + p.TransferId))
                     .Show(toast => { toast.Tag = tag; toast.Group = ProgressGroup; toast.Data = ProgressData(p, 1); });
                 return;
             }
@@ -288,11 +289,11 @@ internal static class Platform
     private static Windows.UI.Notifications.NotificationData ProgressData(TransferProgress p, uint sequence)
     {
         var data = new Windows.UI.Notifications.NotificationData { SequenceNumber = sequence };
-        data.Values["file"] = p.FileCount == 1 ? p.File : $"{p.File} ({p.FileNumber} of {p.FileCount})";
+        data.Values["file"] = p.FileCount == 1 ? p.File : L.T("ToastFileProgress", p.File, p.FileNumber, p.FileCount);
         data.Values["value"] = p.Percent < 0 ? "indeterminate" : (p.Percent / 100.0).ToString(System.Globalization.CultureInfo.InvariantCulture);
         data.Values["amount"] = p.Percent < 0 ? Fmt.Size(p.BytesDone) : $"{p.Percent}%";
-        data.Values["status"] = p.Reconnecting ? $"Connection dropped · waiting for {p.PeerName} to reconnect…"
-            : $"{Fmt.Amount(p.BytesDone, p.TotalBytes)} · {Fmt.Speed(p.BytesPerSecond)}{(p.Eta is null ? "" : $" · {Fmt.Duration(p.Eta.Value)} left")}";
+        data.Values["status"] = p.Reconnecting ? L.T("ConnectionDroppedWaitingFor0ToReconnect", p.PeerName)
+            : $"{Fmt.Amount(p.BytesDone, p.TotalBytes)} · {Fmt.Speed(p.BytesPerSecond)}{(p.Eta is null ? "" : L.T("0Left", Fmt.Duration(p.Eta.Value)))}";
         return data;
     }
     private static void ClearProgressToast(Guid id)
@@ -303,33 +304,33 @@ internal static class Platform
 
     public static string ExplainError(string? code, string name) => code switch
     {
-        "declined" => $"{name} didn't accept the files.",
-        "disconnected" => $"{name} disconnected and didn't come back. Send again to get the rest.",
-        "not_paired" => $"{name} doesn't know this PC any more. Pair again.",
-        "identity_mismatch" => "This isn't the device you paired with. Pair again.",
-        "bad_token" => "That QR code can't be used. Show a new one and scan it again.",
-        "token_expired" => "That QR code expired. Show a new one and scan it again.",
-        "busy" => $"{name} is busy pairing. Try again shortly.",
-        "rejected" or "user_declined" => "Pairing was cancelled.",
-        "cancelled" => "The transfer was cancelled.",
-        "no_space" => $"{name} doesn't have enough free space.",
-        "checksum_mismatch" => "A file changed during the transfer. Try sending it again.",
-        "io_error" => "The transfer stopped while reading or saving a file.",
-        "protocol_error" => $"HopDrop couldn't understand the response from {name}. Update HopDrop on both devices.",
-        "unsupported_version" => "Update HopDrop on both devices, then try again.",
-        "timeout" => $"{name} stopped responding. Check that it's still on the same network.",
-        _ => "Something went wrong. Please try again."
+        "declined" => L.T("0DidnTAcceptTheFiles", name),
+        "disconnected" => L.T("0DisconnectedAndDidnTComeBackSendAgainToGetTheRest", name),
+        "not_paired" => L.T("0DoesnTKnowThisPCAnyMorePairAgain", name),
+        "identity_mismatch" => L.T("ThisIsnTTheDeviceYouPairedWithPairAgain"),
+        "bad_token" => L.T("ThatQRCodeCanTBeUsedShowANewOneAndScanItAgain"),
+        "token_expired" => L.T("ThatQRCodeExpiredShowANewOneAndScanItAgain"),
+        "busy" => L.T("0IsBusyPairingTryAgainShortly", name),
+        "rejected" or "user_declined" => L.T("PairingWasCancelled"),
+        "cancelled" => L.T("TheTransferWasCancelled"),
+        "no_space" => L.T("0DoesnTHaveEnoughFreeSpace", name),
+        "checksum_mismatch" => L.T("AFileChangedDuringTheTransferTrySendingItAgain"),
+        "io_error" => L.T("TheTransferStoppedWhileReadingOrSavingAFile"),
+        "protocol_error" => L.T("HopDropCouldnTUnderstandTheResponseFrom0UpdateHopDropOnBothDevice", name),
+        "unsupported_version" => L.T("UpdateHopDropOnBothDevicesThenTryAgain"),
+        "timeout" => L.T("0StoppedRespondingCheckThatItSStillOnTheSameNetwork", name),
+        _ => L.T("SomethingWentWrongPleaseTryAgain")
     };
     public static string ExplainException(Exception error, string name)
     {
         if (error is HopDropException protocol) return ExplainError(protocol.Code, name);
         if (error is TimeoutException or System.Net.Sockets.SocketException)
-            return $"Can't reach {name}. Make sure HopDrop is open on it and both devices are on the same Wi-Fi or hotspot.";
+            return L.T("CanTReach0MakeSureHopDropIsOpenOnItAndBothDevicesAreOnTheSameWiFi", name);
         if (error is System.Security.Authentication.AuthenticationException)
-            return $"Couldn't make a secure connection to {name}.";
+            return L.T("CouldnTMakeASecureConnectionTo0", name);
         if (error is IOException or UnauthorizedAccessException)
-            return "HopDrop couldn't read or save a file. Check its permission and free space.";
-        return "Something went wrong. Please try again.";
+            return L.T("HopDropCouldnTReadOrSaveAFileCheckItsPermissionAndFreeSpace");
+        return L.T("SomethingWentWrongPleaseTryAgain");
     }
 
     /// <summary>File types that run code when opened. From devices that aren't trusted, the "files arrived" toast offers no one-click Open for these.</summary>
@@ -343,13 +344,13 @@ internal static class Platform
         bool ok = result.ErrorCode is null;
         int count = result.SavedPaths.Count;
         string title = ok
-            ? $"{(result.Incoming ? "Received" : "Sent")} {Fmt.Files(count)} {(result.Incoming ? "from" : "to")} {name}"
-            : result.ErrorCode == "cancelled" ? $"{(result.Incoming ? "Receiving from" : "Sending to")} {name} was cancelled"
-            : result.Incoming ? $"Receiving from {name} stopped" : $"Couldn't finish sending to {name}";
+            ? (result.Incoming ? L.T("ReceivedFilesFrom", Fmt.Files(count), name) : L.T("SentFilesTo", Fmt.Files(count), name))
+            : result.ErrorCode == "cancelled" ? L.T(result.Incoming ? "ReceivingCancelled" : "SendingCancelled", name)
+            : result.Incoming ? L.T("ReceivingFrom0Stopped", name) : L.T("CouldnTFinishSendingTo0", name);
         string line = ok ? $"{Fmt.Names(result.SavedPaths, result.Incoming ? root : null)} · {Fmt.Size(result.Bytes)}" : ExplainError(result.ErrorCode, name);
         string where = ok
-            ? $"Saved in {result.ReceiveFolderDisplayName}{(result.Incoming ? "" : " on " + name)}"
-            : $"{count} of {result.Offered} files {(result.Incoming ? "were saved" : "arrived")}";
+            ? (result.Incoming ? L.T("SavedInFolder", result.ReceiveFolderDisplayName) : L.T("SavedOnDevice", result.ReceiveFolderDisplayName, name))
+            : L.T(result.Incoming ? "SavedFileProgress" : "DeliveredFileProgress", count, result.Offered);
         try
         {
             var toast = new ToastContentBuilder().AddText(title).AddText(line).AddText(where);
@@ -359,8 +360,8 @@ internal static class Platform
                 // Clicking the notification itself shows the files in their folder.
                 toast.AddArgument("action", count == 1 ? "select:" + first : "folder:" + folder);
                 if (count == 1 && (result.Trusted || !Runnable.Contains(Path.GetExtension(first))))
-                    toast.AddButton(new ToastButton().SetContent("Open").AddArgument("action", "file:" + first));
-                toast.AddButton(new ToastButton().SetContent("Open folder").AddArgument("action", count == 1 ? "select:" + first : "folder:" + folder));
+                    toast.AddButton(new ToastButton().SetContent(L.T("Open")).AddArgument("action", "file:" + first));
+                toast.AddButton(new ToastButton().SetContent(L.T("OpenFolder")).AddArgument("action", count == 1 ? "select:" + first : "folder:" + folder));
             }
             toast.Show();
         }
@@ -380,12 +381,12 @@ internal static class Platform
         {
             string size = offer.TotalBytes >= 0 ? " · " + Fmt.Size(offer.TotalBytes) : "";
             new ToastContentBuilder()
-                .AddText($"{offer.PeerName} wants to send you {Fmt.Files(offer.Files.Count)}")
+                .AddText(L.T("0WantsToSendYou1", offer.PeerName, Fmt.Files(offer.Files.Count)))
                 .AddText(Fmt.Names(offer.Files) + size)
-                .AddText("Accept to save them in your receive folder.")
+                .AddText(L.T("AcceptToSaveThemInYourReceiveFolder"))
                 .AddArgument("action", "open")
-                .AddButton(new ToastButton().SetContent("Accept").AddArgument("action", "accept:" + offer.TransferId))
-                .AddButton(new ToastButton().SetContent("Decline").AddArgument("action", "decline:" + offer.TransferId))
+                .AddButton(new ToastButton().SetContent(L.T("Accept")).AddArgument("action", "accept:" + offer.TransferId))
+                .AddButton(new ToastButton().SetContent(L.T("Decline")).AddArgument("action", "decline:" + offer.TransferId))
                 .SetToastScenario(ToastScenario.Reminder)
                 .Show(toast => { toast.Tag = OfferTag(offer.TransferId); toast.Group = "offers"; toast.ExpirationTime = offer.Deadline; });
         }
@@ -400,9 +401,9 @@ internal static class Platform
     {
         try
         {
-            var toast = new ToastContentBuilder().AddText($"Received {Fmt.Files(files.Count)} via Bluetooth").AddText(Fmt.Names(files)).AddText("Saved in " + folderLabel);
-            if (files.Count == 1) toast.AddButton(new ToastButton().SetContent("Open").AddArgument("action", "file:" + files[0]));
-            toast.AddButton(new ToastButton().SetContent("Show in folder").AddArgument("action", "select:" + files[0]));
+            var toast = new ToastContentBuilder().AddText(L.T("Received0ViaBluetooth", Fmt.Files(files.Count))).AddText(Fmt.Names(files)).AddText(L.T("SavedIn") + folderLabel);
+            if (files.Count == 1) toast.AddButton(new ToastButton().SetContent(L.T("Open")).AddArgument("action", "file:" + files[0]));
+            toast.AddButton(new ToastButton().SetContent(L.T("ShowInFolder")).AddArgument("action", "select:" + files[0]));
             toast.Show();
         }
         catch (Exception e) { Debug.WriteLine(e); }

@@ -35,7 +35,7 @@ internal sealed class BluetoothWizard
         _ = Task.Run(() =>
         {
             try { ReceiveLoop(session.Token); }
-            catch (Exception e) { Log("receive loop failed: " + e); _notice("Bluetooth receiving stopped. Click Finish in the Bluetooth window if a file is waiting."); }
+            catch (Exception e) { Log("receive loop failed: " + e); _notice(L.T("BluetoothReceivingStoppedClickFinishInTheBluetoothWindowIfAFileIs")); }
         });
     }
 
@@ -68,14 +68,14 @@ internal sealed class BluetoothWizard
             Process wizard;
             var waitingSince = DateTime.UtcNow.AddSeconds(-2);
             try { wizard = Process.Start(new ProcessStartInfo("fsquirt.exe") { UseShellExecute = true })!; }
-            catch (Exception) { _notice("Windows Bluetooth isn't available on this PC. Turn on Bluetooth in Windows Settings."); break; }
+            catch (Exception) { _notice(L.T("WindowsBluetoothIsnTAvailableOnThisPCTurnOnBluetoothInWindowsSett")); break; }
             using (wizard)
             {
                 var window = WaitForWindow(wizard.Id, TimeSpan.FromSeconds(10));
                 Log($"wizard pid {wizard.Id}, window {(window is null ? "not found" : window.Current.NativeWindowHandle.ToString())}");
                 if (window is null || !Press(window, ReceiveOption))
                 {
-                    _notice("Click \"Receive files\" in the Bluetooth window, then send from your phone.");
+                    _notice(L.T("ClickReceiveFilesInTheBluetoothWindowThenSendFromYourPhone"));
                     break;
                 }
                 var outcome = WaitForFiles(wizard, window, waitingSince, stop);
@@ -99,12 +99,12 @@ internal sealed class BluetoothWizard
             if (location is null || finish is null) continue;
             string folder = SaveFolder(window, location);
             Log($"save page: folder '{folder}'");
-            if (!Directory.Exists(folder)) { _notice("A Bluetooth file arrived. Click Finish in the Bluetooth window to save it."); return []; }
-            if (!Press(window, Finish)) { _notice("Click Finish in the Bluetooth window to save the file."); return []; }
+            if (!Directory.Exists(folder)) { _notice(L.T("ABluetoothFileArrivedClickFinishInTheBluetoothWindowToSaveIt")); return []; }
+            if (!Press(window, Finish)) { _notice(L.T("ClickFinishInTheBluetoothWindowToSaveTheFile")); return []; }
             wizard.WaitForExit(15000);
             var arrived = Arrived(folder, waitingSince);
             Log($"finish pressed; exited {wizard.HasExited}; {arrived.Count} new file(s)");
-            if (arrived.Count == 0) _notice($"The Bluetooth file was saved in {folder}.");
+            if (arrived.Count == 0) _notice(L.T("TheBluetoothFileWasSavedIn0", folder));
             return MoveIntoReceiveFolder(arrived);
         }
         Log($"wait ended: stop {stop.IsCancellationRequested}, exited {wizard.HasExited}");

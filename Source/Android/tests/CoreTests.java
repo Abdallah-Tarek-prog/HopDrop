@@ -89,5 +89,16 @@ public final class CoreTests {
         check(BackupRules.oldSentFile("abcdef").equals("backup-sent-abcdef.txt"),"legacy sent list name");
         check(BackupRules.sentFile("legacy","abcdef").equals(BackupRules.oldSentFile("abcdef")),"migration reuses old sent list");
     }
-    public static void main(String[] args)throws Exception{sas();qr();platforms();names();json();framing();meter();backup();System.out.println("PASS core tests: "+count+" checks");}
+    private static void transport(){
+        check(Transport.combine("local_network","local_network").equals("local_network"),"same local route");
+        check(Transport.combine("direct_link","direct_link").equals("direct_link"),"same direct route");
+        check(Transport.combine("local_network","direct_link").equals("mixed"),"local to direct route");
+        check(Transport.combine("direct_link","local_network").equals("mixed"),"direct to local route");
+        check(Transport.combine("mixed","direct_link").equals("mixed"),"mixed route remains mixed");
+        check(Transport.combine("unknown","direct_link").equals("unknown"),"unknown route is honest");
+        check(Transport.stored(null).equals("unknown"),"legacy entry has unknown route");
+        check(Transport.stored("wifi").equals("unknown"),"unrecognized route is unknown");
+        check(Transport.stored("mixed").equals("mixed"),"mixed route loads from history");
+    }
+    public static void main(String[] args)throws Exception{sas();qr();platforms();names();json();framing();meter();backup();transport();System.out.println("PASS core tests: "+count+" checks");}
 }

@@ -64,6 +64,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -147,15 +148,16 @@ fun DeviceAvatar(platform: Platform, online: Boolean, size: Dp = 44.dp, containe
 }
 
 /** "Online", "Seen 5 min ago", "Seen 2 days ago". */
+@Composable
 fun presence(online: Boolean, lastSeen: Long, now: Long): String {
-    if (online) return "Online"
-    if (lastSeen <= 0) return "Offline"
+    if (online) return stringResource(R.string.ui_online)
+    if (lastSeen <= 0) return stringResource(R.string.ui_offline)
     val minutes = maxOf(1L, (now - lastSeen) / 60000)
-    if (minutes < 60) return "Seen $minutes min ago"
+    if (minutes < 60) return androidx.compose.ui.res.pluralStringResource(R.plurals.seen_minutes, minutes.toInt(), minutes)
     val hours = minutes / 60
-    if (hours < 24) return "Seen $hours h ago"
+    if (hours < 24) return androidx.compose.ui.res.pluralStringResource(R.plurals.seen_hours, hours.toInt(), hours)
     val days = hours / 24
-    return if (days == 1L) "Seen yesterday" else "Seen $days days ago"
+    return if (days == 1L) stringResource(R.string.ui_seen_yesterday) else androidx.compose.ui.res.pluralStringResource(R.plurals.seen_days, days.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), days)
 }
 
 /** The current time, refreshed every 30 seconds, for "seen … ago" labels. */
@@ -257,24 +259,28 @@ fun ProgressBar(fraction: Float?, modifier: Modifier = Modifier) {
 }
 
 /** Top-level items of a transfer: loose files, plus each sent folder once ("Photos folder"). */
-fun topItems(names: List<String>): List<String> {
-    val shown = ArrayList<String>()
+data class TopItem(val name: String, val folder: Boolean)
+
+fun topItems(names: List<String>): List<TopItem> {
+    val shown = ArrayList<TopItem>()
     val folders = HashSet<String>()
     for (name in names) {
         val slash = name.indexOf('/')
-        if (slash <= 0) shown.add(name)
-        else if (folders.add(name.substring(0, slash))) shown.add(name.substring(0, slash) + " folder")
+        if (slash <= 0) shown.add(TopItem(name, false))
+        else if (folders.add(name.substring(0, slash))) shown.add(TopItem(name.substring(0, slash), true))
     }
     return shown
 }
 
 /** "report.pdf", "report.pdf + 2 more" — never a comma-separated list. */
+@Composable
 fun shortSummary(names: List<String>): String {
     val items = topItems(names)
+    val first = items.firstOrNull()?.let { if (it.folder) stringResource(R.string.folder_named, ltr(it.name)) else it.name }
     return when {
-        items.isEmpty() -> "No files"
-        items.size == 1 -> items[0]
-        else -> items[0] + " + " + (items.size - 1) + " more"
+        first == null -> stringResource(R.string.ui_no_files)
+        items.size == 1 -> first
+        else -> stringResource(R.string.summary_more, first, stringResource(R.string.more_count, items.size - 1))
     }
 }
 
@@ -289,25 +295,24 @@ fun LiveCard(live: LiveUi, onCancel: (Boolean) -> Unit, modifier: Modifier = Mod
         when { ok -> scheme.primaryContainer; failed -> scheme.errorContainer; else -> scheme.secondaryContainer }, label = "badge")
     val badgeFg = when { ok -> scheme.onPrimaryContainer; failed -> scheme.onErrorContainer; else -> scheme.onSecondaryContainer }
     val title = when (state) {
-        LiveState.Connecting -> "Connecting to ${live.peer}…"
-        LiveState.ConnectingDirectly -> "Connecting directly to ${live.peer}…"
-        LiveState.Queued -> "Waiting for ${live.peer}"
-        LiveState.TextSent -> "Text sent to ${live.peer}"
-        is LiveState.Waiting -> "Waiting for ${live.peer} to accept"
-        LiveState.Reconnecting -> if (live.incoming) "Waiting for ${live.peer} to reconnect" else "Reconnecting to ${live.peer}"
-        is LiveState.Moving -> if (live.incoming) "Receiving from ${live.peer}" else "Sending to ${live.peer}"
-        is LiveState.Done -> (if (live.incoming) "Received " else "Sent ") + Format.files(state.count) +
-            (if (live.incoming) " from " else " to ") + live.peer
-        is LiveState.Stopped -> if (state.cancelled) "Cancelled" else if (live.incoming) "Receiving from ${live.peer} stopped" else "Couldn't send to ${live.peer}"
+        LiveState.Connecting -> stringResource(R.string.live_connecting, ltr(live.peer))
+        LiveState.ConnectingDirectly -> stringResource(R.string.live_connecting_direct, ltr(live.peer))
+        LiveState.Queued -> stringResource(R.string.live_waiting, ltr(live.peer))
+        LiveState.TextSent -> stringResource(R.string.live_text_sent, ltr(live.peer))
+        is LiveState.Waiting -> stringResource(R.string.live_waiting_accept, ltr(live.peer))
+        LiveState.Reconnecting -> stringResource(if (live.incoming) R.string.live_waiting_reconnect else R.string.live_reconnecting, ltr(live.peer))
+        is LiveState.Moving -> stringResource(if (live.incoming) R.string.live_receiving else R.string.live_sending, ltr(live.peer))
+        is LiveState.Done -> stringResource(if (live.incoming) R.string.received_from else R.string.sent_to, filesText(state.count), ltr(live.peer))
+        is LiveState.Stopped -> if (state.cancelled) stringResource(R.string.ui_cancelled) else stringResource(if (live.incoming) R.string.live_receive_stopped else R.string.live_send_stopped, ltr(live.peer))
     }
     val detail = when (state) {
         LiveState.Connecting -> null
-        LiveState.ConnectingDirectly -> "Not on the same Wi-Fi"
-        LiveState.Queued -> "Sends when it's back"
+        LiveState.ConnectingDirectly -> stringResource(R.string.ui_not_on_the_same_wi_fi)
+        LiveState.Queued -> stringResource(R.string.ui_sends_when_it_s_back)
         LiveState.TextSent -> null
-        is LiveState.Waiting -> Format.files(state.count)
-        LiveState.Reconnecting -> "Continues where it stopped"
-        is LiveState.Moving -> if (state.count > 1) "${state.file}  ·  ${state.index} of ${state.count}" else state.file
+        is LiveState.Waiting -> filesText(state.count)
+        LiveState.Reconnecting -> stringResource(R.string.ui_continues_where_it_stopped)
+        is LiveState.Moving -> if (state.count > 1) stringResource(R.string.file_position, ltr(state.file), state.index, state.count) else state.file
         is LiveState.Done -> shortSummary(state.files)
         is LiveState.Stopped -> state.reason
     }
@@ -325,7 +330,8 @@ fun LiveCard(live: LiveUi, onCancel: (Boolean) -> Unit, modifier: Modifier = Mod
                     maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
             if (live.active) {
-                IconButton(onClick = { onCancel(live.incoming) }, modifier = Modifier.semantics { contentDescription = "Cancel transfer" }) {
+                val cancelDescription = stringResource(R.string.ui_cancel_transfer)
+                IconButton(onClick = { onCancel(live.incoming) }, modifier = Modifier.semantics { contentDescription = cancelDescription }) {
                     Icon(Icons.Rounded.Close, contentDescription = null)
                 }
             } else Spacer(Modifier.width(8.dp))
@@ -335,14 +341,15 @@ fun LiveCard(live: LiveUi, onCancel: (Boolean) -> Unit, modifier: Modifier = Mod
             ProgressBar((state as? LiveState.Moving)?.fraction, Modifier.padding(end = 8.dp))
             if (state is LiveState.Moving) {
                 Row(Modifier.fillMaxWidth().padding(top = 6.dp, end = 8.dp)) {
-                    Text(Format.amount(state.done, state.total) + (state.fraction?.let { "  ·  ${(it * 100).toInt()}%" } ?: ""),
+                    Text(if (state.total < 0) sizeText(state.done) else stringResource(R.string.amount_of, sizeText(state.done), sizeText(state.total)),
                         style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
-                    Text(Format.speed(state.speed) + if (state.secondsLeft >= 0) "  ·  " + Format.duration(state.secondsLeft) + " left" else "",
+                    Text(stringResource(R.string.speed_per_second, sizeText(state.speed.toLong())) + if (state.secondsLeft >= 0)
+                        "  ·  " + stringResource(R.string.time_left, durationText(state.secondsLeft)) else "",
                         style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
                 }
             }
         } else if (state is LiveState.Done) {
-            Text(Format.size(state.bytes) + " in " + Format.duration(maxOf(1, state.millis / 1000)),
+            Text(stringResource(R.string.history_size_in, sizeText(state.bytes), durationText(maxOf(1, state.millis / 1000))),
                 style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant, modifier = Modifier.padding(start = 52.dp, top = 6.dp))
         }
     }

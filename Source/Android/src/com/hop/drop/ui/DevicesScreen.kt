@@ -1,5 +1,9 @@
 package com.hop.drop.ui
 
+import com.hop.drop.R
+
+import androidx.compose.ui.res.stringResource
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -85,11 +89,11 @@ fun DevicesScreen(state: HopUiState, actions: HopActions, padding: PaddingValues
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             item(key = "phone") { ThisPhoneCard(state.phone, actions) }
-            item(key = "paired-header") { SectionHeader("Paired") }
+            item(key = "paired-header") { SectionHeader(stringResource(R.string.ui_paired)) }
             if (state.devices.isEmpty()) {
                 item(key = "paired-empty") {
                     HopCard {
-                        Text("No paired devices yet", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.ui_no_paired_devices_yet), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             } else {
@@ -98,25 +102,25 @@ fun DevicesScreen(state: HopUiState, actions: HopActions, padding: PaddingValues
                 }
             }
             item(key = "nearby-header") {
-                SectionHeader("Nearby") {
+                SectionHeader(stringResource(R.string.ui_nearby)) {
                     if (state.phone.receiving && state.phone.addresses.isNotEmpty()) {
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 4.dp)) {
                             CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
                             Spacer(Modifier.width(8.dp))
-                            Text("Searching", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(R.string.ui_searching), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
             }
             when {
                 !state.phone.receiving -> item(key = "nearby-off") {
-                    HopCard { EmptyState(Icons.Rounded.ErrorOutline, "Not searching", "HopDrop isn't receiving right now. Reopen the app.") }
+                    HopCard { EmptyState(Icons.Rounded.ErrorOutline, stringResource(R.string.ui_not_searching), stringResource(R.string.ui_hopdrop_isn_t_receiving_right_now_reopen_the_app)) }
                 }
                 state.phone.addresses.isEmpty() -> item(key = "nearby-offline") {
-                    HopCard { EmptyState(Icons.Rounded.WifiOff, "Not on Wi-Fi", "No problem: scan the QR code on your PC and HopDrop connects to it directly.") }
+                    HopCard { EmptyState(Icons.Rounded.WifiOff, stringResource(R.string.ui_not_on_wi_fi), stringResource(R.string.ui_no_problem_scan_the_qr_code_on_your_pc_and_hopdrop_conn)) }
                 }
                 state.nearby.isEmpty() -> item(key = "nearby-empty") {
-                    HopCard { EmptyState(Icons.Rounded.Radar, "Looking for devices…", "Devices on this Wi-Fi show up here. For a PC, scanning its QR code is quicker and works on any network.") }
+                    HopCard { EmptyState(Icons.Rounded.Radar, stringResource(R.string.ui_looking_for_devices), stringResource(R.string.ui_devices_on_this_wi_fi_show_up_here_for_a_pc_scanning_it)) }
                 }
                 else -> items(state.nearby, key = { "nearby:" + it.id }) { device ->
                     NearbyRow(device, Modifier.animateItem()) { actions.pairNearby(device) }
@@ -129,22 +133,23 @@ fun DevicesScreen(state: HopUiState, actions: HopActions, padding: PaddingValues
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ThisPhoneCard(phone: PhoneUi, actions: HopActions) {
+    val ipLabel = stringResource(R.string.ui_ip_address)
     HopCard(color = MaterialTheme.colorScheme.surfaceContainer) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             DeviceAvatar(Platform.Android, phone.receiving, size = 48.dp, container = MaterialTheme.colorScheme.primaryContainer)
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                Text("This phone", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.ui_this_phone), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(phone.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            FilledTonalIconButton(onClick = actions::showMyQr) { Icon(Icons.Rounded.QrCode2, contentDescription = "Show my QR code") }
+            FilledTonalIconButton(onClick = actions::showMyQr) { Icon(Icons.Rounded.QrCode2, contentDescription = stringResource(R.string.ui_show_my_qr_code)) }
         }
         if (phone.addresses.isNotEmpty()) {
             FlowRow(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 for (a in phone.addresses) {
                     AssistChip(
-                        onClick = { actions.copy("IP address", a.ip) },
-                        label = { Text(a.kind + "  " + a.ip) },
-                        trailingIcon = { Icon(Icons.Rounded.ContentCopy, contentDescription = "Copy", modifier = Modifier.size(AssistChipDefaults.IconSize)) },
+                        onClick = { actions.copy(ipLabel, a.ip) },
+                        label = { Text(a.kind + "  " + ltr(a.ip)) },
+                        trailingIcon = { Icon(Icons.Rounded.ContentCopy, contentDescription = stringResource(R.string.ui_copy), modifier = Modifier.size(AssistChipDefaults.IconSize)) },
                     )
                 }
             }
@@ -159,13 +164,13 @@ private fun PairedRow(device: DeviceUi, now: Long, modifier: Modifier, onClick: 
             DeviceAvatar(device.platform, device.online)
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                 Text(device.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(device.platform.label + "  ·  " +
-                    if (device.direct) "Connected directly" else presence(device.online, device.lastSeen, now),
+                Text((if (device.platform.label == "Computer") stringResource(R.string.ui_computer) else device.platform.label) + "  ·  " +
+                    if (device.direct) stringResource(R.string.ui_connected_directly) else presence(device.online, device.lastSeen, now),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            if (device.hasLink) Icon(Icons.Rounded.WifiTethering, contentDescription = "Can connect directly", tint = MaterialTheme.colorScheme.primary,
+            if (device.hasLink) Icon(Icons.Rounded.WifiTethering, contentDescription = stringResource(R.string.ui_can_connect_directly), tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(end = 6.dp).size(20.dp))
-            if (device.trusted) Icon(Icons.Rounded.VerifiedUser, contentDescription = "Trusted", tint = MaterialTheme.colorScheme.primary,
+            if (device.trusted) Icon(Icons.Rounded.VerifiedUser, contentDescription = stringResource(R.string.ui_trusted), tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp))
             Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -179,9 +184,9 @@ private fun NearbyRow(device: NearbyUi, modifier: Modifier, onPair: () -> Unit) 
             DeviceAvatar(device.platform, online = false, container = MaterialTheme.colorScheme.surfaceContainerHighest)
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                 Text(device.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(device.address, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(ltr(device.address), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            FilledTonalButton(onClick = onPair) { Text("Pair") }
+            FilledTonalButton(onClick = onPair) { Text(stringResource(R.string.ui_pair)) }
         }
     }
 }
@@ -194,8 +199,8 @@ fun DeviceDetailsScreen(device: DeviceUi, actions: HopActions, onDismiss: () -> 
     val now = rememberNow()
     val transparent = ListItemDefaults.colors(containerColor = Color.Transparent)
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Device details") }, navigationIcon = {
-            IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") }
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.ui_device_details)) }, navigationIcon = {
+            IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.ui_back)) }
         }) },
         bottomBar = {
             Button(
@@ -205,7 +210,7 @@ fun DeviceDetailsScreen(device: DeviceUi, actions: HopActions, onDismiss: () -> 
             ) {
                 Icon(Icons.Rounded.DeleteOutline, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Remove device")
+                Text(stringResource(R.string.ui_remove_device))
             }
         },
     ) { padding ->
@@ -214,56 +219,56 @@ fun DeviceDetailsScreen(device: DeviceUi, actions: HopActions, onDismiss: () -> 
                 DeviceAvatar(device.platform, device.online, size = 56.dp)
                 Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
                     Text(device.name, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text(device.platform.label + "  ·  " + presence(device.online, device.lastSeen, now),
+                    Text((if (device.platform.label == "Computer") stringResource(R.string.ui_computer) else device.platform.label) + "  ·  " + presence(device.online, device.lastSeen, now),
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                IconButton(onClick = { renaming = true }) { Icon(Icons.Rounded.Edit, contentDescription = "Rename") }
+                IconButton(onClick = { renaming = true }) { Icon(Icons.Rounded.Edit, contentDescription = stringResource(R.string.ui_rename)) }
             }
             Spacer(Modifier.height(12.dp))
             ListItem(
-                headlineContent = { Text("Trust this device") },
-                supportingContent = { Text("Sends without asking first") },
+                headlineContent = { Text(stringResource(R.string.ui_trust_this_device)) },
+                supportingContent = { Text(stringResource(R.string.ui_sends_without_asking_first)) },
                 leadingContent = { Icon(Icons.Rounded.VerifiedUser, contentDescription = null) },
                 trailingContent = { Switch(checked = device.trusted, onCheckedChange = { actions.setTrusted(device, it) }) },
                 colors = transparent,
             )
             if (device.hasLink) ListItem(
-                headlineContent = { Text(if (device.direct) "Connected directly" else "Connect directly") },
-                supportingContent = { Text(if (device.direct) "No shared Wi-Fi needed right now" else "When you're not on the same Wi-Fi, so it can send to this phone") },
+                headlineContent = { Text(if (device.direct) stringResource(R.string.ui_connected_directly) else stringResource(R.string.ui_connect_directly)) },
+                supportingContent = { Text(if (device.direct) stringResource(R.string.ui_no_shared_wi_fi_needed_right_now) else stringResource(R.string.ui_when_you_re_not_on_the_same_wi_fi_so_it_can_send_to_thi)) },
                 leadingContent = { Icon(Icons.Rounded.WifiTethering, contentDescription = null) },
                 trailingContent = {
-                    if (device.direct) TextButton(onClick = actions::disconnectDirect) { Text("Done") }
-                    else FilledTonalButton(onClick = { actions.connectDirectly(device) }) { Text("Connect") }
+                    if (device.direct) TextButton(onClick = actions::disconnectDirect) { Text(stringResource(R.string.ui_done)) }
+                    else FilledTonalButton(onClick = { actions.connectDirectly(device) }) { Text(stringResource(R.string.ui_connect)) }
                 },
                 colors = transparent,
             )
             ListItem(
-                headlineContent = { Text("Paired") },
+                headlineContent = { Text(stringResource(R.string.ui_paired)) },
                 supportingContent = { Text(DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(device.pairedAt))) },
                 colors = transparent,
             )
             if (device.address != null) {
-                ListItem(headlineContent = { Text("Last address") }, supportingContent = { Text(device.address) }, colors = transparent)
+                ListItem(headlineContent = { Text(stringResource(R.string.ui_last_address)) }, supportingContent = { Text(ltr(device.address)) }, colors = transparent)
             }
         }
     }
     if (renaming) {
         TextInputDialog(
-            title = "Rename device", initial = device.name, label = "Name",
+            title = stringResource(R.string.ui_rename_device), initial = device.name, label = stringResource(R.string.ui_name),
             onDismiss = { renaming = false },
             onSave = { name -> actions.rename(device, name).also { if (it == null) renaming = false } },
         )
     }
     if (removing) {
         HopModal(
-            onDismissRequest = { removing = false }, paneTitle = "Remove ${device.name}?",
-            title = { Text("Remove ${device.name}?") },
-            text = { Text("You'll need to pair again to send files between these devices.") },
+            onDismissRequest = { removing = false }, paneTitle = stringResource(R.string.remove_device_question, ltr(device.name)),
+            title = { Text(stringResource(R.string.remove_device_question, ltr(device.name))) },
+            text = { Text(stringResource(R.string.ui_you_ll_need_to_pair_again_to_send_files_between_these_d)) },
             confirmButton = {
                 Button(onClick = { removing = false; onDismiss(); actions.remove(device) },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Remove") }
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text(stringResource(R.string.ui_remove)) }
             },
-            dismissButton = { TextButton(onClick = { removing = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { removing = false }) { Text(stringResource(R.string.ui_cancel)) } },
         )
     }
 }

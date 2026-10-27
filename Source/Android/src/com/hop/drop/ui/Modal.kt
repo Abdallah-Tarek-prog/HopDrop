@@ -1,5 +1,8 @@
 package com.hop.drop.ui
 
+import com.hop.drop.R
+import androidx.compose.ui.res.stringResource
+
 import android.os.Build
 import android.provider.Settings
 import android.view.WindowManager
@@ -134,7 +137,7 @@ fun HopModal(
                             ProvideTextStyle(MaterialTheme.typography.headlineSmall) { title() }
                         }
                         if (!required) IconButton(onClick = { close() }, modifier = Modifier.padding(start = 8.dp)) {
-                            Icon(Icons.Rounded.Close, contentDescription = "Close")
+                            Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.scan_close))
                         }
                     }
                     Box(Modifier.fillMaxWidth().padding(top = 16.dp).weight(1f, fill = false).verticalScroll(rememberScrollState())) {

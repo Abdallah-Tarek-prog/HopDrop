@@ -200,7 +200,7 @@ public sealed class DiscoveryService(string id, Func<string> name, Func<int> por
     }
     private async Task BroadcastAsync(string type, CancellationToken ct)
     {
-        byte[] bytes = new DiscoveryMessage(2, type, id, type == "bye" ? "" : name(), "windows", port(), type != "bye").Encode();
+        byte[] bytes = new DiscoveryMessage(2, type, id, type == "bye" ? "" : name(), DevicePlatform.Current, port(), type != "bye").Encode();
         await _sendGate.WaitAsync(ct);
         try
         {
@@ -237,7 +237,7 @@ public sealed class DiscoveryService(string id, Func<string> name, Func<int> por
                 if (changed) NearbyChanged?.Invoke(_table.Items);
                 if (message.Type == "query" || first)
                 {
-                    byte[] reply = new DiscoveryMessage(2, "announce", id, name(), "windows", port(), true).Encode();
+                    byte[] reply = new DiscoveryMessage(2, "announce", id, name(), DevicePlatform.Current, port(), true).Encode();
                     await _udp.SendAsync(reply, packet.RemoteEndPoint, ct);
                 }
             }

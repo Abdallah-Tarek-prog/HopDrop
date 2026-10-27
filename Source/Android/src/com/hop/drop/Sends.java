@@ -209,8 +209,8 @@ final class Sends {
                 synchronized (Sends.class) {
                     if (waiting && !queued(app, job.id)) app.live().clear(label);
                     else {
-                        app.live().failedToStart(label, ErrorText.forDevice(e, label));
-                        app.notices().couldNotSend(label, ErrorText.forDevice(e, label));
+                        app.live().failedToStart(label, ErrorText.forDevice(app, e, label));
+                        app.notices().couldNotSend(label, ErrorText.forDevice(app, e, label));
                         dequeue(app, job.id);
                     }
                 }
@@ -226,9 +226,8 @@ final class Sends {
         try {
             for (String text : job.texts) {
                 if (app.peer().sendText(reached.device, text, job.clip)) {
-                    app.saveText(false, label, text);
                     app.live().textSent(label);
-                    toast(app, (job.clip ? "Clipboard sent to " : "Sent to ") + label);
+                    toast(app, Language.text(app, job.clip ? R.string.clipboard_sent_to : R.string.sent_to_peer, label));
                 }
             }
             List<Object> shown = new ArrayList<>();
@@ -247,7 +246,8 @@ final class Sends {
                 waitForDevice(app, job, d, label, waiting);
                 return;
             }
-            String reason = e.getMessage() != null && e.getMessage().startsWith("cancelled") ? "You cancelled it." : ErrorText.forDevice(e, label);
+            String reason = e.getMessage() != null && e.getMessage().startsWith("cancelled")
+                    ? Language.text(app, R.string.main_you_cancelled_it) : ErrorText.forDevice(app, e, label);
             if (item == null || !item.finished() || item.failure != null) {
                 app.live().failedToStart(label, reason);
                 app.notices().couldNotSend(label, reason);
@@ -266,7 +266,7 @@ final class Sends {
     private static List<Peer.FileItem> items(HopApp app, Job job, List<Object> shown) {
         List<Peer.FileItem> items = new ArrayList<>();
         for (Uri tree : job.trees) {
-            for (FolderScan.Item file : FolderScan.files(app.getContentResolver(), tree)) {
+            for (FolderScan.Item file : FolderScan.files(app, tree)) {
                 items.add(new Peer.FileItem(file.name, file.size, () -> app.getContentResolver().openInputStream(file.uri), file.folder));
                 if (shown.size() < 50) shown.add(java.util.Arrays.asList(file.folder == null ? file.name : file.folder + "/" + file.name, file.uri.toString()));
             }
@@ -328,7 +328,7 @@ final class Sends {
             boolean fresh = !queued(app, job.id);
             queue(app, job);
             app.live().queued(label);
-            if (fresh) app.notices().queued(device.id, label, job.textOnly() ? "Your text" : job.summary);
+            if (fresh) app.notices().queued(device.id, label, summary(app, job));
         }
     }
 
@@ -474,10 +474,12 @@ final class Sends {
     }
 
     /** A short summary of what a list of files is ("3 files"), for notifications about waiting sends. */
-    static String summary(int files, int folders) {
-        if (folders == 0) return Format.files(files);
-        if (files == 0) return Format.folders(folders);
-        return Format.folders(folders) + " and " + Format.files(files);
+    static String summary(Context context, Job job) {
+        if (job.textOnly()) return Language.text(context, R.string.main_your_text);
+        int files = job.files.size() + job.listed.size(), folders = job.trees.size();
+        if (folders == 0) return Language.files(context, files);
+        if (files == 0) return Language.folders(context, folders);
+        return Language.text(context, R.string.selection_and, Language.folders(context, folders), Language.files(context, files));
     }
 
 }

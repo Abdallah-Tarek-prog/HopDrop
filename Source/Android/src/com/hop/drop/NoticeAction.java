@@ -16,7 +16,7 @@ public final class NoticeAction extends BroadcastReceiver {
         String action = intent.getAction();
         if (COPY.equals(action)) {
             String text = intent.getStringExtra("text");
-            if (text != null && app.copyText(text) && android.os.Build.VERSION.SDK_INT < 33) Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show();
+            if (text != null && app.copyText(text) && android.os.Build.VERSION.SDK_INT < 33) Toast.makeText(context, Language.text(context, R.string.copied), Toast.LENGTH_SHORT).show();
         } else if (CANCEL_QUEUE.equals(action)) {
             String device = intent.getStringExtra("device");
             if (device != null) Sends.cancelQueued(app, device);

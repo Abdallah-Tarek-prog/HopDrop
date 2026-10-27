@@ -16,6 +16,7 @@ import android.os.Looper;
 import android.util.Log;
 import java.io.IOException;
 import java.net.Inet4Address;
+import java.net.InetAddress;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -58,6 +59,16 @@ public final class DirectLink {
 
     /** The network name the phone is joined to right now, or null. */
     public synchronized String connectedTo() { return network != null ? ssid : null; }
+
+    /** Identify the interface a connected transfer socket actually used. */
+    public boolean owns(InetAddress local) {
+        Network active = network;
+        LinkProperties properties = active == null ? null : connectivity.getLinkProperties(active);
+        if (properties == null) return false;
+        for (LinkAddress address : properties.getLinkAddresses())
+            if (address.getAddress().equals(local)) return true;
+        return false;
+    }
 
     public boolean wifiOn() { return wifi != null && wifi.isWifiEnabled(); }
 

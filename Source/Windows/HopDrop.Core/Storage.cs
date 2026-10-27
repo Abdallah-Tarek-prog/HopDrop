@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
+using System.Diagnostics;
 using System.Text.Json;
 
 namespace HopDrop.Core;
@@ -19,9 +21,18 @@ public sealed record HopDropPaths(string DataDirectory, string LogDirectory, str
     public string BackupsPath => BackupsFile ?? Path.Combine(DataDirectory, "backups.json");
     public string IdentityPfxPath => IdentityPfxFile ?? Path.Combine(DataDirectory, "identity.pfx");
     public string IdentityKeyPath => IdentityKeyFile ?? Path.Combine(DataDirectory, "identity.key");
-    public static HopDropPaths Default => new(
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "HopDrop"),
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HopDrop", "logs"));
+    public static HopDropPaths Default => OperatingSystem.IsLinux()
+        ? new(Path.Combine(LinuxHome("XDG_DATA_HOME", ".local/share"), "hopdrop"),
+            Path.Combine(LinuxHome("XDG_STATE_HOME", ".local/state"), "hopdrop", "logs"))
+            { SettingsFile = Path.Combine(LinuxHome("XDG_CONFIG_HOME", ".config"), "hopdrop", "settings.json") }
+        : new(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "HopDrop"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HopDrop", "logs"));
+    private static string LinuxHome(string variable, string fallback)
+    {
+        string? value = Environment.GetEnvironmentVariable(variable);
+        return !string.IsNullOrWhiteSpace(value) && Path.IsPathFullyQualified(value)
+            ? value : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), fallback);
+    }
     public string DefaultReceiveDirectory => ReceiveDirectory is null
         ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "HopDrop")
         : Path.GetFullPath(ReceiveDirectory);
@@ -36,7 +47,7 @@ public sealed record ReceivedBackup(string DeviceId, string DeviceName, string F
 public sealed record PairedDevice(string Id, string Name, string Platform, DateTimeOffset PairedAt, List<string> LastAddresses, DateTimeOffset LastSeen, string? Alias = null, int Port = 7410, bool Trusted = false, DirectLinkInfo? Link = null);
 /// <param name="Count">How many files the transfer had when <paramref name="Files"/> keeps only the first ones; null when it lists them all.</param>
 /// <param name="Text">A text message (no files) sent or received, e.g. a link or a copied clipboard.</param>
-public sealed record HistoryEntry(DateTimeOffset At, string PeerId, string Direction, string Result, List<string> Files, string? Folder, int? Count = null, string? Text = null)
+public sealed record HistoryEntry(DateTimeOffset At, string PeerId, string Direction, string Result, List<string> Files, string? Folder, int? Count = null, string? Text = null, string? Transport = null)
 {
     public int FileCount => Count ?? Files.Count;
 }
@@ -116,6 +127,7 @@ public sealed class Identity : IDisposable
     public static string Fingerprint(X509Certificate2 cert) => Convert.ToHexString(SHA256.HashData(cert.RawData)).ToLowerInvariant();
     public static Identity LoadOrCreate(HopDropPaths paths)
     {
+        if (OperatingSystem.IsLinux()) return LoadOrCreateLinux(paths);
         string pfx = paths.IdentityPfxPath, key = paths.IdentityKeyPath;
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(pfx))!);
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(key))!);
@@ -137,7 +149,89 @@ public sealed class Identity : IDisposable
         File.WriteAllBytes(key, Dpapi.Protect(System.Text.Encoding.UTF8.GetBytes(secret)));
         return new(X509CertificateLoader.LoadPkcs12FromFile(pfx, secret));
     }
+    [SupportedOSPlatform("linux")]
+    private static Identity LoadOrCreateLinux(HopDropPaths paths)
+    {
+        string pfx = paths.IdentityPfxPath, key = paths.IdentityKeyPath;
+        string directory = Path.GetDirectoryName(Path.GetFullPath(pfx))!;
+        string keyDirectory = Path.GetDirectoryName(Path.GetFullPath(key))!;
+        Directory.CreateDirectory(directory);
+        File.SetUnixFileMode(directory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        Directory.CreateDirectory(keyDirectory);
+        File.SetUnixFileMode(keyDirectory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        if (File.Exists(key)) File.SetUnixFileMode(key, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        string? secret = File.Exists(key) ? File.ReadAllText(key) : LinuxSecret.Lookup(pfx);
+        if (File.Exists(pfx))
+        {
+            File.SetUnixFileMode(pfx, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            if (string.IsNullOrEmpty(secret)) throw new CryptographicException("HopDrop identity password is unavailable; unlock the keyring or restore identity.key.");
+            return new(X509CertificateLoader.LoadPkcs12FromFile(pfx, secret));
+        }
+        using var ec = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var request = new CertificateRequest("CN=HopDrop", ec, HashAlgorithmName.SHA256);
+        request.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, true));
+        request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature, true));
+        var uses = new OidCollection { new Oid("1.3.6.1.5.5.7.3.1"), new Oid("1.3.6.1.5.5.7.3.2") };
+        request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(uses, false));
+        request.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(request.PublicKey, false));
+        using var created = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddYears(30));
+        secret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        if (!LinuxSecret.Store(pfx, secret))
+        {
+            using var passwordFile = new FileStream(key, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+            File.SetUnixFileMode(passwordFile.SafeFileHandle, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            using var writer = new StreamWriter(passwordFile);
+            writer.Write(secret);
+        }
+        using (var identityFile = new FileStream(pfx, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+        {
+            File.SetUnixFileMode(identityFile.SafeFileHandle, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            identityFile.Write(created.Export(X509ContentType.Pfx, secret));
+        }
+        return new(X509CertificateLoader.LoadPkcs12FromFile(pfx, secret));
+    }
     public void Dispose() => Certificate.Dispose();
+}
+
+internal static class LinuxSecret
+{
+    private static string Attribute(string path) => Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(Path.GetFullPath(path)))).ToLowerInvariant();
+    public static string? Lookup(string path)
+    {
+        try
+        {
+            using var process = Process.Start(Start("lookup", path));
+            if (process is null) return null;
+            if (!process.WaitForExit(3000)) { process.Kill(); return null; }
+            string value = process.StandardOutput.ReadToEnd().TrimEnd('\r', '\n');
+            return process.ExitCode == 0 && value.Length > 0 ? value : null;
+        }
+        catch (System.ComponentModel.Win32Exception) { return null; }
+    }
+    public static bool Store(string path, string secret)
+    {
+        try
+        {
+            var start = Start("store", path);
+            start.ArgumentList.Insert(1, "--label=HopDrop identity");
+            start.RedirectStandardInput = true;
+            using var process = Process.Start(start);
+            if (process is null) return false;
+            process.StandardInput.Write(secret);
+            process.StandardInput.Close();
+            if (!process.WaitForExit(3000)) { process.Kill(); return false; }
+            return process.ExitCode == 0;
+        }
+        catch (System.ComponentModel.Win32Exception) { return false; }
+    }
+    private static ProcessStartInfo Start(string action, string path)
+    {
+        var start = new ProcessStartInfo("secret-tool") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+        start.ArgumentList.Add(action);
+        start.ArgumentList.Add("application"); start.ArgumentList.Add("hopdrop");
+        start.ArgumentList.Add("identity"); start.ArgumentList.Add(Attribute(path));
+        return start;
+    }
 }
 
 internal static class Dpapi

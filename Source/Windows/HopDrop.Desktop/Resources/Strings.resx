@@ -1,0 +1,1108 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <data name="Send" xml:space="preserve">
+    <value>Send</value>
+  </data>
+  <data name="Devices" xml:space="preserve">
+    <value>Devices</value>
+  </data>
+  <data name="Activity" xml:space="preserve">
+    <value>Activity</value>
+  </data>
+  <data name="Settings" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="PickFilesThenChooseAPairedDeviceEverythingStaysOnYourLocalNetwork" xml:space="preserve">
+    <value>Pick files, then choose a paired device. Everything stays on your local network.</value>
+  </data>
+  <data name="DropFilesOrFoldersHere" xml:space="preserve">
+    <value>Drop files or folders here</value>
+  </data>
+  <data name="BrowseFiles" xml:space="preserve">
+    <value>Browse files</value>
+  </data>
+  <data name="AddAFolder" xml:space="preserve">
+    <value>Add a folder</value>
+  </data>
+  <data name="Text" xml:space="preserve">
+    <value>Text</value>
+  </data>
+  <data name="FilesToSend" xml:space="preserve">
+    <value>Files to send</value>
+  </data>
+  <data name="ClearAll" xml:space="preserve">
+    <value>Clear all</value>
+  </data>
+  <data name="SendTo" xml:space="preserve">
+    <value>Send to</value>
+  </data>
+  <data name="SendTo2Devices" xml:space="preserve">
+    <value>Send to 2 devices</value>
+  </data>
+  <data name="OtherWays" xml:space="preserve">
+    <value>Other ways</value>
+  </data>
+  <data name="SendWithBluetooth" xml:space="preserve">
+    <value>Send with Bluetooth</value>
+  </data>
+  <data name="RarelyNeededPhonesReachThisPCDirectlyEvenWithoutASharedWiFiOpensW" xml:space="preserve">
+    <value>Rarely needed: phones reach this PC directly even without a shared Wi-Fi. Opens Windows' Bluetooth window; much slower, and the phone accepts the file in its Bluetooth notification.</value>
+  </data>
+  <data name="SendViaBluetooth" xml:space="preserve">
+    <value>Send via Bluetooth</value>
+  </data>
+  <data name="ChooseFilesToSend" xml:space="preserve">
+    <value>Choose files to send</value>
+  </data>
+  <data name="ChooseFoldersToSend" xml:space="preserve">
+    <value>Choose folders to send</value>
+  </data>
+  <data name="HopDropCouldnTReadThatFolder" xml:space="preserve">
+    <value>HopDrop couldn't read that folder: </value>
+  </data>
+  <data name="0And1" xml:space="preserve">
+    <value>{0} and {1}</value>
+  </data>
+  <data name="NothingSelectedYet" xml:space="preserve">
+    <value>Nothing selected yet</value>
+  </data>
+  <data name="DropFilesOrFoldersAboveOrClickBrowseYouCanAddAsManyAsYouLike" xml:space="preserve">
+    <value>Drop files or folders above, or click Browse. You can add as many as you like.</value>
+  </data>
+  <data name="RemoveFolder" xml:space="preserve">
+    <value>Remove folder </value>
+  </data>
+  <data name="Folder012" xml:space="preserve">
+    <value>Folder · {0} · {1} · {2}</value>
+  </data>
+  <data name="Remove" xml:space="preserve">
+    <value>Remove </value>
+  </data>
+  <data name="And0More" xml:space="preserve">
+    <value>…and {0} more</value>
+  </data>
+  <data name="NoPairedDevicesYet" xml:space="preserve">
+    <value>No paired devices yet</value>
+  </data>
+  <data name="PairOnceInDevicesScanAQRCodeWithYourPhoneAfterThatSendingIsOneCli" xml:space="preserve">
+    <value>Pair once in Devices (scan a QR code with your phone). After that, sending is one click, both ways.</value>
+  </data>
+  <data name="PairADevice" xml:space="preserve">
+    <value>Pair a device</value>
+  </data>
+  <data name="Select" xml:space="preserve">
+    <value>Select </value>
+  </data>
+  <data name="SendTo0Devices" xml:space="preserve">
+    <value>Send to {0} devices</value>
+  </data>
+  <data name="Online" xml:space="preserve">
+    <value>Online</value>
+  </data>
+  <data name="Offline" xml:space="preserve">
+    <value>Offline</value>
+  </data>
+  <data name="OfflineSeen0" xml:space="preserve">
+    <value>Offline · seen {0}</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="AddFilesFirst" xml:space="preserve">
+    <value>Add files first</value>
+  </data>
+  <data name="OfflineSendsWhenItSBack" xml:space="preserve">
+    <value>Offline · sends when it's back</value>
+  </data>
+  <data name="Sent01In2" xml:space="preserve">
+    <value>Sent {0} · {1} in {2}</value>
+  </data>
+  <data name="ConnectionDroppedReconnecting" xml:space="preserve">
+    <value>Connection dropped · reconnecting…</value>
+  </data>
+  <data name="WaitingFor0ToAccept" xml:space="preserve">
+    <value>Waiting for {0} to accept…</value>
+  </data>
+  <data name="0Left" xml:space="preserve">
+    <value> · {0} left</value>
+  </data>
+  <data name="Connecting" xml:space="preserve">
+    <value>Connecting…</value>
+  </data>
+  <data name="AddAtLeastOneFileFirst" xml:space="preserve">
+    <value>Add at least one file first.</value>
+  </data>
+  <data name="PairOnceAndDevicesRecogniseEachOtherFromThenOnInBothDirections" xml:space="preserve">
+    <value>Pair once, and devices recognise each other from then on, in both directions.</value>
+  </data>
+  <data name="ThisComputer" xml:space="preserve">
+    <value>This computer</value>
+  </data>
+  <data name="Ready" xml:space="preserve">
+    <value>Ready</value>
+  </data>
+  <data name="DirectLinkOn" xml:space="preserve">
+    <value>Direct link on</value>
+  </data>
+  <data name="DirectLinkOff" xml:space="preserve">
+    <value>Direct link off</value>
+  </data>
+  <data name="DirectLinkStarting" xml:space="preserve">
+    <value>Direct link starting</value>
+  </data>
+  <data name="DirectLinkWaiting" xml:space="preserve">
+    <value>Direct link waiting</value>
+  </data>
+  <data name="ReadyToReceiveFromPairedDevicesWhileHopDropIsRunningAlsoFromTheTr" xml:space="preserve">
+    <value>Ready to receive from paired devices while HopDrop is running (also from the tray).</value>
+  </data>
+  <data name="WiFi" xml:space="preserve">
+    <value>Wi-Fi</value>
+  </data>
+  <data name="NotConnectedToALocalNetworkJoinWiFiOrTurnOnWindowsMobileHotspot" xml:space="preserve">
+    <value>Not connected to a local network. Join Wi-Fi, or turn on Windows Mobile hotspot.</value>
+  </data>
+  <data name="Copy" xml:space="preserve">
+    <value>Copy </value>
+  </data>
+  <data name="PairAPhone" xml:space="preserve">
+    <value>Pair a phone</value>
+  </data>
+  <data name="PairedDevices" xml:space="preserve">
+    <value>Paired devices</value>
+  </data>
+  <data name="PairingIsPermanentPairedDevicesStayPairedUntilYouRemoveThemHereOr" xml:space="preserve">
+    <value>Pairing is permanent. Paired devices stay paired until you remove them here or on the other device.</value>
+  </data>
+  <data name="NearbyDevices" xml:space="preserve">
+    <value>Nearby devices</value>
+  </data>
+  <data name="Refresh" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="PairByIPAddress" xml:space="preserve">
+    <value>Pair by IP address</value>
+  </data>
+  <data name="ScanTheQRCodeAboveWithHopDropOnYourPhoneOrPickANearbyDeviceBelow" xml:space="preserve">
+    <value>Scan the QR code above with HopDrop on your phone, or pick a nearby device below.</value>
+  </data>
+  <data name="Rename" xml:space="preserve">
+    <value>Rename</value>
+  </data>
+  <data name="RenameDevice" xml:space="preserve">
+    <value>Rename device</value>
+  </data>
+  <data name="ChooseANameForThisDeviceOnThisPC" xml:space="preserve">
+    <value>Choose a name for this device on this PC</value>
+  </data>
+  <data name="UseAtMost40Characters" xml:space="preserve">
+    <value>Use at most 40 characters.</value>
+  </data>
+  <data name="Remove_c3812fc4" xml:space="preserve">
+    <value>Remove</value>
+  </data>
+  <data name="Remove0YouLlNeedToPairAgainToSendFilesBetweenTheseDevices" xml:space="preserve">
+    <value>Remove {0}? You'll need to pair again to send files between these devices.</value>
+  </data>
+  <data name="RemoveDevice" xml:space="preserve">
+    <value>Remove device</value>
+  </data>
+  <data name="0Paired1MMMDYyyy" xml:space="preserve">
+    <value>{0} · paired {1:MMM d, yyyy}</value>
+  </data>
+  <data name="OnlineNow" xml:space="preserve">
+    <value>Online now</value>
+  </data>
+  <data name="TrustFilesFromThisDevice" xml:space="preserve">
+    <value>Trust files from this device</value>
+  </data>
+  <data name="TrustedFilesArriveWithoutAskingAndOpenWithoutWindowsDownloadedFil" xml:space="preserve">
+    <value>Trusted: files arrive without asking and open without Windows' "downloaded file" warnings. Only for devices you own.</value>
+  </data>
+  <data name="Searching" xml:space="preserve">
+    <value>Searching…</value>
+  </data>
+  <data name="NearbyDevicesNeedTheSameWiFiThePairingQRAboveWorksWithoutItYouCan" xml:space="preserve">
+    <value>Nearby devices need the same Wi-Fi. The pairing QR above works without it. You can also pair by IP address.</value>
+  </data>
+  <data name="Paired" xml:space="preserve">
+    <value>Paired</value>
+  </data>
+  <data name="Pair" xml:space="preserve">
+    <value>Pair</value>
+  </data>
+  <data name="ReadyToSend" xml:space="preserve">
+    <value> · ready to send</value>
+  </data>
+  <data name="PairByComparingA6DigitNumber" xml:space="preserve">
+    <value> · pair by comparing a 6-digit number</value>
+  </data>
+  <data name="ClickToShowABiggerCode" xml:space="preserve">
+    <value>Click to show a bigger code</value>
+  </data>
+  <data name="ScanWithHopDropOnYourPhone" xml:space="preserve">
+    <value>Scan with HopDrop on your phone</value>
+  </data>
+  <data name="OnYourPhoneHopDropPairScanClickTheCodeToMakeItBigger" xml:space="preserve">
+    <value>On your phone: HopDrop → Pair → Scan. Click the code to make it bigger.</value>
+  </data>
+  <data name="YourPhoneDoesnTNeedToBeOnTheSameWiFi" xml:space="preserve">
+    <value>Your phone doesn't need to be on the same Wi-Fi.</value>
+  </data>
+  <data name="EachCodeWorksOnceANewOneAppearsEvery5Minutes" xml:space="preserve">
+    <value>Each code works once. A new one appears every 5 minutes.</value>
+  </data>
+  <data name="CodeValidFor0100" xml:space="preserve">
+    <value>Code valid for {0}:{1:00}</value>
+  </data>
+  <data name="PairAnotherDevice" xml:space="preserve">
+    <value>Pair another device</value>
+  </data>
+  <data name="PairedWith" xml:space="preserve">
+    <value>Paired with </value>
+  </data>
+  <data name="YouCanSendFilesBothWaysNowNoCodesNeededNextTime" xml:space="preserve">
+    <value>You can send files both ways now. No codes needed next time.</value>
+  </data>
+  <data name="TypeTheOtherDeviceSAddressOnAPhoneItSUnderHopDropDevicesThisPhone" xml:space="preserve">
+    <value>Type the other device's address. On a phone it's under HopDrop → Devices → This phone.</value>
+  </data>
+  <data name="EnterALocalAddressLike192168123" xml:space="preserve">
+    <value>Enter a local address like 192.168.1.23</value>
+  </data>
+  <data name="PortMustBeBetween1And65535" xml:space="preserve">
+    <value>Port must be between 1 and 65535.</value>
+  </data>
+  <data name="TheDevice" xml:space="preserve">
+    <value>the device</value>
+  </data>
+  <data name="EverythingYouSentAndReceivedNewestFirst" xml:space="preserve">
+    <value>Everything you sent and received, newest first.</value>
+  </data>
+  <data name="ClearList" xml:space="preserve">
+    <value>Clear list</value>
+  </data>
+  <data name="ClearTheActivityListReceivedFilesStayWhereTheyAre" xml:space="preserve">
+    <value>Clear the activity list? Received files stay where they are.</value>
+  </data>
+  <data name="ClearActivity" xml:space="preserve">
+    <value>Clear activity</value>
+  </data>
+  <data name="NoTransfersYet" xml:space="preserve">
+    <value>No transfers yet</value>
+  </data>
+  <data name="FilesYouSendAndReceiveWillAppearHere" xml:space="preserve">
+    <value>Files you send and receive will appear here.</value>
+  </data>
+  <data name="SendFiles" xml:space="preserve">
+    <value>Send files</value>
+  </data>
+  <data name="Bluetooth" xml:space="preserve">
+    <value>Bluetooth</value>
+  </data>
+  <data name="ARemovedDevice" xml:space="preserve">
+    <value>a removed device</value>
+  </data>
+  <data name="Copy_e21f935f" xml:space="preserve">
+    <value>Copy</value>
+  </data>
+  <data name="OpenLink" xml:space="preserve">
+    <value>Open link</value>
+  </data>
+  <data name="ReceivingFrom0Stopped" xml:space="preserve">
+    <value>Receiving from {0} stopped</value>
+  </data>
+  <data name="CouldnTSendTo0" xml:space="preserve">
+    <value>Couldn't send to {0}</value>
+  </data>
+  <data name="0Done" xml:space="preserve">
+    <value> ({0} done)</value>
+  </data>
+  <data name="SavedIn0" xml:space="preserve">
+    <value> · saved in {0}</value>
+  </data>
+  <data name="Cancelled" xml:space="preserve">
+    <value> · cancelled</value>
+  </data>
+  <data name="Open" xml:space="preserve">
+    <value>Open</value>
+  </data>
+  <data name="ShowInFolder" xml:space="preserve">
+    <value>Show in folder</value>
+  </data>
+  <data name="HowHopDropLooksWhereFilesGoAndHowItRunsOnThisPC" xml:space="preserve">
+    <value>How HopDrop looks, where files go, and how it runs on this PC.</value>
+  </data>
+  <data name="General" xml:space="preserve">
+    <value>General</value>
+  </data>
+  <data name="Save" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="Use140Characters" xml:space="preserve">
+    <value>Use 1–40 characters.</value>
+  </data>
+  <data name="NameSaved" xml:space="preserve">
+    <value>Name saved</value>
+  </data>
+  <data name="OtherDevicesNowSeeThisPCAs0" xml:space="preserve">
+    <value>Other devices now see this PC as {0}.</value>
+  </data>
+  <data name="ThisPCSName" xml:space="preserve">
+    <value>This PC's name</value>
+  </data>
+  <data name="ShownToPhonesAndOtherComputers" xml:space="preserve">
+    <value>Shown to phones and other computers.</value>
+  </data>
+  <data name="UseWindowsSetting" xml:space="preserve">
+    <value>Use Windows setting</value>
+  </data>
+  <data name="Light" xml:space="preserve">
+    <value>Light</value>
+  </data>
+  <data name="Dark" xml:space="preserve">
+    <value>Dark</value>
+  </data>
+  <data name="Appearance" xml:space="preserve">
+    <value>Appearance</value>
+  </data>
+  <data name="LightDarkOrFollowWindows" xml:space="preserve">
+    <value>Light, dark, or follow Windows.</value>
+  </data>
+  <data name="Receiving" xml:space="preserve">
+    <value>Receiving</value>
+  </data>
+  <data name="Change" xml:space="preserve">
+    <value>Change…</value>
+  </data>
+  <data name="ChooseWhereHopDropSavesReceivedFiles" xml:space="preserve">
+    <value>Choose where HopDrop saves received files</value>
+  </data>
+  <data name="Default" xml:space="preserve">
+    <value>Default</value>
+  </data>
+  <data name="ThisDriveCanTMarkFilesAsDownloadedSoWindowsWonTWarnBeforeOpeningF" xml:space="preserve">
+    <value>This drive can't mark files as downloaded, so Windows won't warn before opening files from devices you haven't trusted.</value>
+  </data>
+  <data name="ReceiveFolder" xml:space="preserve">
+    <value>Receive folder</value>
+  </data>
+  <data name="FilesFromPhonesAndOtherPCsAreSavedHere" xml:space="preserve">
+    <value>Files from phones and other PCs are saved here.</value>
+  </data>
+  <data name="Backups" xml:space="preserve">
+    <value>Backups</value>
+  </data>
+  <data name="ChooseWhereHopDropSavesBackups" xml:space="preserve">
+    <value>Choose where HopDrop saves backups</value>
+  </data>
+  <data name="SaveBackupsIn" xml:space="preserve">
+    <value>Save backups in</value>
+  </data>
+  <data name="NoBackupsReceivedYet" xml:space="preserve">
+    <value>No backups received yet</value>
+  </data>
+  <data name="OpenFolder" xml:space="preserve">
+    <value>Open folder</value>
+  </data>
+  <data name="BackupFolderIsnTAvailable" xml:space="preserve">
+    <value>Backup folder isn't available.</value>
+  </data>
+  <data name="ForgetEntry" xml:space="preserve">
+    <value>Forget entry</value>
+  </data>
+  <data name="CouldnTLoadBackups" xml:space="preserve">
+    <value>Couldn't load backups: </value>
+  </data>
+  <data name="AskBeforeReceiving" xml:space="preserve">
+    <value>Ask before receiving</value>
+  </data>
+  <data name="ANotificationAsksYouToAcceptOrDeclineFilesFromPairedDevicesDevice" xml:space="preserve">
+    <value>A notification asks you to accept or decline files from paired devices. Devices you trust (Devices page) skip the question.</value>
+  </data>
+  <data name="CloseToTheTray" xml:space="preserve">
+    <value>Close to the tray</value>
+  </data>
+  <data name="ClosingTheWindowKeepsHopDropSIconInTheTrayNextToTheClockSoPhonesC" xml:space="preserve">
+    <value>Closing the window keeps HopDrop's icon in the tray (next to the clock) so phones can still send. Quit from the tray icon.</value>
+  </data>
+  <data name="ReceiveInTheBackground" xml:space="preserve">
+    <value>Receive in the background</value>
+  </data>
+  <data name="PhonesCanSendToThisPCEvenAfterYouQuitHopDropAndAfterARestartHopDr" xml:space="preserve">
+    <value>Phones can send to this PC even after you quit HopDrop, and after a restart. HopDrop keeps a small hidden receiver running (no window, no tray icon) and notifies you when files arrive. </value>
+  </data>
+  <data name="ToStopItOpenHopDropAndChooseQuitAndStopReceivingInTheTrayMenu" xml:space="preserve">
+    <value>To stop it, open HopDrop and choose "Quit and stop receiving" in the tray menu.</value>
+  </data>
+  <data name="StartWithWindows" xml:space="preserve">
+    <value>Start with Windows</value>
+  </data>
+  <data name="HopDropStartsHiddenInTheTrayWhenYouSignInSoThisPCCanReceiveWithou" xml:space="preserve">
+    <value>HopDrop starts hidden in the tray when you sign in, so this PC can receive without opening it.</value>
+  </data>
+  <data name="On" xml:space="preserve">
+    <value>On · </value>
+  </data>
+  <data name="Off" xml:space="preserve">
+    <value>Off</value>
+  </data>
+  <data name="WaitingForAPairedPhoneOrPairing" xml:space="preserve">
+    <value>Waiting for a paired phone or pairing</value>
+  </data>
+  <data name="Starting" xml:space="preserve">
+    <value>Starting…</value>
+  </data>
+  <data name="WindowsFirewallMayBlockPhonesOnThisDirectLink" xml:space="preserve">
+    <value>Windows Firewall may block phones on this direct link.</value>
+  </data>
+  <data name="AllowDirectLink" xml:space="preserve">
+    <value>Allow direct link</value>
+  </data>
+  <data name="DirectConnection" xml:space="preserve">
+    <value>Direct connection</value>
+  </data>
+  <data name="PhonesCanReachThisPCWithoutASharedWiFiNeighboursWiFiListsShowAPro" xml:space="preserve">
+    <value>Phones can reach this PC without a shared Wi-Fi. Neighbours' Wi-Fi lists show a protected network named </value>
+  </data>
+  <data name="Clipboard" xml:space="preserve">
+    <value>Clipboard</value>
+  </data>
+  <data name="PutTextFromMyDevicesOnTheClipboard" xml:space="preserve">
+    <value>Put text from my devices on the clipboard</value>
+  </data>
+  <data name="TextCopiedOnYourPhoneIsReadyToPasteHere" xml:space="preserve">
+    <value>Text copied on your phone is ready to paste here.</value>
+  </data>
+  <data name="ShareWhatICopy" xml:space="preserve">
+    <value>Share what I copy</value>
+  </data>
+  <data name="TextYouCopyHereGoesToYourPairedPhonesThatAreOnline" xml:space="preserve">
+    <value>Text you copy here goes to your paired phones that are online.</value>
+  </data>
+  <data name="Privacy" xml:space="preserve">
+    <value>Privacy</value>
+  </data>
+  <data name="EveryoneOnTheNetwork" xml:space="preserve">
+    <value>Everyone on the network</value>
+  </data>
+  <data name="OnlyMyPairedDevices" xml:space="preserve">
+    <value>Only my paired devices</value>
+  </data>
+  <data name="WhoCanSeeThisPCSName" xml:space="preserve">
+    <value>Who can see this PC's name</value>
+  </data>
+  <data name="HopDropTellsDevicesOnTheSameNetworkThatThisPCIsHereOnlyMyPairedDe" xml:space="preserve">
+    <value>HopDrop tells devices on the same network that this PC is here. "Only my paired devices" hides the name from everyone else, </value>
+  </data>
+  <data name="ExceptWhileTheDevicesPageIsOpenForPairingPairedDevicesStillFindAn" xml:space="preserve">
+    <value>except while the Devices page is open for pairing. Paired devices still find and reach this PC.</value>
+  </data>
+  <data name="WindowsIntegration" xml:space="preserve">
+    <value>Windows integration</value>
+  </data>
+  <data name="ExplorerShareMenu" xml:space="preserve">
+    <value>Explorer Share menu</value>
+  </data>
+  <data name="RightClickFilesInFileExplorerShareHopDropTheyOpenHereReadyToSend" xml:space="preserve">
+    <value>Right-click files in File Explorer → Share → HopDrop. They open here, ready to send.</value>
+  </data>
+  <data name="ExplorerSendToMenu" xml:space="preserve">
+    <value>Explorer "Send to" menu</value>
+  </data>
+  <data name="RightClickFilesInFileExplorerSendToHopDrop" xml:space="preserve">
+    <value>Right-click files in File Explorer → Send to → HopDrop.</value>
+  </data>
+  <data name="AlsoOnPublicNetworksSomeHotspotsAreMarkedPublic" xml:space="preserve">
+    <value>Also on public networks (some hotspots are marked public)</value>
+  </data>
+  <data name="CouldnTReadWindowsFirewallIfPhonesCanTFindThisPCClickAllow" xml:space="preserve">
+    <value>Couldn't read Windows Firewall. If phones can't find this PC, click Allow.</value>
+  </data>
+  <data name="AllowedOnPrivateAndPublicNetworks" xml:space="preserve">
+    <value>Allowed on private and public networks.</value>
+  </data>
+  <data name="AllowedOnPrivateNetworksPublicNetworksMayBlockPhones" xml:space="preserve">
+    <value>Allowed on private networks. Public networks may block phones.</value>
+  </data>
+  <data name="WindowsFirewallMayBlockPhonesFromReachingHopDropClickAllowNeedsAd" xml:space="preserve">
+    <value>Windows Firewall may block phones from reaching HopDrop. Click Allow (needs admin).</value>
+  </data>
+  <data name="WindowsFirewall" xml:space="preserve">
+    <value>Windows Firewall</value>
+  </data>
+  <data name="AllowHopDrop" xml:space="preserve">
+    <value>Allow HopDrop</value>
+  </data>
+  <data name="AIAgents" xml:space="preserve">
+    <value>AI agents</value>
+  </data>
+  <data name="Copied" xml:space="preserve">
+    <value>Copied. </value>
+  </data>
+  <data name="CouldnTUseTheClipboardTryAgain" xml:space="preserve">
+    <value>Couldn't use the clipboard. Try again.</value>
+  </data>
+  <data name="CopyForClaudeCode" xml:space="preserve">
+    <value>Copy for Claude Code</value>
+  </data>
+  <data name="PasteItInATerminalAndPressEnter" xml:space="preserve">
+    <value>Paste it in a terminal and press Enter.</value>
+  </data>
+  <data name="CopyForCodex" xml:space="preserve">
+    <value>Copy for Codex</value>
+  </data>
+  <data name="CopyMCPSettingsJSON" xml:space="preserve">
+    <value>Copy MCP settings (JSON)</value>
+  </data>
+  <data name="PasteItIntoTheAgentSMCPSettingsClaudeDesktopCursorAndOthers" xml:space="preserve">
+    <value>Paste it into the agent's MCP settings (Claude Desktop, Cursor and others).</value>
+  </data>
+  <data name="ThenAskYourAgentThingsLikeSendReportPdfToMyPhoneOrWaitForThePhoto" xml:space="preserve">
+    <value>Then ask your agent things like "send report.pdf to my phone" or "wait for the photo I send from my phone". Scripts and agents without MCP can run: HopDrop.exe agent help</value>
+  </data>
+  <data name="ThisCopyOfHopDropIsnTInstalledIfYouMoveHopDropExeCopyTheSetupAgai" xml:space="preserve">
+    <value>This copy of HopDrop isn't installed. If you move HopDrop.exe, copy the setup again.</value>
+  </data>
+  <data name="LetAIAgentsUseHopDrop" xml:space="preserve">
+    <value>Let AI agents use HopDrop</value>
+  </data>
+  <data name="AIAssistantsOnThisPCClaudeCodexCursorAndOthersThatSupportMCPCanLi" xml:space="preserve">
+    <value>AI assistants on this PC (Claude, Codex, Cursor and others that support MCP) can list your paired devices, send files and folders to them, and find files you received. </value>
+  </data>
+  <data name="TheyCanTPairNewDevicesChangeSettingsOrAcceptFilesForYouAndYouSeeT" xml:space="preserve">
+    <value>They can't pair new devices, change settings or accept files for you, and you see their transfers here like your own.</value>
+  </data>
+  <data name="Receive" xml:space="preserve">
+    <value>Receive</value>
+  </data>
+  <data name="BluetoothFileTransfer" xml:space="preserve">
+    <value>Bluetooth file transfer</value>
+  </data>
+  <data name="ForWhenThereSNoSharedNetworkReceiveHopDropOpensWindowsBluetoothWi" xml:space="preserve">
+    <value>For when there's no shared network. Receive: HopDrop opens Windows' Bluetooth window in receive mode and moves arriving files into your receive folder. </value>
+  </data>
+  <data name="ThePhoneMustBePairedWithThisPCInWindowsBluetoothSettingsMuchSlowe" xml:space="preserve">
+    <value>The phone must be paired with this PC in Windows Bluetooth settings. Much slower than Wi-Fi.</value>
+  </data>
+  <data name="About" xml:space="preserve">
+    <value>About</value>
+  </data>
+  <data name="PrivateFileTransferOnYourOwnNetworkNoCloudNoAccountsDeviceID01" xml:space="preserve">
+    <value>Private file transfer on your own network. No cloud, no accounts. Device ID {0} {1}.</value>
+  </data>
+  <data name="RestartToUpdate" xml:space="preserve">
+    <value>Restart to update</value>
+  </data>
+  <data name="CheckNow" xml:space="preserve">
+    <value>Check now</value>
+  </data>
+  <data name="Updates" xml:space="preserve">
+    <value>Updates</value>
+  </data>
+  <data name="HopDropChecksOnceADayAndInstallsUpdatesWhenYouReNotUsingIt" xml:space="preserve">
+    <value>HopDrop checks once a day and installs updates when you're not using it.</value>
+  </data>
+  <data name="TheMicrosoftStoreKeepsHopDropUpToDate" xml:space="preserve">
+    <value>The Microsoft Store keeps HopDrop up to date.</value>
+  </data>
+  <data name="ThisCopyRunsWithoutBeingInstalledSoItDoesnTUpdateItselfInstallHop" xml:space="preserve">
+    <value>This copy runs without being installed, so it doesn't update itself. Install HopDrop with its Setup file to get automatic updates.</value>
+  </data>
+  <data name="ADevice" xml:space="preserve">
+    <value>a device</value>
+  </data>
+  <data name="0SavedIn1" xml:space="preserve">
+    <value>{0} · saved in {1}</value>
+  </data>
+  <data name="0In1" xml:space="preserve">
+    <value>{0} in {1}</value>
+  </data>
+  <data name="0Of1FilesDone" xml:space="preserve">
+    <value>{0} of {1} files done</value>
+  </data>
+  <data name="ConnectingTo0" xml:space="preserve">
+    <value>Connecting to {0}…</value>
+  </data>
+  <data name="GettingReadyToSend0" xml:space="preserve">
+    <value>Getting ready to send {0}</value>
+  </data>
+  <data name="WaitingFor0ToReconnect" xml:space="preserve">
+    <value>Waiting for {0} to reconnect…</value>
+  </data>
+  <data name="ReconnectingTo0" xml:space="preserve">
+    <value>Reconnecting to {0}…</value>
+  </data>
+  <data name="TheConnectionDroppedHopDropContinuesWhereItStopped" xml:space="preserve">
+    <value>The connection dropped. HopDrop continues where it stopped.</value>
+  </data>
+  <data name="0WillStartSendingOnceTheyAcceptOn1" xml:space="preserve">
+    <value>{0} will start sending once they accept on {1}.</value>
+  </data>
+  <data name="ReadyToReceive" xml:space="preserve">
+    <value>Ready to receive</value>
+  </data>
+  <data name="HopDropCanTStartAtSignIn" xml:space="preserve">
+    <value>HopDrop can't start at sign-in</value>
+  </data>
+  <data name="SendFilesWithHopDrop" xml:space="preserve">
+    <value>Send files with HopDrop</value>
+  </data>
+  <data name="0WantsToPair" xml:space="preserve">
+    <value>{0} wants to pair</value>
+  </data>
+  <data name="CompareThe6DigitNumberOnBothScreens" xml:space="preserve">
+    <value>Compare the 6-digit number on both screens.</value>
+  </data>
+  <data name="ShowNumber" xml:space="preserve">
+    <value>Show number</value>
+  </data>
+  <data name="ConnectionDroppedWaitingFor0ToReconnect" xml:space="preserve">
+    <value>Connection dropped · waiting for {0} to reconnect…</value>
+  </data>
+  <data name="0DidnTAcceptTheFiles" xml:space="preserve">
+    <value>{0} didn't accept the files.</value>
+  </data>
+  <data name="0DisconnectedAndDidnTComeBackSendAgainToGetTheRest" xml:space="preserve">
+    <value>{0} disconnected and didn't come back. Send again to get the rest.</value>
+  </data>
+  <data name="0DoesnTKnowThisPCAnyMorePairAgain" xml:space="preserve">
+    <value>{0} doesn't know this PC any more. Pair again.</value>
+  </data>
+  <data name="ThisIsnTTheDeviceYouPairedWithPairAgain" xml:space="preserve">
+    <value>This isn't the device you paired with. Pair again.</value>
+  </data>
+  <data name="ThatQRCodeCanTBeUsedShowANewOneAndScanItAgain" xml:space="preserve">
+    <value>That QR code can't be used. Show a new one and scan it again.</value>
+  </data>
+  <data name="ThatQRCodeExpiredShowANewOneAndScanItAgain" xml:space="preserve">
+    <value>That QR code expired. Show a new one and scan it again.</value>
+  </data>
+  <data name="0IsBusyPairingTryAgainShortly" xml:space="preserve">
+    <value>{0} is busy pairing. Try again shortly.</value>
+  </data>
+  <data name="PairingWasCancelled" xml:space="preserve">
+    <value>Pairing was cancelled.</value>
+  </data>
+  <data name="TheTransferWasCancelled" xml:space="preserve">
+    <value>The transfer was cancelled.</value>
+  </data>
+  <data name="0DoesnTHaveEnoughFreeSpace" xml:space="preserve">
+    <value>{0} doesn't have enough free space.</value>
+  </data>
+  <data name="AFileChangedDuringTheTransferTrySendingItAgain" xml:space="preserve">
+    <value>A file changed during the transfer. Try sending it again.</value>
+  </data>
+  <data name="TheTransferStoppedWhileReadingOrSavingAFile" xml:space="preserve">
+    <value>The transfer stopped while reading or saving a file.</value>
+  </data>
+  <data name="HopDropCouldnTUnderstandTheResponseFrom0UpdateHopDropOnBothDevice" xml:space="preserve">
+    <value>HopDrop couldn't understand the response from {0}. Update HopDrop on both devices.</value>
+  </data>
+  <data name="UpdateHopDropOnBothDevicesThenTryAgain" xml:space="preserve">
+    <value>Update HopDrop on both devices, then try again.</value>
+  </data>
+  <data name="0StoppedRespondingCheckThatItSStillOnTheSameNetwork" xml:space="preserve">
+    <value>{0} stopped responding. Check that it's still on the same network.</value>
+  </data>
+  <data name="SomethingWentWrongPleaseTryAgain" xml:space="preserve">
+    <value>Something went wrong. Please try again.</value>
+  </data>
+  <data name="CanTReach0MakeSureHopDropIsOpenOnItAndBothDevicesAreOnTheSameWiFi" xml:space="preserve">
+    <value>Can't reach {0}. Make sure HopDrop is open on it and both devices are on the same Wi-Fi or hotspot.</value>
+  </data>
+  <data name="CouldnTMakeASecureConnectionTo0" xml:space="preserve">
+    <value>Couldn't make a secure connection to {0}.</value>
+  </data>
+  <data name="HopDropCouldnTReadOrSaveAFileCheckItsPermissionAndFreeSpace" xml:space="preserve">
+    <value>HopDrop couldn't read or save a file. Check its permission and free space.</value>
+  </data>
+  <data name="CouldnTFinishSendingTo0" xml:space="preserve">
+    <value>Couldn't finish sending to {0}</value>
+  </data>
+  <data name="SavedIn01" xml:space="preserve">
+    <value>Saved in {0}{1}</value>
+  </data>
+  <data name="0WantsToSendYou1" xml:space="preserve">
+    <value>{0} wants to send you {1}</value>
+  </data>
+  <data name="AcceptToSaveThemInYourReceiveFolder" xml:space="preserve">
+    <value>Accept to save them in your receive folder.</value>
+  </data>
+  <data name="Accept" xml:space="preserve">
+    <value>Accept</value>
+  </data>
+  <data name="Decline" xml:space="preserve">
+    <value>Decline</value>
+  </data>
+  <data name="Received0ViaBluetooth" xml:space="preserve">
+    <value>Received {0} via Bluetooth</value>
+  </data>
+  <data name="SavedIn" xml:space="preserve">
+    <value>Saved in </value>
+  </data>
+  <data name="WaitingForBluetoothFiles" xml:space="preserve">
+    <value>Waiting for Bluetooth files</value>
+  </data>
+  <data name="SendFromYourPhoneWithBluetoothAndPickThisPCFilesAreSavedIn0" xml:space="preserve">
+    <value>Send from your phone with Bluetooth and pick this PC. Files are saved in {0}.</value>
+  </data>
+  <data name="OpenHopDrop" xml:space="preserve">
+    <value>Open HopDrop</value>
+  </data>
+  <data name="SendFiles_4f967e3b" xml:space="preserve">
+    <value>Send files…</value>
+  </data>
+  <data name="ReceiveViaBluetooth" xml:space="preserve">
+    <value>Receive via Bluetooth</value>
+  </data>
+  <data name="CloseHopDropKeepReceiving" xml:space="preserve">
+    <value>Close HopDrop (keep receiving)</value>
+  </data>
+  <data name="QuitAndStopReceiving" xml:space="preserve">
+    <value>Quit and stop receiving</value>
+  </data>
+  <data name="QuitHopDrop" xml:space="preserve">
+    <value>Quit HopDrop</value>
+  </data>
+  <data name="SendClipboard" xml:space="preserve">
+    <value>Send clipboard</value>
+  </data>
+  <data name="SendClipboardTo" xml:space="preserve">
+    <value>Send clipboard to </value>
+  </data>
+  <data name="ClipboardIsEmpty" xml:space="preserve">
+    <value>Clipboard is empty</value>
+  </data>
+  <data name="CopySomeTextAndTryAgain" xml:space="preserve">
+    <value>Copy some text and try again.</value>
+  </data>
+  <data name="NoPairedDevices" xml:space="preserve">
+    <value>No paired devices</value>
+  </data>
+  <data name="PairADeviceFirst" xml:space="preserve">
+    <value>Pair a device first.</value>
+  </data>
+  <data name="HopDropIsStillReceiving" xml:space="preserve">
+    <value>HopDrop is still receiving</value>
+  </data>
+  <data name="PhonesCanKeepSendingToThisPCToStopOpenHopDropAndUseSettingsOrQuit" xml:space="preserve">
+    <value>Phones can keep sending to this PC. To stop, open HopDrop and use Settings or Quit in the tray menu.</value>
+  </data>
+  <data name="Windows" xml:space="preserve">
+    <value>Windows</value>
+  </data>
+  <data name="Android" xml:space="preserve">
+    <value>Android</value>
+  </data>
+  <data name="Linux" xml:space="preserve">
+    <value>Linux</value>
+  </data>
+  <data name="UnknownSize" xml:space="preserve">
+    <value>Unknown size</value>
+  </data>
+  <data name="0B" xml:space="preserve">
+    <value>{0} B</value>
+  </data>
+  <data name="000KB" xml:space="preserve">
+    <value>{0:0.0} KB</value>
+  </data>
+  <data name="000MB" xml:space="preserve">
+    <value>{0:0.0} MB</value>
+  </data>
+  <data name="0000GB" xml:space="preserve">
+    <value>{0:0.00} GB</value>
+  </data>
+  <data name="0S" xml:space="preserve">
+    <value>{0} s</value>
+  </data>
+  <data name="0Min1S" xml:space="preserve">
+    <value>{0} min {1} s</value>
+  </data>
+  <data name="0Min" xml:space="preserve">
+    <value>{0} min</value>
+  </data>
+  <data name="0H1Min" xml:space="preserve">
+    <value>{0} h {1} min</value>
+  </data>
+  <data name="Folder" xml:space="preserve">
+    <value> folder</value>
+  </data>
+  <data name="NoFiles" xml:space="preserve">
+    <value>No files</value>
+  </data>
+  <data name="01More" xml:space="preserve">
+    <value>{0} + {1} more</value>
+  </data>
+  <data name="0More" xml:space="preserve">
+    <value>
++ {0} more</value>
+  </data>
+  <data name="0Of1" xml:space="preserve">
+    <value>{0} of {1}</value>
+  </data>
+  <data name="JustNow" xml:space="preserve">
+    <value>just now</value>
+  </data>
+  <data name="0MinAgo" xml:space="preserve">
+    <value>{0} min ago</value>
+  </data>
+  <data name="0HAgo" xml:space="preserve">
+    <value>{0} h ago</value>
+  </data>
+  <data name="0DaysAgo" xml:space="preserve">
+    <value>{0} days ago</value>
+  </data>
+  <data name="Version0IsReady" xml:space="preserve">
+    <value>Version {0} is ready.</value>
+  </data>
+  <data name="CheckingForUpdates" xml:space="preserve">
+    <value>Checking for updates…</value>
+  </data>
+  <data name="HopDropIsUpToDate" xml:space="preserve">
+    <value>HopDrop is up to date.</value>
+  </data>
+  <data name="DownloadingVersion0" xml:space="preserve">
+    <value>Downloading version {0}…</value>
+  </data>
+  <data name="HopDropUpdateReady" xml:space="preserve">
+    <value>HopDrop update ready</value>
+  </data>
+  <data name="Version0InstallsTheNextTimeHopDropRestartsOrNowFromSettings" xml:space="preserve">
+    <value>Version {0} installs the next time HopDrop restarts, or now from Settings.</value>
+  </data>
+  <data name="CouldnTCheckForUpdatesCheckTheInternetConnectionAndTryAgain" xml:space="preserve">
+    <value>Couldn't check for updates. Check the internet connection and try again.</value>
+  </data>
+  <data name="ThisPCSWiFiCanTCreateADirectLink" xml:space="preserve">
+    <value>This PC's Wi-Fi can't create a direct link</value>
+  </data>
+  <data name="WiFiDirect" xml:space="preserve">
+    <value>Wi-Fi Direct</value>
+  </data>
+  <data name="WiFiIsOff" xml:space="preserve">
+    <value>Wi-Fi is off</value>
+  </data>
+  <data name="MobileHotspotOrAnotherAppIsUsingThisPCSWiFiDirect" xml:space="preserve">
+    <value>Mobile hotspot (or another app) is using this PC's Wi-Fi Direct</value>
+  </data>
+  <data name="SendCancelled" xml:space="preserve">
+    <value>Send cancelled</value>
+  </data>
+  <data name="TheFilesAreNoLongerOnThisPC" xml:space="preserve">
+    <value>The files are no longer on this PC.</value>
+  </data>
+  <data name="SentTextTo" xml:space="preserve">
+    <value>Sent text to </value>
+  </data>
+  <data name="SentTo" xml:space="preserve">
+    <value>Sent to </value>
+  </data>
+  <data name="OpenHopDropOnYourPhoneAndTapConnect" xml:space="preserve">
+    <value>Open HopDrop on your phone and tap Connect</value>
+  </data>
+  <data name="ConnectBothDevicesToTheSameWiFi" xml:space="preserve">
+    <value>Connect both devices to the same Wi-Fi</value>
+  </data>
+  <data name="UseTheSameWiFiOrTurnOnSettingsDirectConnection" xml:space="preserve">
+    <value>Use the same Wi-Fi or turn on Settings → Direct connection</value>
+  </data>
+  <data name="YourDevice" xml:space="preserve">
+    <value>your device</value>
+  </data>
+  <data name="CouldnTSavePendingSends" xml:space="preserve">
+    <value>Couldn't save pending sends</value>
+  </data>
+  <data name="WindowsHasHopDropTurnedOffAtSignInTurnItOnInTaskManagerStartupApp" xml:space="preserve">
+    <value>Windows has HopDrop turned off at sign-in. Turn it on in Task Manager → Startup apps.</value>
+  </data>
+  <data name="WindowsDoesnTAllowHopDropToStartAtSignInOnThisPC" xml:space="preserve">
+    <value>Windows doesn't allow HopDrop to start at sign-in on this PC.</value>
+  </data>
+  <data name="HopDropCouldnTSetItselfToStartAtSignIn" xml:space="preserve">
+    <value>HopDrop couldn't set itself to start at sign-in.</value>
+  </data>
+  <data name="HopDropCouldnTStart" xml:space="preserve">
+    <value>HopDrop couldn't start</value>
+  </data>
+  <data name="BluetoothReceivingStoppedClickFinishInTheBluetoothWindowIfAFileIs" xml:space="preserve">
+    <value>Bluetooth receiving stopped. Click Finish in the Bluetooth window if a file is waiting.</value>
+  </data>
+  <data name="WindowsBluetoothIsnTAvailableOnThisPCTurnOnBluetoothInWindowsSett" xml:space="preserve">
+    <value>Windows Bluetooth isn't available on this PC. Turn on Bluetooth in Windows Settings.</value>
+  </data>
+  <data name="ClickReceiveFilesInTheBluetoothWindowThenSendFromYourPhone" xml:space="preserve">
+    <value>Click "Receive files" in the Bluetooth window, then send from your phone.</value>
+  </data>
+  <data name="ABluetoothFileArrivedClickFinishInTheBluetoothWindowToSaveIt" xml:space="preserve">
+    <value>A Bluetooth file arrived. Click Finish in the Bluetooth window to save it.</value>
+  </data>
+  <data name="ClickFinishInTheBluetoothWindowToSaveTheFile" xml:space="preserve">
+    <value>Click Finish in the Bluetooth window to save the file.</value>
+  </data>
+  <data name="TheBluetoothFileWasSavedIn0" xml:space="preserve">
+    <value>The Bluetooth file was saved in {0}.</value>
+  </data>
+  <data name="PairDevice" xml:space="preserve">
+    <value>Pair device</value>
+  </data>
+  <data name="TheyMatch" xml:space="preserve">
+    <value>They match</value>
+  </data>
+  <data name="Continue" xml:space="preserve">
+    <value>Continue</value>
+  </data>
+  <data name="PairingCode" xml:space="preserve">
+    <value>Pairing code</value>
+  </data>
+  <data name="OnYourPhoneHopDropPairScan" xml:space="preserve">
+    <value>On your phone: HopDrop → Pair → Scan</value>
+  </data>
+  <data name="ClickAnywhereOrPressEscToClose" xml:space="preserve">
+    <value>Click anywhere or press Esc to close.</value>
+  </data>
+  <data name="SendText" xml:space="preserve">
+    <value>Send text</value>
+  </data>
+  <data name="FromYourClipboardYouCanEditIt" xml:space="preserve">
+    <value>From your clipboard. You can edit it.</value>
+  </data>
+  <data name="TypeOrPasteTextToSend" xml:space="preserve">
+    <value>Type or paste text to send.</value>
+  </data>
+  <data name="TypeOrPasteText" xml:space="preserve">
+    <value>Type or paste text</value>
+  </data>
+  <data name="Language" xml:space="preserve">
+    <value>Language</value>
+  </data>
+  <data name="LanguageDescription" xml:space="preserve">
+    <value>English is the default. Choose the language used in HopDrop.</value>
+  </data>
+  <data name="TransportLocalNetwork" xml:space="preserve">
+    <value>Local network</value>
+  </data>
+  <data name="TransportDirectLink" xml:space="preserve">
+    <value>Direct link</value>
+  </data>
+  <data name="TransportBluetooth" xml:space="preserve">
+    <value>Bluetooth</value>
+  </data>
+  <data name="TransportMixed" xml:space="preserve">
+    <value>Multiple connections</value>
+  </data>
+  <data name="TransportUnknown" xml:space="preserve">
+    <value>Connection not recorded</value>
+  </data>
+  <data name="TextFrom" xml:space="preserve">
+    <value>Text from {0}</value>
+  </data>
+  <data name="TextTo" xml:space="preserve">
+    <value>Text to {0}</value>
+  </data>
+  <data name="ReceivedFilesFrom" xml:space="preserve">
+    <value>Received {0} from {1}</value>
+  </data>
+  <data name="SentFilesTo" xml:space="preserve">
+    <value>Sent {0} to {1}</value>
+  </data>
+  <data name="ReceivingCancelled" xml:space="preserve">
+    <value>Receiving from {0} was cancelled</value>
+  </data>
+  <data name="SendingCancelled" xml:space="preserve">
+    <value>Sending to {0} was cancelled</value>
+  </data>
+  <data name="PairWith" xml:space="preserve">
+    <value>Pair with {0}</value>
+  </data>
+  <data name="SameNumber" xml:space="preserve">
+    <value>Does {0} show the same number?</value>
+  </data>
+  <data name="FilesZero" xml:space="preserve">
+    <value>{0:N0} files</value>
+  </data>
+  <data name="FilesOne" xml:space="preserve">
+    <value>{0:N0} file</value>
+  </data>
+  <data name="FilesTwo" xml:space="preserve">
+    <value>{0:N0} files</value>
+  </data>
+  <data name="FilesFew" xml:space="preserve">
+    <value>{0:N0} files</value>
+  </data>
+  <data name="FilesMany" xml:space="preserve">
+    <value>{0:N0} files</value>
+  </data>
+  <data name="FilesOther" xml:space="preserve">
+    <value>{0:N0} files</value>
+  </data>
+  <data name="FoldersZero" xml:space="preserve">
+    <value>{0:N0} folders</value>
+  </data>
+  <data name="FoldersOne" xml:space="preserve">
+    <value>{0:N0} folder</value>
+  </data>
+  <data name="FoldersTwo" xml:space="preserve">
+    <value>{0:N0} folders</value>
+  </data>
+  <data name="FoldersFew" xml:space="preserve">
+    <value>{0:N0} folders</value>
+  </data>
+  <data name="FoldersMany" xml:space="preserve">
+    <value>{0:N0} folders</value>
+  </data>
+  <data name="FoldersOther" xml:space="preserve">
+    <value>{0:N0} folders</value>
+  </data>
+  <data name="SpeedPerSecond" xml:space="preserve">
+    <value>{0}/s</value>
+  </data>
+  <data name="ReceivingStopped" xml:space="preserve">
+    <value>Receiving from {0} stopped</value>
+  </data>
+  <data name="SendingStopped" xml:space="preserve">
+    <value>Sending to {0} stopped</value>
+  </data>
+  <data name="ReceivingFilesFrom" xml:space="preserve">
+    <value>Receiving {0} from {1}</value>
+  </data>
+  <data name="SendingFilesTo" xml:space="preserve">
+    <value>Sending {0} to {1}</value>
+  </data>
+  <data name="FileProgress" xml:space="preserve">
+    <value>{0} · {1} of {2}</value>
+  </data>
+  <data name="SavedInFolder" xml:space="preserve">
+    <value>Saved in {0}</value>
+  </data>
+  <data name="SavedOnDevice" xml:space="preserve">
+    <value>Saved in {0} on {1}</value>
+  </data>
+  <data name="SavedFileProgress" xml:space="preserve">
+    <value>{0} of {1} files were saved</value>
+  </data>
+  <data name="DeliveredFileProgress" xml:space="preserve">
+    <value>{0} of {1} files arrived</value>
+  </data>
+  <data name="BackupLastRun" xml:space="preserve">
+    <value>{0} · Last run {1:g}</value>
+  </data>
+  <data name="CopiedFrom" xml:space="preserve">
+    <value>Copied from {0}</value>
+  </data>
+  <data name="TrayReceiving" xml:space="preserve">
+    <value>Receiving {1} from {0}</value>
+  </data>
+  <data name="TraySending" xml:space="preserve">
+    <value>Sending {1} to {0}</value>
+  </data>
+  <data name="ToastFileProgress" xml:space="preserve">
+    <value>{0} ({1} of {2})</value>
+  </data>
+</root>

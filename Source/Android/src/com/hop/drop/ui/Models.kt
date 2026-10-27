@@ -1,5 +1,7 @@
 package com.hop.drop.ui
 
+import com.hop.drop.R
+
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -10,7 +12,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 // What the screens show. MainActivity turns the engine's objects into these and writes them into [HopUiState];
 // the screens only read the state and call [HopActions].
 
-enum class Tab(val label: String) { Send("Send"), Activity("Activity"), Devices("Devices") }
+enum class Tab(val label: Int) { Send(R.string.ui_send), Activity(R.string.activity_tab), Devices(R.string.devices_tab) }
 
 data class Platform(val label: String) {
     companion object {
@@ -82,7 +84,7 @@ data class HistoryFile(val name: String, val uri: Uri?)
 data class HistoryUi(
     val at: Long, val incoming: Boolean, val peer: String, val files: List<HistoryFile>, val count: Int,
     val bytes: Long, val millis: Long, val folder: String?, val problem: String?, val cancelled: Boolean, val offered: Int,
-    val text: String? = null,
+    val text: String? = null, val transport: String = "unknown",
 ) {
     val ok: Boolean get() = problem == null
     val key: String get() = "$at|$incoming|$peer"
@@ -98,6 +100,7 @@ data class PairingUi(val name: String, val error: String? = null, val direct: Bo
 data class QrUi(val image: ImageBitmap, val addresses: List<AddressUi>)
 
 data class SettingsUi(
+    val language: String = "en",
     val theme: ThemeMode = ThemeMode.System,
     val palette: Palette = Palette.Ember,
     val background: Boolean = true,
@@ -222,6 +225,7 @@ interface HopActions {
     fun clearHistory()
 
     fun setTheme(mode: ThemeMode)
+    fun setLanguage(language: String)
     fun setPalette(palette: Palette)
     fun setBackground(on: Boolean)
     fun setAsk(on: Boolean)

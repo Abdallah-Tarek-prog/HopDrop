@@ -18,6 +18,7 @@
     <PackageReference Include="Velopack" Version="1.2.161" />
     <Resource Include="Assets/HopDrop.ico" />
     <ProjectReference Include="../HopDrop.Core/HopDrop.Core.csproj" />
+    <ProjectReference Include="../../Shared/HopDrop.Agents/HopDrop.Agents.csproj" />
     <PackageReference Include="WPF-UI" Version="4.3.0" />
     <PackageReference Include="QRCoder" Version="1.8.0" />
     <PackageReference Include="Microsoft.Toolkit.Uwp.Notifications" Version="7.1.3" />

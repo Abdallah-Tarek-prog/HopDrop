@@ -1,5 +1,9 @@
 package com.hop.drop.ui
 
+import com.hop.drop.R
+
+import androidx.compose.ui.res.stringResource
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -146,13 +150,13 @@ internal fun MainScreen(state: HopUiState, actions: HopActions, snackbar: Snackb
                     ReceiverPill(state.phone.receiving) { statusOpen = true }
                     if (state.tab == Tab.Activity && state.history.isNotEmpty()) {
                         Box {
-                            IconButton(onClick = { menuOpen = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More") }
+                            IconButton(onClick = { menuOpen = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.ui_more)) }
                             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                                DropdownMenuItem(text = { Text("Clear activity") }, onClick = { menuOpen = false; confirmClear = true })
+                                DropdownMenuItem(text = { Text(stringResource(R.string.ui_clear_activity)) }, onClick = { menuOpen = false; confirmClear = true })
                             }
                         }
                     }
-                    IconButton(onClick = { state.settingsOpen = true }) { Icon(Icons.Rounded.Settings, contentDescription = "Settings") }
+                    IconButton(onClick = { state.settingsOpen = true }) { Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.ui_settings)) }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
             )
@@ -170,7 +174,7 @@ internal fun MainScreen(state: HopUiState, actions: HopActions, snackbar: Snackb
                                     contentDescription = null)
                             }
                         },
-                        label = { Text(tab.label) },
+                        label = { Text(stringResource(tab.label)) },
                         colors = NavigationBarItemDefaults.colors(
                             indicatorColor = MaterialTheme.colorScheme.primaryContainer,
                             selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -184,7 +188,7 @@ internal fun MainScreen(state: HopUiState, actions: HopActions, snackbar: Snackb
                 ExtendedFloatingActionButton(
                     onClick = actions::scanQr,
                     icon = { Icon(Icons.Rounded.QrCodeScanner, contentDescription = null) },
-                    text = { Text("Pair device") },
+                    text = { Text(stringResource(R.string.ui_pair_device)) },
                 )
             }
         },
@@ -210,14 +214,14 @@ internal fun MainScreen(state: HopUiState, actions: HopActions, snackbar: Snackb
     if (statusOpen) ReceiverModal(state.phone, state.settings.background, actions) { statusOpen = false }
     if (confirmClear) {
         HopModal(
-            onDismissRequest = { confirmClear = false }, paneTitle = "Clear activity?",
-            title = { Text("Clear activity?") },
-            text = { Text("This clears the list only. Received files stay where they are.") },
+            onDismissRequest = { confirmClear = false }, paneTitle = stringResource(R.string.ui_clear_activity_15),
+            title = { Text(stringResource(R.string.ui_clear_activity_15)) },
+            text = { Text(stringResource(R.string.ui_this_clears_the_list_only_received_files_stay_where_the)) },
             confirmButton = {
                 Button(onClick = { confirmClear = false; actions.clearHistory() },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Clear") }
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text(stringResource(R.string.ui_clear)) }
             },
-            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text(stringResource(R.string.ui_cancel)) } },
         )
     }
 }
@@ -231,41 +235,43 @@ private fun ReceiverPill(receiving: Boolean, onClick: () -> Unit) {
         Row(Modifier.padding(horizontal = 12.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(8.dp).clip(CircleShape).background(if (receiving) OnlineGreen else scheme.outline))
             Spacer(Modifier.width(7.dp))
-            Text(if (receiving) "Ready" else "Off", style = MaterialTheme.typography.labelLarge)
+            Text(if (receiving) stringResource(R.string.ui_ready) else stringResource(R.string.ui_off), style = MaterialTheme.typography.labelLarge)
         }
     }
 }
 
 @Composable
 private fun ReceiverModal(phone: PhoneUi, background: Boolean, actions: HopActions, onDismiss: () -> Unit) {
-    val title = if (phone.receiving) "Ready to receive" else "Not receiving"
+    val ipLabel = stringResource(R.string.ui_ip_address)
+    val title = if (phone.receiving) stringResource(R.string.ui_ready_to_receive) else stringResource(R.string.ui_not_receiving)
     HopModal(onDismissRequest = onDismiss, paneTitle = title,
         title = { Text(title) },
         text = { Column {
             Text(
                 when {
-                    !phone.receiving -> "Close HopDrop and open it again. If that doesn't help, turn Wi-Fi off and on."
-                    background -> "Paired devices can send to this phone at any time."
-                    else -> "Paired devices can send to this phone while HopDrop is open."
+                    !phone.receiving -> stringResource(R.string.ui_close_hopdrop_and_open_it_again_if_that_doesn_t_help_tu)
+                    background -> stringResource(R.string.ui_paired_devices_can_send_to_this_phone_at_any_time)
+                    else -> stringResource(R.string.ui_paired_devices_can_send_to_this_phone_while_hopdrop_is_)
                 },
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 6.dp),
             )
-            ListItem(headlineContent = { Text("Name") }, supportingContent = { Text(phone.name) },
+            ListItem(headlineContent = { Text(stringResource(R.string.ui_name)) }, supportingContent = { Text(phone.name) },
                 colors = ListItemDefaults.colors(containerColor = Color.Transparent))
             if (phone.addresses.isEmpty()) {
-                ListItem(headlineContent = { Text("No local network") }, supportingContent = { Text("Join Wi-Fi or turn on your hotspot.") },
+                ListItem(headlineContent = { Text(stringResource(R.string.ui_no_local_network)) }, supportingContent = { Text(stringResource(R.string.ui_join_wi_fi_or_turn_on_your_hotspot)) },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent))
             }
             for (a in phone.addresses) {
                 ListItem(
-                    headlineContent = { Text(a.ip) },
+                    headlineContent = { Text(ltr(a.ip)) },
                     supportingContent = { Text(a.kind) },
-                    trailingContent = { IconButton(onClick = { actions.copy("IP address", a.ip) }) { Icon(Icons.Rounded.ContentCopy, contentDescription = "Copy ${a.ip}") } },
+                    trailingContent = { IconButton(onClick = { actions.copy(ipLabel, a.ip) }) { Icon(Icons.Rounded.ContentCopy,
+                        contentDescription = stringResource(R.string.copy_address, ltr(a.ip))) } },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 )
             }
         } },
-        confirmButton = { Button(onClick = onDismiss) { Text("Done") } },
+        confirmButton = { Button(onClick = onDismiss) { Text(stringResource(R.string.ui_done)) } },
     )
 }

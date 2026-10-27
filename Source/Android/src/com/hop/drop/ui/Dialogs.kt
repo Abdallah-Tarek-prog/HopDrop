@@ -1,5 +1,9 @@
 package com.hop.drop.ui
 
+import com.hop.drop.R
+
+import androidx.compose.ui.res.stringResource
+
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -67,19 +71,19 @@ fun GlobalDialogs(state: HopUiState, actions: HopActions) {
         }
     }
     if (state.askAddress) TextInputDialog(
-        title = "Pair by IP address", initial = "", label = "Address", placeholder = "192.168.1.23",
-        help = "Shown on the other device under Devices.", keyboard = KeyboardType.Uri, confirm = "Pair",
+        title = stringResource(R.string.ui_pair_by_ip_address), initial = "", label = stringResource(R.string.ui_address), placeholder = "192.168.1.23",
+        help = stringResource(R.string.ui_shown_on_the_other_device_under_devices), keyboard = KeyboardType.Uri, confirm = stringResource(R.string.ui_pair),
         onDismiss = { state.askAddress = false },
         onSave = { address -> actions.pairByAddress(address).also { if (it == null) state.askAddress = false } },
     )
     if (state.askBackground) {
         HopModal(
-            onDismissRequest = { state.askBackground = false }, paneTitle = "Receive files any time",
+            onDismissRequest = { state.askBackground = false }, paneTitle = stringResource(R.string.ui_receive_files_any_time),
             icon = { Icon(Icons.Rounded.BatteryChargingFull, contentDescription = null) },
-            title = { Text("Receive files any time") },
-            text = { Text("Let HopDrop run in the background so files arrive even when the screen is off.") },
-            confirmButton = { Button(onClick = { state.askBackground = false; actions.allowBackground() }) { Text("Allow") } },
-            dismissButton = { TextButton(onClick = { state.askBackground = false }) { Text("Not now") } },
+            title = { Text(stringResource(R.string.ui_receive_files_any_time)) },
+            text = { Text(stringResource(R.string.ui_let_hopdrop_run_in_the_background_so_files_arrive_even_)) },
+            confirmButton = { Button(onClick = { state.askBackground = false; actions.allowBackground() }) { Text(stringResource(R.string.ui_allow)) } },
+            dismissButton = { TextButton(onClick = { state.askBackground = false }) { Text(stringResource(R.string.ui_not_now)) } },
         )
     }
 }
@@ -88,9 +92,9 @@ fun GlobalDialogs(state: HopUiState, actions: HopActions) {
 @Composable
 private fun PairCodeDialog(prompt: PromptUi, actions: HopActions) {
     HopModal(
-        onDismissRequest = { actions.answerPrompt(false) }, required = true, paneTitle = "Pair with ${prompt.name}?",
+        onDismissRequest = { actions.answerPrompt(false) }, required = true, paneTitle = stringResource(R.string.pair_with, ltr(prompt.name)),
         icon = { Icon(Icons.Rounded.Link, contentDescription = null) },
-        title = { Text("Pair with ${prompt.name}?") },
+        title = { Text(stringResource(R.string.pair_with, ltr(prompt.name))) },
         text = {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
@@ -99,40 +103,41 @@ private fun PairCodeDialog(prompt: PromptUi, actions: HopActions) {
                     color = MaterialTheme.colorScheme.primary,
                 )
                 Spacer(Modifier.height(12.dp))
-                Text("Check that ${prompt.name} shows the same number.", textAlign = TextAlign.Center)
+                Text(stringResource(R.string.compare_number, ltr(prompt.name)), textAlign = TextAlign.Center)
             }
         },
-        confirmButton = { Button(onClick = { actions.answerPrompt(true) }) { Text("They match") } },
-        dismissButton = { TextButton(onClick = { actions.answerPrompt(false) }) { Text("Cancel") } },
+        confirmButton = { Button(onClick = { actions.answerPrompt(true) }) { Text(stringResource(R.string.ui_they_match)) } },
+        dismissButton = { TextButton(onClick = { actions.answerPrompt(false) }) { Text(stringResource(R.string.ui_cancel)) } },
     )
 }
 
-/** "Ask before receiving": who wants to send what, one file per line. */
+/** stringResource(R.string.ui_ask_before_receiving): who wants to send what, one file per line. */
 @Composable
 private fun OfferDialog(offer: OfferUi, actions: HopActions) {
     val items = topItems(offer.files)
     HopModal(
         onDismissRequest = { actions.answerOffer(offer, false) }, required = true,
-        paneTitle = "${offer.peer} wants to send you files",
+        paneTitle = stringResource(R.string.offer_files, ltr(offer.peer), fileObjectsText(offer.files.size)),
         icon = { Icon(Icons.Rounded.Download, contentDescription = null) },
-        title = { Text("${offer.peer} wants to send you " + Format.files(offer.files.size)) },
+        title = { Text(stringResource(R.string.offer_files, ltr(offer.peer), fileObjectsText(offer.files.size))) },
         text = {
             Column {
-                for (name in items.take(6)) {
+                for (item in items.take(6)) {
                     Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        FileIcon(name.removeSuffix(" folder"), null, size = 32.dp, folder = name.endsWith(" folder"))
-                        Text(name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        FileIcon(item.name, null, size = 32.dp, folder = item.folder)
+                        Text(if (item.folder) stringResource(R.string.folder_named, ltr(item.name)) else item.name,
+                            style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(start = 12.dp))
                     }
                 }
-                if (items.size > 6) Text("+ ${items.size - 6} more", style = MaterialTheme.typography.bodySmall,
+                if (items.size > 6) Text("+ " + stringResource(R.string.more_count, items.size - 6), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
-                if (offer.total >= 0) Text(Format.size(offer.total), style = MaterialTheme.typography.bodySmall,
+                if (offer.total >= 0) Text(sizeText(offer.total), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
             }
         },
-        confirmButton = { Button(onClick = { actions.answerOffer(offer, true) }) { Text("Accept") } },
-        dismissButton = { TextButton(onClick = { actions.answerOffer(offer, false) }) { Text("Decline") } },
+        confirmButton = { Button(onClick = { actions.answerOffer(offer, true) }) { Text(stringResource(R.string.ui_accept)) } },
+        dismissButton = { TextButton(onClick = { actions.answerOffer(offer, false) }) { Text(stringResource(R.string.ui_decline)) } },
     )
 }
 
@@ -142,21 +147,21 @@ private fun PairingDialog(pairing: PairingUi, actions: HopActions) {
     val failed = pairing.error != null
     HopModal(
         onDismissRequest = actions::dismissPairing, required = !failed,
-        paneTitle = if (failed) "Couldn't pair" else "Pairing with ${pairing.name}",
+        paneTitle = if (failed) stringResource(R.string.ui_couldn_t_pair) else stringResource(R.string.pairing_with, ltr(pairing.name)),
         icon = { Icon(if (failed) Icons.Rounded.ErrorOutline else Icons.Rounded.Link, contentDescription = null) },
-        title = { Text(if (failed) "Couldn't pair" else "Pairing with ${pairing.name}…") },
+        title = { Text(if (failed) stringResource(R.string.ui_couldn_t_pair) else stringResource(R.string.pairing_with, ltr(pairing.name))) },
         text = {
             if (failed) Text(pairing.error ?: "")
             else Column {
-                if (pairing.direct) Text("Not on the same Wi-Fi, so HopDrop is connecting to it directly. If Android asks, tap Connect.",
+                if (pairing.direct) Text(stringResource(R.string.pairing_direct_help),
                     style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 12.dp))
                 ProgressBar(null, Modifier.padding(top = 8.dp))
             }
         },
         confirmButton = {
-            if (failed) Button(onClick = { actions.dismissPairing(); actions.scanQr() }) { Text("Scan again") }
+            if (failed) Button(onClick = { actions.dismissPairing(); actions.scanQr() }) { Text(stringResource(R.string.ui_scan_again)) }
         },
-        dismissButton = { TextButton(onClick = actions::dismissPairing) { Text(if (failed) "Close" else "Cancel") } },
+        dismissButton = { TextButton(onClick = actions::dismissPairing) { Text(if (failed) stringResource(R.string.ui_close) else stringResource(R.string.ui_cancel)) } },
     )
 }
 
@@ -165,26 +170,26 @@ private fun PairingDialog(pairing: PairingUi, actions: HopActions) {
 @Composable
 private fun QrModal(qr: QrUi, actions: HopActions) {
     HopModal(
-        onDismissRequest = actions::closeMyQr, paneTitle = "Scan to pair", keepScreenOn = true,
-        title = { Text("Scan to pair") },
+        onDismissRequest = actions::closeMyQr, paneTitle = stringResource(R.string.ui_scan_to_pair), keepScreenOn = true,
+        title = { Text(stringResource(R.string.ui_scan_to_pair)) },
         text = {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Open HopDrop on the other device and scan this code.", style = MaterialTheme.typography.bodyMedium,
+                Text(stringResource(R.string.ui_open_hopdrop_on_the_other_device_and_scan_this_code), style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 4.dp))
                 Surface(color = Color.White, shape = RoundedCornerShape(20.dp), modifier = Modifier.padding(top = 20.dp).widthIn(max = 300.dp).fillMaxWidth().aspectRatio(1f)) {
-                    Image(qr.image, contentDescription = "Pairing QR code", filterQuality = FilterQuality.None, modifier = Modifier.padding(14.dp))
+                    Image(qr.image, contentDescription = stringResource(R.string.ui_pairing_qr_code), filterQuality = FilterQuality.None, modifier = Modifier.padding(14.dp))
                 }
-                Text("Works once, for 5 minutes", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                Text(stringResource(R.string.ui_works_once_for_5_minutes), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 12.dp))
                 if (qr.addresses.isNotEmpty()) {
                     FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)) {
-                        for (a in qr.addresses) Text(a.kind + "  " + a.ip, style = MaterialTheme.typography.labelMedium,
+                        for (a in qr.addresses) Text(a.kind + "  " + ltr(a.ip), style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
         },
-        confirmButton = { Button(onClick = actions::closeMyQr) { Text("Done") } },
+        confirmButton = { Button(onClick = actions::closeMyQr) { Text(stringResource(R.string.ui_done)) } },
     )
 }
 
@@ -195,15 +200,15 @@ private fun QrModal(qr: QrUi, actions: HopActions) {
 @Composable
 private fun BackupSetupDialog(setup: BackupSetupUi, device: String?, actions: HopActions, onDismiss: () -> Unit) {
     HopModal(
-        onDismissRequest = onDismiss, paneTitle = "Back up ${setup.folderName}",
+        onDismissRequest = onDismiss, paneTitle = stringResource(R.string.backup_folder_title, ltr(setup.folderName)),
         icon = { Icon(Icons.Rounded.Backup, contentDescription = null) },
-        title = { Text("Send the ${setup.existing} files already there, or only new ones?") },
-        text = { Text("Choose which files to send first. You can change this backup's settings later.") },
+        title = { Text(stringResource(R.string.backup_existing_question, setup.existing)) },
+        text = { Text(stringResource(R.string.backup_setup_help)) },
         confirmButton = {
-            Button(onClick = { device?.let { actions.startBackup(it, true) } }, enabled = device != null) { Text("Send existing files") }
+            Button(onClick = { device?.let { actions.startBackup(it, true) } }, enabled = device != null) { Text(stringResource(R.string.ui_send_existing_files)) }
         },
         dismissButton = {
-            TextButton(onClick = { device?.let { actions.startBackup(it, false) } }, enabled = device != null) { Text("Only new files") }
+            TextButton(onClick = { device?.let { actions.startBackup(it, false) } }, enabled = device != null) { Text(stringResource(R.string.ui_only_new_files)) }
         },
     )
 }
@@ -212,7 +217,7 @@ private fun BackupSetupDialog(setup: BackupSetupUi, device: String?, actions: Ho
 @Composable
 fun TextInputDialog(
     title: String, initial: String, label: String, onDismiss: () -> Unit, onSave: (String) -> String?,
-    placeholder: String? = null, help: String? = null, keyboard: KeyboardType = KeyboardType.Text, confirm: String = "Save",
+    placeholder: String? = null, help: String? = null, keyboard: KeyboardType = KeyboardType.Text, confirm: String = stringResource(R.string.ui_save),
 ) {
     var text by remember { mutableStateOf(initial) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -233,7 +238,7 @@ fun TextInputDialog(
             )
         },
         confirmButton = { Button(onClick = { error = onSave(text.trim()) }) { Text(confirm) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.ui_cancel)) } },
     )
 }
 
@@ -242,20 +247,20 @@ fun TextInputDialog(
 fun TextNoteDialog(initial: String, onDismiss: () -> Unit, onAdd: (String) -> Unit) {
     var text by remember { mutableStateOf(initial) }
     HopModal(
-        onDismissRequest = onDismiss, paneTitle = "Send text",
-        title = { Text("Send text") },
+        onDismissRequest = onDismiss, paneTitle = stringResource(R.string.ui_send_text),
+        title = { Text(stringResource(R.string.ui_send_text)) },
         text = {
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },
-                placeholder = { Text("Type or paste text") },
-                supportingText = { Text(if (initial.isNotEmpty() && text == initial) "From your clipboard" else "Arrives as text, ready to copy") },
+                placeholder = { Text(stringResource(R.string.ui_type_or_paste_text)) },
+                supportingText = { Text(if (initial.isNotEmpty() && text == initial) stringResource(R.string.ui_from_your_clipboard) else stringResource(R.string.ui_arrives_as_text_ready_to_copy)) },
                 minLines = 5, maxLines = 10,
                 keyboardOptions = KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences),
                 modifier = Modifier.fillMaxWidth(),
             )
         },
-        confirmButton = { Button(onClick = { onAdd(text) }, enabled = text.isNotBlank()) { Text("Add") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { Button(onClick = { onAdd(text) }, enabled = text.isNotBlank()) { Text(stringResource(R.string.ui_add)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.ui_cancel)) } },
     )
 }

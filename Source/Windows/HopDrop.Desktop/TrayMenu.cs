@@ -38,6 +38,7 @@ internal sealed class TrayMenu : Window
 
     public TrayMenu(string status, IReadOnlyList<Item> items)
     {
+        FlowDirection = L.Direction; Language = L.Language;
         bool dark = UseDark();
         var background = Solid(dark ? 0x2C2C2C : 0xF9F9F9u);
         var border = Solid(dark ? 0x454545 : 0xE0E0E0u);

@@ -38,6 +38,7 @@ public sealed partial class MainWindow : FluentWindow
         _devices = devices ?? (peer is null ? SampleDevices() : []);
         _history = history ?? [];
         Title = "HopDrop";
+        FlowDirection = L.Direction; Language = L.Language;
         FontFamily = Ui.Font; FontSize = 14;
         WindowBackdropType = WindowBackdropType.None;
         var work = SystemParameters.WorkArea;
@@ -51,17 +52,17 @@ public sealed partial class MainWindow : FluentWindow
         Content = shell;
         var logo = BitmapFrame.Create(new Uri("pack://application:,,,/Assets/HopDrop.ico"));
         Icon = logo;
-        shell.Children.Add(new Wpf.Ui.Controls.TitleBar { Title = "HopDrop", Height = 44, Icon = new ImageIcon { Source = logo } });
+        shell.Children.Add(new Wpf.Ui.Controls.TitleBar { Title = "HopDrop", Height = 44, FlowDirection = FlowDirection.LeftToRight, Icon = new ImageIcon { Source = logo } });
         _navigation = new NavigationView
         {
             PaneDisplayMode = NavigationViewPaneDisplayMode.Left, IsPaneOpen = true, OpenPaneLength = 220,
             Transition = Wpf.Ui.Animations.Transition.None,
             IsBackButtonVisible = NavigationViewBackButtonVisible.Collapsed
         };
-        _navigation.MenuItems.Add(new NavigationViewItem("Send", SymbolRegular.Send24, typeof(SendPage)));
-        _navigation.MenuItems.Add(new NavigationViewItem("Devices", SymbolRegular.PhoneLaptop24, typeof(DevicesPage)));
-        _navigation.MenuItems.Add(new NavigationViewItem("Activity", SymbolRegular.History24, typeof(ActivityPage)));
-        _navigation.FooterMenuItems.Add(new NavigationViewItem("Settings", SymbolRegular.Settings24, typeof(SettingsPage)));
+        _navigation.MenuItems.Add(new NavigationViewItem(L.T("Send"), SymbolRegular.Send24, typeof(SendPage)));
+        _navigation.MenuItems.Add(new NavigationViewItem(L.T("Devices"), SymbolRegular.PhoneLaptop24, typeof(DevicesPage)));
+        _navigation.MenuItems.Add(new NavigationViewItem(L.T("Activity"), SymbolRegular.History24, typeof(ActivityPage)));
+        _navigation.FooterMenuItems.Add(new NavigationViewItem(L.T("Settings"), SymbolRegular.Settings24, typeof(SettingsPage)));
         Grid.SetRow(_navigation, 1); shell.Children.Add(_navigation);
         _liveHost = new StackPanel();
         _liveBar = new Border { Child = _liveHost, Padding = new Thickness(16, 10, 16, 12), Visibility = Visibility.Collapsed, BorderThickness = new Thickness(0, 1, 0, 0), ClipToBounds = true };
@@ -112,6 +113,19 @@ public sealed partial class MainWindow : FluentWindow
     }
     /// <summary>Rebuilds the visible page (after a theme change or a data change that affects its layout).</summary>
     internal void RenderCurrent() { if (CurrentPage is not null) CurrentPage.Content = Build(CurrentPage.Key); }
+    private void ChangeLanguage(string language)
+    {
+        Preferences.Language = language;
+        L.Apply(language);
+        FlowDirection = L.Direction; Language = L.Language;
+        string[] keys = ["Send", "Devices", "Activity"];
+        for (int i = 0; i < keys.Length; i++)
+            if (_navigation.MenuItems[i] is NavigationViewItem item) item.Content = L.T(keys[i]);
+        if (_navigation.FooterMenuItems[0] is NavigationViewItem settings) settings.Content = L.T("Settings");
+        foreach (var row in _liveRows.Values) _liveHost.Children.Remove(row.Root);
+        _liveRows.Clear();
+        RenderCurrent(); RenderLive();
+    }
     internal FrameworkElement Build(string key)
     {
         bool pairing = key == "devices" && IsVisible && WindowState != WindowState.Minimized;
@@ -312,7 +326,7 @@ public sealed partial class MainWindow : FluentWindow
     }
     internal async void OnTransferFinished(TransferResult r)
     {
-        string name = r.PeerName.Length > 0 ? r.PeerName : _devices.FirstOrDefault(d => d.Id == r.PeerId)?.Name ?? "a device";
+        string name = r.PeerName.Length > 0 ? r.PeerName : _devices.FirstOrDefault(d => d.Id == r.PeerId)?.Name ?? L.T("ADevice");
         if (!r.Incoming) _live.Remove("pending:" + r.PeerId);
         string key = r.TransferId.ToString();
         if (!_live.TryGetValue(key, out var item))
@@ -407,7 +421,7 @@ public sealed partial class MainWindow : FluentWindow
         var speed = Ui.Subtle(""); speed.HorizontalAlignment = HorizontalAlignment.Right; Grid.SetColumn(speed, 1);
         bottom.Children.Add(detail); bottom.Children.Add(speed); middle.Children.Add(bottom);
         Grid.SetColumn(middle, 1); grid.Children.Add(middle);
-        var cancel = Ui.Button("Cancel", () => { if (item.TransferId is Guid id) _peer?.CancelTransfer(id); }, icon: SymbolRegular.Dismiss24);
+        var cancel = Ui.Button(L.T("Cancel"), () => { if (item.TransferId is Guid id) _peer?.CancelTransfer(id); }, icon: SymbolRegular.Dismiss24);
         cancel.Margin = new Thickness(0); cancel.VerticalAlignment = VerticalAlignment.Center;
         Grid.SetColumn(cancel, 2); grid.Children.Add(cancel);
         return new LiveRow { Root = new Border { Child = grid, ClipToBounds = true }, Badge = badge, Title = title, Detail = detail, Amount = amount, Speed = speed, Bar = bar, Cancel = cancel };
@@ -431,42 +445,42 @@ public sealed partial class MainWindow : FluentWindow
         if (item.Failure is not null)
         {
             Restyle(row.Badge, SymbolRegular.ErrorCircle24, Palette.Danger, Palette.DangerBg);
-            row.Title.Text = $"Couldn't send to {item.PeerName}"; row.Detail.Text = item.Failure; return;
+            row.Title.Text = L.T("CouldnTSendTo0", item.PeerName); row.Detail.Text = item.Failure; return;
         }
         if (item.Result is TransferResult r)
         {
             bool ok = r.ErrorCode is null;
             Restyle(row.Badge, ok ? SymbolRegular.CheckmarkCircle24 : SymbolRegular.ErrorCircle24, ok ? Palette.Success : Palette.Danger, ok ? Palette.SuccessBg : Palette.DangerBg);
-            row.Title.Text = ok ? $"{(r.Incoming ? "Received" : "Sent")} {Fmt.Files(r.SavedPaths.Count)} {(r.Incoming ? "from" : "to")} {item.PeerName}"
-                : $"{(r.Incoming ? "Receiving from" : "Sending to")} {item.PeerName} stopped";
-            row.Detail.Text = ok ? $"{Fmt.Names(r.SavedPaths)} · saved in {r.ReceiveFolderDisplayName}" : Platform.ExplainError(r.ErrorCode, item.PeerName);
-            row.Amount.Text = ok ? $"{Fmt.Size(r.Bytes)} in {Fmt.Duration(r.Duration)}" : $"{r.SavedPaths.Count} of {r.Offered} files done";
+            row.Title.Text = ok ? (r.Incoming ? L.T("ReceivedFilesFrom", Fmt.Files(r.SavedPaths.Count), item.PeerName) : L.T("SentFilesTo", Fmt.Files(r.SavedPaths.Count), item.PeerName))
+                : L.T(r.Incoming ? "ReceivingStopped" : "SendingStopped", item.PeerName);
+            row.Detail.Text = ok ? L.T("0SavedIn1", Fmt.Names(r.SavedPaths), r.ReceiveFolderDisplayName) : Platform.ExplainError(r.ErrorCode, item.PeerName);
+            row.Amount.Text = ok ? L.T("0In1", Fmt.Size(r.Bytes), Fmt.Duration(r.Duration)) : L.T("0Of1FilesDone", r.SavedPaths.Count, r.Offered);
             return;
         }
         Restyle(row.Badge, item.Incoming ? SymbolRegular.ArrowDownload24 : SymbolRegular.ArrowUpload24, Palette.OnPrimaryBg, Palette.PrimaryBg);
         if (item.Progress is not TransferProgress p)
         {
-            row.Title.Text = $"Connecting to {item.PeerName}…"; row.Detail.Text = $"Getting ready to send {SelectionSummary()}";
+            row.Title.Text = L.T("ConnectingTo0", item.PeerName); row.Detail.Text = L.T("GettingReadyToSend0", SelectionSummary());
             row.Bar.IsIndeterminate = true; return;
         }
         if (p.Reconnecting)
         {
-            row.Title.Text = p.Incoming ? $"Waiting for {item.PeerName} to reconnect…" : $"Reconnecting to {item.PeerName}…";
-            row.Detail.Text = "The connection dropped. HopDrop continues where it stopped.";
+            row.Title.Text = p.Incoming ? L.T("WaitingFor0ToReconnect", item.PeerName) : L.T("ReconnectingTo0", item.PeerName);
+            row.Detail.Text = L.T("TheConnectionDroppedHopDropContinuesWhereItStopped");
             row.Bar.IsIndeterminate = true; return;
         }
         if (p.WaitingForApproval)
         {
-            row.Title.Text = $"Waiting for {item.PeerName} to accept…";
-            row.Detail.Text = $"{Fmt.Files(p.FileCount)} will start sending once they accept on {item.PeerName}.";
+            row.Title.Text = L.T("WaitingFor0ToAccept", item.PeerName);
+            row.Detail.Text = L.T("0WillStartSendingOnceTheyAcceptOn1", Fmt.Files(p.FileCount), item.PeerName);
             row.Bar.IsIndeterminate = true; return;
         }
-        row.Title.Text = $"{(p.Incoming ? "Receiving" : "Sending")} {Fmt.Files(p.FileCount)} {(p.Incoming ? "from" : "to")} {item.PeerName}";
-        row.Detail.Text = p.FileCount == 1 ? p.File : $"{p.File} · {p.FileNumber} of {p.FileCount}";
+        row.Title.Text = p.Incoming ? L.T("ReceivingFilesFrom", Fmt.Files(p.FileCount), item.PeerName) : L.T("SendingFilesTo", Fmt.Files(p.FileCount), item.PeerName);
+        row.Detail.Text = p.FileCount == 1 ? p.File : L.T("FileProgress", p.File, p.FileNumber, p.FileCount);
         row.Bar.IsIndeterminate = p.Percent < 0;
         if (p.Percent >= 0) Motion.SmoothValue(row.Bar, p.BytesDone * 100.0 / p.TotalBytes);
         row.Amount.Text = Fmt.Amount(p.BytesDone, p.TotalBytes) + (p.Percent >= 0 ? $"  ·  {p.Percent}%" : "");
-        row.Speed.Text = Fmt.Speed(p.BytesPerSecond) + (p.Eta is null ? "" : $" · {Fmt.Duration(p.Eta.Value)} left");
+        row.Speed.Text = Fmt.Speed(p.BytesPerSecond) + (p.Eta is null ? "" : L.T("0Left", Fmt.Duration(p.Eta.Value)));
     }
 
     // ---- Helpers ----
@@ -516,7 +530,7 @@ public sealed partial class MainWindow : FluentWindow
                     SaveVisual(this, Path.Combine(folder, $"send-queued-{theme}.png"));
                     _sampleQueued = null; _selectedDevices.Clear();
                 }
-                if (page == "settings" && Descendants<TextBlock>(this).FirstOrDefault(t => t.Text == "AI agents") is { } agents)
+                if (page == "settings" && Descendants<TextBlock>(this).FirstOrDefault(t => t.Text == L.T("AIAgents")) is { } agents)
                 {
                     DependencyObject? up = agents;
                     while (up is not null and not ScrollViewer) up = VisualTreeHelper.GetParent(up);
@@ -531,7 +545,7 @@ public sealed partial class MainWindow : FluentWindow
             var note = new TextNoteDialog(_devices, "https://example.com/holiday") { Owner = this, Left = -32000, Top = -32000, ShowInTaskbar = false };
             note.Show(); await Task.Delay(300);
             SaveVisual(note, Path.Combine(folder, $"text-dialog-{theme}.png")); note.Close();
-            var menu = new TrayMenu("Ready to receive", App.Instance.TrayMenuItems()) { Left = -32000, Top = -32000, ShowActivated = false };
+            var menu = new TrayMenu(L.T("ReadyToReceive"), App.Instance.TrayMenuItems()) { Left = -32000, Top = -32000, ShowActivated = false };
             menu.Show(); await Task.Delay(300);
             SaveVisual(menu, Path.Combine(folder, $"tray-menu-{theme}.png")); menu.Close();
         }
@@ -578,6 +592,7 @@ public abstract class HopPage : Page
     protected HopPage(string key)
     {
         Key = key;
+        FlowDirection = L.Direction; Language = L.Language;
         Loaded += (_, _) =>
         {
             var window = App.WindowInstance!; window.CurrentPage = this;

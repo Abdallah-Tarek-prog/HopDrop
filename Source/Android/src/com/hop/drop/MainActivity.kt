@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
+import android.content.Context
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import android.graphics.Bitmap
@@ -34,6 +35,7 @@ import com.hop.drop.core.Format
 import com.hop.drop.core.Json
 import com.hop.drop.core.PairUri
 import com.hop.drop.core.Peer
+import com.hop.drop.core.Transport
 import com.hop.drop.net.LocalSockets
 import com.hop.drop.ui.AddressUi
 import com.hop.drop.ui.BackupSetupUi
@@ -76,6 +78,7 @@ import java.util.concurrent.Executors
  * HopApp calls the public methods below (showPrompt, showOffer, onLiveChanged, …) and the screens call [HopActions].
  */
 class MainActivity : ComponentActivity(), HopActions {
+    override fun attachBaseContext(newBase: Context) = super.attachBaseContext(Language.wrap(newBase))
     private lateinit var app: HopApp
     private val state = HopUiState()
     private val work: ExecutorService = Executors.newCachedThreadPool()
@@ -161,7 +164,7 @@ class MainActivity : ComponentActivity(), HopActions {
         try {
             startForegroundService(Intent(this, ReceiveService::class.java))
         } catch (e: RuntimeException) {
-            state.say("Receiving could not start. Open HopDrop again to retry.")
+            state.say(getString(R.string.main_receiving_could_not_start_open_hopdrop_again_to_retry))
         }
         state.settings = loadSettings()
         refreshAll()
@@ -284,13 +287,21 @@ class MainActivity : ComponentActivity(), HopActions {
     private fun refreshPhone() {
         val peer = app.peer()
         state.phone = PhoneUi(
-            name = peer?.name() ?: "Unavailable",
+            name = peer?.name() ?: getString(R.string.unavailable),
             receiving = ReceiveService.running,
-            addresses = LocalSockets.describe(this).map { AddressUi(it.kind, it.ip) },
+            addresses = LocalSockets.describe(this).map { AddressUi(networkName(it.kind), it.ip) },
             deviceId = peer?.id() ?: "",
             version = versionName(),
         )
     }
+
+    private fun networkName(kind: String): String = getString(when (kind) {
+        "Wi-Fi" -> R.string.network_wifi
+        "Hotspot" -> R.string.network_hotspot
+        "USB tethering" -> R.string.network_usb
+        "Ethernet" -> R.string.network_ethernet
+        else -> R.string.network_local
+    })
 
     private fun refreshDevices() {
         val nearby = ReceiveService.activeDiscovery?.list() ?: emptyList()
@@ -326,7 +337,7 @@ class MainActivity : ComponentActivity(), HopActions {
             item.failure != null -> LiveState.Stopped(item.failure, false, 0, 0)
             r != null -> if (r.error == null) LiveState.Done(ArrayList(r.files), r.files.size, r.bytes, r.millis, r.folder) else {
                 val cancelled = r.error.startsWith("cancelled")
-                LiveState.Stopped(if (cancelled) Notices.cancelReason(r) else ErrorText.forDevice(r.error, r.peer), cancelled, r.files.size, r.offered)
+                LiveState.Stopped(if (cancelled) Notices.cancelReason(app, r) else ErrorText.forDevice(app, r.error, r.peer), cancelled, r.files.size, r.offered)
             }
             p.reconnecting -> LiveState.Reconnecting
             p.waiting -> LiveState.Waiting(p.count)
@@ -347,7 +358,7 @@ class MainActivity : ComponentActivity(), HopActions {
     private fun toHistory(e: Map<*, *>): HistoryUi? {
         val at = (e["at"] as? Number)?.toLong() ?: return null
         val incoming = e["incoming"] == true
-        val peer = e["peer"]?.toString() ?: "Unknown device"
+        val peer = e["peer"]?.toString() ?: getString(R.string.main_unknown_device)
         val names = (e["files"] as? List<*>).orEmpty().map { it.toString() }
         val count = (e["count"] as? Number)?.toInt() ?: names.size
         val error = e["error"]?.toString()
@@ -363,8 +374,8 @@ class MainActivity : ComponentActivity(), HopActions {
         }
         val problem = when {
             error == null -> null
-            cancelled -> if (error.contains("Peer cancelled") || error.contains("Sender cancelled")) "$peer cancelled it." else "You cancelled it."
-            else -> ErrorText.forDevice(error, peer)
+            cancelled -> if (error.contains("Peer cancelled") || error.contains("Sender cancelled")) getString(R.string.peer_cancelled, Language.ltr(this, peer)) else getString(R.string.main_you_cancelled_it)
+            else -> ErrorText.forDevice(app, error, peer)
         }
         return HistoryUi(
             at = at, incoming = incoming, peer = peer, files = files, count = count,
@@ -372,12 +383,14 @@ class MainActivity : ComponentActivity(), HopActions {
             folder = e["folder"]?.toString(), problem = problem, cancelled = cancelled,
             offered = (e["offered"] as? Number)?.toInt() ?: -1,
             text = e["text"] as? String,
+            transport = Transport.stored(e["transport"] as? String),
         )
     }
 
     private fun loadSettings(): SettingsUi {
         val p = prefs
         return SettingsUi(
+            language = Language.selected(this),
             theme = ThemeMode.entries.getOrElse(p.getInt("theme", 0)) { ThemeMode.System },
             palette = Palette.of(p.getString("palette", null)),
             background = ReceiveService.background(this),
@@ -393,7 +406,7 @@ class MainActivity : ComponentActivity(), HopActions {
             backups = Backup.entries(this).map { b -> BackupUi(
                 id = b.id, on = b.on, folder = b.folder, device = b.device?.let { app.book().get(it)?.label() },
                 deviceId = b.device, kinds = b.kinds, charging = b.charging, timed = b.timed,
-                from = b.from, to = b.to, status = b.status, lastRun = b.lastRun,
+                from = b.from, to = b.to, status = Backup.displayStatus(this, b.status), lastRun = b.lastRun,
             ) },
             backupPlace = folderName("backup_folder", "Download/HopDrop/Backups"),
             receivedBackups = ReceiveStorage.backups(this).map { ReceivedBackupUi(it.id, it.device, it.folder, it.count, it.lastRun, it.location, it.place) },
@@ -416,7 +429,7 @@ class MainActivity : ComponentActivity(), HopActions {
             if (path.isNotEmpty()) return path.substringAfterLast('/')
         } catch (ignored: Exception) {
         }
-        return "Folder you chose"
+        return getString(R.string.main_folder_you_chose)
     }
 
     private fun versionName(): String = try {
@@ -450,7 +463,7 @@ class MainActivity : ComponentActivity(), HopActions {
     }
 
     private fun describe(uri: Uri): PickedFile {
-        var name = uri.lastPathSegment ?: "File"
+        var name = uri.lastPathSegment ?: getString(R.string.file_fallback)
         var size = -1L
         try {
             contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { c ->
@@ -471,15 +484,15 @@ class MainActivity : ComponentActivity(), HopActions {
         } catch (ignored: Exception) {
         }
         if (state.folders.any { it.uri == tree }) {
-            state.say("That folder is already in the list.")
+            state.say(getString(R.string.main_that_folder_is_already_in_the_list))
             return
         }
         state.tab = Tab.Send
-        state.folders.add(PickedFolder(tree, "Folder", -1, 0, false))
+        state.folders.add(PickedFolder(tree, getString(R.string.ui_folder), -1, 0, false))
         work.execute {
             try {
-                val name = FolderScan.name(contentResolver, tree)
-                val files = FolderScan.files(contentResolver, tree)
+                val name = FolderScan.name(this, tree)
+                val files = FolderScan.files(this, tree)
                 val unknown = files.any { it.size < 0 }
                 val bytes = files.filter { it.size >= 0 }.sumOf { it.size }
                 runOnUiThread {
@@ -487,13 +500,13 @@ class MainActivity : ComponentActivity(), HopActions {
                     if (i < 0) return@runOnUiThread
                     if (files.isEmpty()) {
                         state.folders.removeAt(i)
-                        state.say("That folder has no files to send.")
+                        state.say(getString(R.string.main_that_folder_has_no_files_to_send))
                     } else state.folders[i] = PickedFolder(tree, name, files.size, bytes, unknown)
                 }
             } catch (e: Exception) {
                 runOnUiThread {
                     state.folders.removeAll { it.uri == tree }
-                    state.say("HopDrop couldn't read that folder.")
+                    state.say(getString(R.string.main_hopdrop_couldn_t_read_that_folder))
                 }
             }
         }
@@ -512,7 +525,7 @@ class MainActivity : ComponentActivity(), HopActions {
         state.folders.clear()
     }
 
-    /** Files shared to HopDrop from another app, and taps on "Show files" in a notification. */
+    /** Files shared to HopDrop from another app, and taps on getString(R.string.main_show_files) in a notification. */
     @Suppress("DEPRECATION")
     private fun handle(intent: Intent?) {
         if (intent == null) return
@@ -531,7 +544,7 @@ class MainActivity : ComponentActivity(), HopActions {
             try {
                 uris.add(SharedTextProvider.create(this, text))
             } catch (e: Exception) {
-                state.say("Couldn't prepare the shared text.")
+                state.say(getString(R.string.main_couldn_t_prepare_the_shared_text))
             }
         }
         addFiles(uris, persist = false)
@@ -542,16 +555,16 @@ class MainActivity : ComponentActivity(), HopActions {
         try {
             addFiles(listOf(SharedTextProvider.create(this, text)), persist = false)
         } catch (e: Exception) {
-            state.say("Couldn't prepare the text.")
+            state.say(getString(R.string.main_couldn_t_prepare_the_text))
         }
     }
 
     // ---- Sending ----
 
     private fun selectionSummary(): String = when {
-        state.folders.isEmpty() -> Format.files(state.files.size)
-        state.files.isEmpty() -> Format.folders(state.folders.size)
-        else -> Format.folders(state.folders.size) + " and " + Format.files(state.files.size)
+        state.folders.isEmpty() -> Language.files(this, state.files.size)
+        state.files.isEmpty() -> Language.folders(this, state.folders.size)
+        else -> getString(R.string.selection_and, Language.folders(this, state.folders.size), Language.files(this, state.files.size))
     }
 
     override fun send(device: DeviceUi) = sendToMany(listOf(device))
@@ -562,7 +575,7 @@ class MainActivity : ComponentActivity(), HopActions {
      */
     override fun sendToMany(devices: List<DeviceUi>) {
         if (state.nothingSelected) {
-            state.say("Choose files to send first.")
+            state.say(getString(R.string.main_choose_files_to_send_first))
             return
         }
         state.picking = null
@@ -570,7 +583,7 @@ class MainActivity : ComponentActivity(), HopActions {
             val d = app.book().get(ui.id) ?: continue
             val current = app.live().outgoing(d.label())
             if (current != null && !current.finished()) {
-                state.say("Already sending to ${d.label()}.")
+                state.say(getString(R.string.already_sending, Language.ltr(this, d.label())))
                 continue
             }
             val job = Sends.Job(d.id, selectionSummary())
@@ -579,14 +592,14 @@ class MainActivity : ComponentActivity(), HopActions {
                 if (text != null) job.texts.add(text) else job.files.add(f.uri)
             }
             job.trees.addAll(state.folders.map { it.uri })
-            if (job.textOnly()) job.summary = "your text"
+            if (job.textOnly()) job.summary = getString(R.string.main_your_text)
             app.live().connecting(d.label())
             prefs.edit().putString("last_device", d.id).apply()
             try {
                 startForegroundService(job.intent(this))
                 Shortcuts.used(this, d.id)
             } catch (e: RuntimeException) {
-                app.live().failedToStart(d.label(), ErrorText.forDevice(e, d.label()))
+                app.live().failedToStart(d.label(), ErrorText.forDevice(app, e, d.label()))
             }
         }
     }
@@ -618,7 +631,7 @@ class MainActivity : ComponentActivity(), HopActions {
                     app.directLink().done()
                 }
             } catch (e: Exception) {
-                runOnUiThread { state.connectingTo = null; state.say(ErrorText.forDevice(e, d.label())) }
+                runOnUiThread { state.connectingTo = null; state.say(ErrorText.forDevice(app, e, d.label())) }
             }
         }
     }
@@ -636,7 +649,7 @@ class MainActivity : ComponentActivity(), HopActions {
 
     override fun bluetooth() {
         if (state.nothingSelected) {
-            state.say("Choose files to send first.")
+            state.say(getString(R.string.main_choose_files_to_send_first))
             return
         }
         val loose = ArrayList(state.files.map { it.uri })
@@ -645,20 +658,20 @@ class MainActivity : ComponentActivity(), HopActions {
             launchBluetooth(loose)
             return
         }
-        state.say("Bluetooth sends the files inside folders, without their subfolders.")
+        state.say(getString(R.string.main_bluetooth_sends_the_files_inside_folders_without_their_))
         work.execute {
             try {
-                for (tree in trees) for (item in FolderScan.files(contentResolver, tree)) loose.add(item.uri)
+                for (tree in trees) for (item in FolderScan.files(this, tree)) loose.add(item.uri)
                 runOnUiThread { launchBluetooth(loose) }
             } catch (e: Exception) {
-                runOnUiThread { state.say("HopDrop couldn't read that folder.") }
+                runOnUiThread { state.say(getString(R.string.main_hopdrop_couldn_t_read_that_folder)) }
             }
         }
     }
 
     private fun launchBluetooth(files: ArrayList<Uri>) {
         if (files.isEmpty()) {
-            state.say("There are no files to send.")
+            state.say(getString(R.string.main_there_are_no_files_to_send))
             return
         }
         val share = Intent(if (files.size == 1) Intent.ACTION_SEND else Intent.ACTION_SEND_MULTIPLE).setType("*/*")
@@ -673,9 +686,9 @@ class MainActivity : ComponentActivity(), HopActions {
             if (target != null) {
                 share.setClassName(target.activityInfo.packageName, target.activityInfo.name)
                 startActivity(share)
-            } else startActivity(Intent.createChooser(share, "Send with Bluetooth"))
+            } else startActivity(Intent.createChooser(share, getString(R.string.main_send_with_bluetooth)))
         } catch (e: Exception) {
-            state.say("Bluetooth sharing isn't available on this phone.")
+            state.say(getString(R.string.main_bluetooth_sharing_isn_t_available_on_this_phone))
         }
     }
 
@@ -690,14 +703,14 @@ class MainActivity : ComponentActivity(), HopActions {
         if (data.getBooleanExtra("address", false)) { state.askAddress = true; return }
         if (data.getBooleanExtra("fallback", false)) {
             state.tab = Tab.Devices
-            state.say("Tap the device under Nearby, then check both screens show the same number.")
+            state.say(getString(R.string.main_tap_the_device_under_nearby_then_check_both_screens_sho))
             return
         }
         val uri = data.getStringExtra("uri") ?: return
         val code = try {
             PairUri.parse(uri)
         } catch (e: IllegalArgumentException) {
-            state.say("That QR code can't be used. Show a new one and scan it again.")
+            state.say(getString(R.string.main_that_qr_code_can_t_be_used_show_a_new_one_and_scan_it_a))
             return
         }
         val name = code.name
@@ -707,13 +720,13 @@ class MainActivity : ComponentActivity(), HopActions {
                 val device = pairSmart(code)
                 runOnUiThread {
                     state.pairing = null
-                    state.say("Paired with ${device.name}")
+                    state.say(getString(R.string.paired_with, Language.ltr(this, device.name)))
                     refreshAll()
                 }
                 Shortcuts.update(this, app.book().all())
             } catch (e: Exception) {
                 runOnUiThread { if (state.pairing != null) state.pairing = PairingUi(name,
-                    if (e is PairNetworkException) e.message else ErrorText.forDevice(e, name)) }
+                    if (e is PairNetworkException) e.message else ErrorText.forDevice(app, e, name)) }
             }
         }
     }
@@ -735,8 +748,8 @@ class MainActivity : ComponentActivity(), HopActions {
             } catch (e: Exception) {
                 if (!pairingNoAnswer(e)) throw e
                 if (code.linkSsid == null) throw PairNetworkException(
-                    if (lan) "Your PC didn't answer on this network. Open HopDrop on it, then check its firewall or guest Wi-Fi."
-                    else "This phone and PC are on different networks. Join the same Wi-Fi, or turn on Direct connection in HopDrop on the PC.", e)
+                    if (lan) getString(R.string.main_your_pc_didn_t_answer_on_this_network_open_hopdrop_on_i)
+                    else getString(R.string.main_this_phone_and_pc_are_on_different_networks_join_the_sa), e)
             }
         }
         runOnUiThread { if (state.pairing != null) state.pairing = PairingUi(code.name, null, direct = true) }
@@ -750,19 +763,18 @@ class MainActivity : ComponentActivity(), HopActions {
         } catch (e: Exception) {
             if (!pairingNoAnswer(e)) throw e
             val fix = when {
-                e.message?.startsWith("wifi_off") == true -> "Turn on Wi-Fi on this phone."
-                e.message?.contains("Android didn't allow") == true -> "Android didn't allow it on this phone."
-                e.message?.contains("another PC") == true -> "Finish the other direct connection first."
-                else -> "Check that HopDrop is open on the PC and you're near it."
+                e.message?.startsWith("wifi_off") == true -> getString(R.string.main_turn_on_wi_fi_on_this_phone)
+                e.message?.contains("Android didn't allow") == true -> getString(R.string.main_android_didn_t_allow_it_on_this_phone)
+                e.message?.contains("another PC") == true -> getString(R.string.main_finish_the_other_direct_connection_first)
+                else -> getString(R.string.main_check_that_hopdrop_is_open_on_the_pc_and_you_re_near_it)
             }
-            throw PairNetworkException((if (lan) "Your PC didn't answer on this network, and the direct connection failed too. "
-                else "This phone and PC are on different networks, and the direct connection failed. ") + fix, e)
+            throw PairNetworkException(getString(if (lan) R.string.pair_direct_failed_lan else R.string.pair_direct_failed_remote, fix), e)
         }
     }
 
     override fun showMyQr() {
         if (LocalSockets.addresses(this).isEmpty()) {
-            state.say("Join a Wi-Fi network or turn on your hotspot first.")
+            state.say(getString(R.string.main_join_a_wi_fi_network_or_turn_on_your_hotspot_first))
             return
         }
         makeQr()
@@ -778,10 +790,10 @@ class MainActivity : ComponentActivity(), HopActions {
             val side = matrix.width
             val pixels = IntArray(side * side) { i -> if (matrix.get(i % side, i / side)) Color.BLACK else Color.WHITE }
             val bitmap = Bitmap.createBitmap(pixels, side, side, Bitmap.Config.ARGB_8888)
-            state.qr = QrUi(bitmap.asImageBitmap(), LocalSockets.describe(this).map { AddressUi(it.kind, it.ip) })
+            state.qr = QrUi(bitmap.asImageBitmap(), LocalSockets.describe(this).map { AddressUi(networkName(it.kind), it.ip) })
         } catch (e: Exception) {
             state.qr = null
-            state.say("Couldn't show a QR code. Try again.")
+            state.say(getString(R.string.main_couldn_t_show_a_qr_code_try_again))
         }
     }
 
@@ -795,9 +807,9 @@ class MainActivity : ComponentActivity(), HopActions {
 
     override fun pairByAddress(text: String): String? {
         val parts = text.trim().split(":", limit = 2)
-        if (!PairUri.validIpv4(parts[0])) return "Enter an address like 192.168.1.23"
+        if (!PairUri.validIpv4(parts[0])) return getString(R.string.main_enter_an_address_like_192_168_1_23)
         val port = if (parts.size == 2) parts[1].toIntOrNull() ?: -1 else 7410
-        if (port !in 1..65535) return "Enter an address like 192.168.1.23"
+        if (port !in 1..65535) return getString(R.string.main_enter_an_address_like_192_168_1_23)
         pairSas(parts[0], port, parts[0])
         return null
     }
@@ -811,11 +823,11 @@ class MainActivity : ComponentActivity(), HopActions {
                 val device = app.peer().pairSas(address, port)
                 runOnUiThread {
                     state.pairing = null
-                    state.say("Paired with ${device.name}")
+                    state.say(getString(R.string.paired_with, Language.ltr(this, device.name)))
                     refreshAll()
                 }
             } catch (e: Exception) {
-                runOnUiThread { if (state.pairing != null) state.pairing = PairingUi(label, ErrorText.forDevice(e, label)) }
+                runOnUiThread { if (state.pairing != null) state.pairing = PairingUi(label, ErrorText.forDevice(app, e, label)) }
             }
         }
     }
@@ -829,7 +841,7 @@ class MainActivity : ComponentActivity(), HopActions {
     }
 
     override fun rename(device: DeviceUi, name: String): String? {
-        if (name.length > 40) return "Use at most 40 characters"
+        if (name.length > 40) return getString(R.string.main_use_at_most_40_characters)
         val d = app.book().get(device.id) ?: return null
         d.alias = name.ifEmpty { null }
         app.book().put(d)
@@ -845,7 +857,7 @@ class MainActivity : ComponentActivity(), HopActions {
             Sends.cancelQueued(app, d.id)
             Shortcuts.update(this, app.book().all())
             runOnUiThread {
-                state.say("Removed ${d.label()}")
+                state.say(getString(R.string.removed_device, Language.ltr(this, d.label())))
                 refreshAll()
             }
         }
@@ -875,13 +887,13 @@ class MainActivity : ComponentActivity(), HopActions {
             val mime = uri?.let { try { contentResolver.getType(it) } catch (e: Exception) { null } }
             runOnUiThread {
                 if (uri == null) {
-                    state.say("This file isn't available anymore.")
+                    state.say(getString(R.string.main_this_file_isn_t_available_anymore))
                     return@runOnUiThread
                 }
                 try {
                     startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, mime ?: "*/*").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
                 } catch (e: Exception) {
-                    state.say("No app on this phone can open this file.")
+                    state.say(getString(R.string.main_no_app_on_this_phone_can_open_this_file))
                 }
             }
         }
@@ -892,7 +904,7 @@ class MainActivity : ComponentActivity(), HopActions {
             val uris = ArrayList(files.mapNotNull { it.uri ?: app.receivedUri(it.name) })
             runOnUiThread {
                 if (uris.isEmpty()) {
-                    state.say("These files aren't available anymore.")
+                    state.say(getString(R.string.main_these_files_aren_t_available_anymore))
                     return@runOnUiThread
                 }
                 val intent = if (uris.size == 1) Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_STREAM, uris[0])
@@ -905,7 +917,7 @@ class MainActivity : ComponentActivity(), HopActions {
                 try {
                     startActivity(Intent.createChooser(intent, null))
                 } catch (e: Exception) {
-                    state.say("Sharing isn't available on this phone.")
+                    state.say(getString(R.string.main_sharing_isn_t_available_on_this_phone))
                 }
             }
         }
@@ -915,7 +927,7 @@ class MainActivity : ComponentActivity(), HopActions {
         try {
             startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), null))
         } catch (e: Exception) {
-            state.say("Sharing isn't available on this phone.")
+            state.say(getString(R.string.main_sharing_isn_t_available_on_this_phone))
         }
     }
 
@@ -930,6 +942,14 @@ class MainActivity : ComponentActivity(), HopActions {
     }
 
     // ---- Settings ----
+
+    override fun setLanguage(language: String) {
+        if (language != "en" && language != "ar") return
+        if (Language.selected(this) == language) return
+        prefs.edit().putString("language", language).apply()
+        app.refreshLanguage()
+        recreate()
+    }
 
     override fun setTheme(mode: ThemeMode) {
         prefs.edit().putInt("theme", mode.ordinal).apply()
@@ -948,7 +968,7 @@ class MainActivity : ComponentActivity(), HopActions {
                 startForegroundService(Intent(this, ReceiveService::class.java))
                 if (batteryRestricted()) requestBatteryExemption()
             } catch (e: RuntimeException) {
-                state.say("Receiving could not start. Open HopDrop again to retry.")
+                state.say(getString(R.string.main_receiving_could_not_start_open_hopdrop_again_to_retry))
             }
         }
         state.settings = loadSettings()
@@ -972,7 +992,7 @@ class MainActivity : ComponentActivity(), HopActions {
         try {
             contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
         } catch (e: Exception) {
-            state.say("HopDrop can't save files in that folder. Choose another one.")
+            state.say(getString(R.string.main_hopdrop_can_t_save_files_in_that_folder_choose_another_))
             return
         }
         prefs.edit().putString("folder", uri.toString()).apply()
@@ -985,8 +1005,8 @@ class MainActivity : ComponentActivity(), HopActions {
     }
 
     override fun setPhoneName(name: String): String? {
-        if (name.isEmpty() || name.length > 40) return "Use 1 to 40 characters"
-        val peer = app.peer() ?: return "This phone's identity isn't available."
+        if (name.isEmpty() || name.length > 40) return getString(R.string.main_use_1_to_40_characters)
+        val peer = app.peer() ?: return getString(R.string.main_this_phone_s_identity_isn_t_available)
         peer.setName(name)
         prefs.edit().putString("name", name).apply()
         app.notices().showReady()
@@ -1001,21 +1021,21 @@ class MainActivity : ComponentActivity(), HopActions {
         try {
             startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
         } catch (e: Exception) {
-            state.say("Open Settings → Apps → HopDrop and allow background activity.")
+            state.say(getString(R.string.main_open_settings_apps_hopdrop_and_allow_background_activit))
         }
     }
 
     override fun copy(label: String, text: String) {
         getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText(label, text))
         // Android 13 and newer confirm copies on their own.
-        if (Build.VERSION.SDK_INT < 33) state.say("Copied $text")
+        if (Build.VERSION.SDK_INT < 33) state.say(getString(R.string.copied_text, text))
     }
 
     override fun openLink(url: String) {
         try {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
         } catch (e: Exception) {
-            state.say("No browser on this phone can open the link.")
+            state.say(getString(R.string.main_no_browser_on_this_phone_can_open_the_link))
         }
     }
 
@@ -1027,7 +1047,7 @@ class MainActivity : ComponentActivity(), HopActions {
     // ---- Auto-backup (Backup.java) ----
 
     override fun chooseBackupFolder(id: String?) {
-        if (id == null && app.book().all().isEmpty()) { state.say("Pair a device first."); return }
+        if (id == null && app.book().all().isEmpty()) { state.say(getString(R.string.main_pair_a_device_first)); return }
         backupEditingId = id
         chooseBackup.launch(null)
     }
@@ -1039,13 +1059,13 @@ class MainActivity : ComponentActivity(), HopActions {
         try {
             contentResolver.takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION)
         } catch (e: Exception) {
-            state.say("HopDrop can't read that folder. Choose another one.")
+            state.say(getString(R.string.main_hopdrop_can_t_read_that_folder_choose_another_one))
             return
         }
         val editing = backupEditingId
         work.execute {
-            val name = FolderScan.name(contentResolver, tree)
-            val count = try { FolderScan.files(contentResolver, tree).size } catch (e: Exception) { 0 }
+            val name = FolderScan.name(this, tree)
+            val count = try { FolderScan.files(this, tree).size } catch (e: Exception) { 0 }
             runOnUiThread {
                 val id = if (editing == null) Backup.create(app, tree, name, app.book().all().first().id)
                     else editing.also { Backup.setFolder(app, it, tree, name, true) }
@@ -1064,7 +1084,7 @@ class MainActivity : ComponentActivity(), HopActions {
         Backup.setDevice(app, id, deviceId)
         Backup.activate(app, id, existing)
         state.settings = loadSettings()
-        state.say(if (existing) "Backing up ${setup.folderName}" else "New files in ${setup.folderName} will be backed up")
+        state.say(getString(if (existing) R.string.backing_up else R.string.new_files_backup, Language.ltr(this, setup.folderName)))
     }
 
     override fun setBackupDevice(id: String, deviceId: String) {
@@ -1083,13 +1103,13 @@ class MainActivity : ComponentActivity(), HopActions {
     }
     override fun backupNow(id: String) {
         Backup.check(app, id, true)
-        state.say("Looking for new files…")
+        state.say(getString(R.string.main_looking_for_new_files))
     }
     override fun removeBackup(id: String) { Backup.remove(app, id); state.backupOpen = null; state.settings = loadSettings() }
     override fun chooseBackupPlace() = chooseBackupPlacePicker.launch(null)
     private fun setBackupPlace(uri: Uri) {
         try { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
-        catch (e: Exception) { state.say("HopDrop can't save backups there."); return }
+        catch (e: Exception) { state.say(getString(R.string.main_hopdrop_can_t_save_backups_there)); return }
         prefs.edit().putString("backup_folder", uri.toString()).apply(); state.settings = loadSettings()
     }
     override fun resetBackupPlace() { prefs.edit().remove("backup_folder").apply(); state.settings = loadSettings() }
@@ -1099,7 +1119,7 @@ class MainActivity : ComponentActivity(), HopActions {
 
     override fun addTile() {
         if (Build.VERSION.SDK_INT < 33) {
-            state.say("Pull down the quick settings, tap the pencil, and drag HopDrop in.")
+            state.say(getString(R.string.main_pull_down_the_quick_settings_tap_the_pencil_and_drag_ho))
             return
         }
         try {
@@ -1108,7 +1128,7 @@ class MainActivity : ComponentActivity(), HopActions {
                 android.graphics.drawable.Icon.createWithResource(this, R.drawable.ic_notification), mainExecutor,
             ) { }
         } catch (e: RuntimeException) {
-            state.say("Pull down the quick settings, tap the pencil, and drag HopDrop in.")
+            state.say(getString(R.string.main_pull_down_the_quick_settings_tap_the_pencil_and_drag_ho))
         }
     }
 
@@ -1161,11 +1181,11 @@ class MainActivity : ComponentActivity(), HopActions {
                 state.checkingUpdates = false
                 result.onSuccess { release ->
                     when {
-                        release == null -> { if (state.update?.downloading != true) state.update = null; if (!quiet) state.say("HopDrop is up to date.") }
+                        release == null -> { if (state.update?.downloading != true) state.update = null; if (!quiet) state.say(getString(R.string.main_hopdrop_is_up_to_date)) }
                         quiet -> offerKnownUpdate()
                         state.update == null -> state.update = UpdateUi(release.version, release.size)
                     }
-                }.onFailure { if (!quiet) state.say("Couldn't reach GitHub. Check the internet connection.") }
+                }.onFailure { if (!quiet) state.say(getString(R.string.main_couldn_t_reach_github_check_the_internet_connection)) }
             }
         }
     }
@@ -1188,7 +1208,7 @@ class MainActivity : ComponentActivity(), HopActions {
         if (!packageManager.canRequestPackageInstalls()) {
             // Android asks once per app: allow HopDrop to install apps. Coming back here continues the update.
             installAllowedPending = true
-            state.say("Allow HopDrop to install updates, then come back.")
+            state.say(getString(R.string.main_allow_hopdrop_to_install_updates_then_come_back))
             try {
                 startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
             } catch (e: Exception) {
@@ -1205,13 +1225,14 @@ class MainActivity : ComponentActivity(), HopActions {
                 main.post {
                     if (state.update?.downloading != true) return@post
                     state.update = state.update?.copy(downloading = false, fraction = null)
-                    if (!Updater.install(this, apk)) state.update = state.update?.copy(error = "Allow HopDrop to install updates first")
+                    if (!Updater.install(this, apk)) state.update = state.update?.copy(error = getString(R.string.main_allow_hopdrop_to_install_updates_first))
                 }
             } catch (e: InterruptedException) {
                 // Cancelled.
             } catch (e: Exception) {
                 main.post {
-                    if (state.update?.downloading == true) state.update = state.update?.copy(downloading = false, fraction = null, error = e.message ?: "The download failed")
+                    if (state.update?.downloading == true) state.update = state.update?.copy(downloading = false, fraction = null,
+                        error = getString((e as? Updater.UpdateError)?.messageId ?: R.string.main_the_download_failed))
                 }
             }
         }

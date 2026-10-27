@@ -6,6 +6,7 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Intent;
+import android.content.Context;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Build;
@@ -31,6 +32,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 public final class HopApp extends Application {
+    @Override protected void attachBaseContext(Context base) { super.attachBaseContext(Language.wrap(base)); }
     public static final class Prompt {
         public final String name;
         public final String code;
@@ -170,21 +172,7 @@ public final class HopApp extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
-        NotificationManager manager = getSystemService(NotificationManager.class);
-        manager.createNotificationChannel(new NotificationChannel("transfers", "Transfers in progress",
-                NotificationManager.IMPORTANCE_LOW));
-        manager.createNotificationChannel(new NotificationChannel("results", "Finished transfers",
-                NotificationManager.IMPORTANCE_DEFAULT));
-        // Pops up on screen (heads-up) when files arrive, also while HopDrop is in the background.
-        manager.createNotificationChannel(new NotificationChannel("received", "Files received",
-                NotificationManager.IMPORTANCE_HIGH));
-        manager.createNotificationChannel(new NotificationChannel("pairing", "Pairing requests",
-                NotificationManager.IMPORTANCE_HIGH));
-        manager.createNotificationChannel(new NotificationChannel("requests", "Requests to send you files",
-                NotificationManager.IMPORTANCE_HIGH));
-        // Text a paired device copied and HopDrop put on this phone's clipboard: a quiet note, no pop-up.
-        manager.createNotificationChannel(new NotificationChannel("clipboard", "Copied from your devices",
-                NotificationManager.IMPORTANCE_LOW));
+        refreshChannels();
         book = new DeviceBook(this);
         notices = new Notices(this);
         live = new Live(this::changed);
@@ -211,6 +199,28 @@ public final class HopApp extends Application {
         }
     }
 
+    public void refreshLanguage() {
+        refreshChannels();
+        if (notices != null) notices.showReady();
+        if (book != null) Shortcuts.update(this, book.all());
+    }
+
+    private void refreshChannels() {
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        manager.createNotificationChannel(new NotificationChannel("transfers", Language.text(this, R.string.channel_transfers),
+                NotificationManager.IMPORTANCE_LOW));
+        manager.createNotificationChannel(new NotificationChannel("results", Language.text(this, R.string.channel_results),
+                NotificationManager.IMPORTANCE_DEFAULT));
+        manager.createNotificationChannel(new NotificationChannel("received", Language.text(this, R.string.channel_received),
+                NotificationManager.IMPORTANCE_HIGH));
+        manager.createNotificationChannel(new NotificationChannel("pairing", Language.text(this, R.string.channel_pairing),
+                NotificationManager.IMPORTANCE_HIGH));
+        manager.createNotificationChannel(new NotificationChannel("requests", Language.text(this, R.string.channel_requests),
+                NotificationManager.IMPORTANCE_HIGH));
+        manager.createNotificationChannel(new NotificationChannel("clipboard", Language.text(this, R.string.channel_clipboard),
+                NotificationManager.IMPORTANCE_LOW));
+    }
+
     private final class Events implements Peer.Events {
         @Override
         public boolean confirm(String name, String code, boolean incoming) throws InterruptedException {
@@ -219,14 +229,14 @@ public final class HopApp extends Application {
             MainActivity activity = visible;
             NotificationManager manager = getSystemService(NotificationManager.class);
             if (activity != null) activity.runOnUiThread(() -> activity.showPrompt(p));
-            else manager.notify(Notices.PAIRING, notification("pairing", name + " wants to pair",
-                    "Tap to compare the number " + code, false, -1).setPriority(Notification.PRIORITY_HIGH)
+            else manager.notify(Notices.PAIRING, notification("pairing", Language.text(HopApp.this, R.string.pair_request_title, name),
+                    Language.text(HopApp.this, R.string.pair_request_body, code), false, -1).setPriority(Notification.PRIORITY_HIGH)
                     .setAutoCancel(true).build());
             boolean answer = p.await();
             if (p.isPending()) {
                 p.answer(false);
                 MainActivity showing = visible;
-                if (showing != null) showing.runOnUiThread(() -> showing.closePrompt(p, "Pairing timed out."));
+                if (showing != null) showing.runOnUiThread(() -> showing.closePrompt(p, Language.text(HopApp.this, R.string.pair_timeout)));
             }
             prompt = null;
             manager.cancel(Notices.PAIRING);
@@ -256,7 +266,7 @@ public final class HopApp extends Application {
         public void paired(Peer.Device d) {
             notices.showReady();
             getSystemService(NotificationManager.class).notify(Notices.PAIRING + 100, notification("results",
-                    "Paired with " + d.name, "You can now send files both ways. No codes needed next time.",
+                    Language.text(HopApp.this, R.string.paired_with, d.name), Language.text(HopApp.this, R.string.paired_success_body),
                     false, -1).setAutoCancel(true).build());
             MainActivity activity = visible;
             if (activity != null) activity.runOnUiThread(activity::onPaired);
@@ -287,11 +297,18 @@ public final class HopApp extends Application {
         }
 
         @Override
-        public void text(Peer.Device from, String text, boolean clip) {
-            String name = from == null ? "A paired device" : from.label();
+        public void text(Peer.Device from, String text, boolean clip, String transport) {
+            String name = from == null ? Language.text(HopApp.this, R.string.paired_device) : from.label();
             boolean copied = clip && getSharedPreferences("settings_v2", MODE_PRIVATE).getBoolean("clip_auto", true) && copyText(text);
             notices.text(name, text, copied);
-            saveText(true, name, text);
+            saveText(true, name, text, transport);
+            MainActivity activity = visible;
+            if (activity != null) activity.runOnUiThread(activity::refresh);
+        }
+
+        @Override
+        public void textSent(Peer.Device to, String text, String transport) {
+            saveText(false, to.label(), text, transport);
             MainActivity activity = visible;
             if (activity != null) activity.runOnUiThread(activity::refresh);
         }
@@ -320,7 +337,7 @@ public final class HopApp extends Application {
                 .setColor(getColor(R.color.brand)).setContentTitle(title).setContentText(detail)
                 .setContentIntent(open).setOnlyAlertOnce(ongoing).setOngoing(ongoing);
         if (percent >= 0) b.setProgress(100, percent, false);
-        else if (ongoing && channel.equals("transfers") && !title.startsWith("Ready")) b.setProgress(0, 0, true);
+        else if (ongoing && channel.equals("transfers") && !title.equals(Language.text(this, R.string.notification_ready))) b.setProgress(0, 0, true);
         return b;
     }
 
@@ -376,12 +393,13 @@ public final class HopApp extends Application {
 
     /** Records a text message in Activity. */
     @SuppressWarnings("unchecked")
-    synchronized void saveText(boolean incoming, String peer, String text) {
+    synchronized void saveText(boolean incoming, String peer, String text, String transport) {
         SharedPreferences p = getSharedPreferences("history_v2", MODE_PRIVATE);
         try {
             List<Object> list = (List<Object>) Json.parseObject(p.getString("data", "{\"items\":[]}")).get("items");
             list.add(0, Json.obj("at", System.currentTimeMillis(), "incoming", incoming, "peer", peer, "files", new ArrayList<>(),
-                    "count", 0, "text", text, "bytes", (long) text.length(), "offered", 0, "millis", 0));
+                    "count", 0, "text", text, "bytes", (long) text.length(), "offered", 0, "millis", 0,
+                    "transport", transport));
             while (list.size() > 100) list.remove(list.size() - 1);
             p.edit().putString("data", Json.string(Json.obj("items", list))).apply();
         } catch (Exception ignored) {
@@ -472,7 +490,7 @@ public final class HopApp extends Application {
             }
             Map<String, Object> entry = Json.obj("at", System.currentTimeMillis(), "incoming", r.incoming, "peer", r.peer,
                     "files", names, "count", r.files.size(), "uris", uris, "folder", r.folder, "error", r.error,
-                    "bytes", r.bytes, "offered", r.offered, "millis", r.millis);
+                    "bytes", r.bytes, "offered", r.offered, "millis", r.millis, "transport", r.transport);
             List<Object> sent = r.incoming ? null : sources.remove(r.peer);
             if (sent != null) entry.put("sources", sent);
             list.add(0, entry);

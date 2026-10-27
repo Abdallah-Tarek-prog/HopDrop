@@ -66,8 +66,8 @@ internal sealed class SendQueue : IDisposable
             var items = entry.Items?.Where(i => File.Exists(i.Path)).ToList();
             if (entry.Items is not null && items!.Count == 0)
             {
-                if (retry) { Remove(entry.Id); Platform.Notify("Send cancelled", "The files are no longer on this PC."); }
-                else throw new FileNotFoundException("The files are no longer on this PC.");
+                if (retry) { Remove(entry.Id); Platform.Notify(L.T("SendCancelled"), L.T("TheFilesAreNoLongerOnThisPC")); }
+                else throw new FileNotFoundException(L.T("TheFilesAreNoLongerOnThisPC"));
                 return;
             }
             _lastResult.TryRemove(entry.DeviceId, out _);
@@ -84,10 +84,10 @@ internal sealed class SendQueue : IDisposable
                 if (entry.Text is not null && !_lastResult.ContainsKey(entry.DeviceId))
                 {
                     App.WindowInstance?.OnHistoryChanged();
-                    Platform.Notify("Sent text to " + await DeviceNameAsync(entry.DeviceId), entry.Text.Length > 200 ? entry.Text[..200] + "…" : entry.Text);
+                    Platform.Notify(L.T("SentTextTo") + await DeviceNameAsync(entry.DeviceId), entry.Text.Length > 200 ? entry.Text[..200] + "…" : entry.Text);
                 }
                 else if (retry && App.WindowInstance is { IsVisible: true, IsActive: true })
-                    Platform.Notify("Sent to " + await DeviceNameAsync(entry.DeviceId), entry.Text is null ? Fmt.Files(items!.Count) : "Text");
+                    Platform.Notify(L.T("SentTo") + await DeviceNameAsync(entry.DeviceId), entry.Text is null ? Fmt.Files(items!.Count) : L.T("Text"));
             }
             catch (Exception ex)
             {
@@ -102,13 +102,13 @@ internal sealed class SendQueue : IDisposable
                     {
                         _entries.Add(entry); Save();
                         var device = (await _peer.DevicesAsync()).FirstOrDefault(d => d.Id == entry.DeviceId);
-                        Platform.Notify("Offline · sends when it's back", name + "\n" + WaitingHint(device));
+                        Platform.Notify(L.T("OfflineSendsWhenItSBack"), name + "\n" + WaitingHint(device));
                     }
                 }
                 else
                 {
                     if (retry) Remove(entry.Id);
-                    Platform.Notify($"Couldn't send to {name}", Platform.ExplainException(ex, name));
+                    Platform.Notify(L.T("CouldnTSendTo0", name), Platform.ExplainException(ex, name));
                     if (!retry) throw;
                 }
             }
@@ -123,14 +123,14 @@ internal sealed class SendQueue : IDisposable
     internal static string WaitingHint(PairedDevice? device)
     {
         if (device?.Platform == "android" && App.Instance.Link?.State == DirectLinkState.On)
-            return "Open HopDrop on your phone and tap Connect";
-        return Preferences.DirectLink ? "Connect both devices to the same Wi-Fi" :
-            "Use the same Wi-Fi or turn on Settings → Direct connection";
+            return L.T("OpenHopDropOnYourPhoneAndTapConnect");
+        return Preferences.DirectLink ? L.T("ConnectBothDevicesToTheSameWiFi") :
+            L.T("UseTheSameWiFiOrTurnOnSettingsDirectConnection");
     }
     private async Task<string> DeviceNameAsync(string id)
     {
-        try { var d = (await _peer.DevicesAsync()).FirstOrDefault(d => d.Id == id); return d?.Alias ?? d?.Name ?? "your device"; }
-        catch { return "your device"; }
+        try { var d = (await _peer.DevicesAsync()).FirstOrDefault(d => d.Id == id); return d?.Alias ?? d?.Name ?? L.T("YourDevice"); }
+        catch { return L.T("YourDevice"); }
     }
     private void Save()
     {
@@ -141,7 +141,7 @@ internal sealed class SendQueue : IDisposable
             File.WriteAllText(temp, JsonSerializer.Serialize(_entries));
             File.Move(temp, _path, true);
         }
-        catch (Exception ex) { Debug.WriteLine(ex); Platform.Notify("Couldn't save pending sends", ex.Message); }
+        catch (Exception ex) { Debug.WriteLine(ex); Platform.Notify(L.T("CouldnTSavePendingSends"), ex.Message); }
         Changed?.Invoke();
     }
     private void Remove(Guid id) { _entries.RemoveAll(e => e.Id == id); Save(); }

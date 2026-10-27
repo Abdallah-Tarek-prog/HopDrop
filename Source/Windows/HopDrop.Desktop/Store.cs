@@ -77,10 +77,10 @@ internal static class Store
             return state switch
             {
                 StartupTaskState.Enabled or StartupTaskState.EnabledByPolicy => null,
-                StartupTaskState.DisabledByUser => "Windows has HopDrop turned off at sign-in. Turn it on in Task Manager → Startup apps.",
-                _ => "Windows doesn't allow HopDrop to start at sign-in on this PC."
+                StartupTaskState.DisabledByUser => L.T("WindowsHasHopDropTurnedOffAtSignInTurnItOnInTaskManagerStartupApp"),
+                _ => L.T("WindowsDoesnTAllowHopDropToStartAtSignInOnThisPC")
             };
         }
-        catch (Exception e) { Debug.WriteLine(e); return "HopDrop couldn't set itself to start at sign-in."; }
+        catch (Exception e) { Debug.WriteLine(e); return L.T("HopDropCouldnTSetItselfToStartAtSignIn"); }
     }
 }

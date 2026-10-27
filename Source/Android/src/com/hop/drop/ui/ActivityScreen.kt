@@ -64,6 +64,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.hop.drop.R
 import com.hop.drop.core.Format
 import java.text.DateFormat
 import java.text.SimpleDateFormat
@@ -73,13 +75,14 @@ import java.time.ZoneId
 import java.util.Date
 import java.util.Locale
 
-private enum class Filter(val label: String) { All("All"), Received("Received"), Sent("Sent") }
+private enum class Filter(val label: Int) { All(R.string.ui_all), Received(R.string.ui_received), Sent(R.string.ui_sent) }
 
+@Composable
 private fun dayLabel(day: LocalDate): String {
     val today = LocalDate.now()
     return when (day) {
-        today -> "Today"
-        today.minusDays(1) -> "Yesterday"
+        today -> stringResource(R.string.ui_today)
+        today.minusDays(1) -> stringResource(R.string.ui_yesterday)
         else -> {
             val date = Date.from(day.atStartOfDay(ZoneId.systemDefault()).toInstant())
             SimpleDateFormat(if (day.year == today.year) "EEEE, MMM d" else "MMM d, yyyy", Locale.getDefault()).format(date)
@@ -114,17 +117,17 @@ fun ActivityScreen(state: HopUiState, actions: HopActions, padding: PaddingValue
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         if (state.live.isNotEmpty()) {
-            item(key = "now") { SectionHeader("Now", Modifier.padding(top = 0.dp)) }
+            item(key = "now") { SectionHeader(stringResource(R.string.ui_now), Modifier.padding(top = 0.dp)) }
             items(state.live, key = { "live:" + it.key }) { LiveCard(it, actions::cancel, Modifier.animateItem()) }
         }
         if (history.isEmpty()) {
             item(key = "empty") {
-                EmptyState(Icons.Rounded.History, "Nothing here yet", "Files you send and receive show up here.")
+                EmptyState(Icons.Rounded.History, stringResource(R.string.ui_nothing_here_yet), stringResource(R.string.ui_files_you_send_and_receive_show_up_here))
             }
         } else {
             item(key = "search") { SearchAndFilter(query, { query = it }, filter) { filter = it } }
             if (shown.isEmpty()) {
-                item(key = "no-match") { EmptyState(Icons.Rounded.SearchOff, "No matches") }
+                item(key = "no-match") { EmptyState(Icons.Rounded.SearchOff, stringResource(R.string.ui_no_matches)) }
             }
             groups.forEach { (day, entries) ->
                 stickyHeader(key = "day:$day") {
@@ -161,9 +164,9 @@ private fun SearchAndFilter(query: String, onQuery: (String) -> Unit, filter: Fi
         OutlinedTextField(
             value = query,
             onValueChange = onQuery,
-            placeholder = { Text("Search files or devices") },
+            placeholder = { Text(stringResource(R.string.ui_search_files_or_devices)) },
             leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
-            trailingIcon = if (query.isNotEmpty()) ({ IconButton(onClick = { onQuery("") }) { Icon(Icons.Rounded.Close, contentDescription = "Clear search") } }) else null,
+            trailingIcon = if (query.isNotEmpty()) ({ IconButton(onClick = { onQuery("") }) { Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.ui_clear_search)) } }) else null,
             singleLine = true,
             shape = CircleShape,
             colors = OutlinedTextFieldDefaults.colors(
@@ -174,16 +177,27 @@ private fun SearchAndFilter(query: String, onQuery: (String) -> Unit, filter: Fi
             modifier = Modifier.fillMaxWidth(),
         )
         Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            for (f in Filter.entries) FilterChip(selected = filter == f, onClick = { onFilter(f) }, label = { Text(f.label) })
+            for (f in Filter.entries) FilterChip(selected = filter == f, onClick = { onFilter(f) }, label = { Text(stringResource(f.label)) })
         }
     }
 }
 
+@Composable
 private fun statusLine(e: HistoryUi): String = when {
-    e.ok -> Format.files(e.count) + "  ·  " + Format.size(e.bytes)
-    e.cancelled -> "Cancelled" + if (e.offered > 0) "  ·  ${e.count} of ${Format.files(e.offered)}" else ""
-    else -> e.problem ?: "Stopped"
+    e.ok -> filesText(e.count) + "  ·  " + sizeText(e.bytes)
+    e.cancelled -> stringResource(R.string.ui_cancelled) + if (e.offered > 0)
+        "  ·  " + stringResource(R.string.count_of_files, e.count, e.offered.toString()) else ""
+    else -> e.problem ?: stringResource(R.string.ui_stopped)
 }
+
+@Composable
+private fun transportLabel(transport: String): String = stringResource(when (transport) {
+    "local_network" -> R.string.transport_local_network
+    "direct_link" -> R.string.transport_direct_link
+    "bluetooth" -> R.string.transport_bluetooth
+    "mixed" -> R.string.transport_mixed
+    else -> R.string.transport_unknown
+})
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -197,18 +211,20 @@ private fun HistoryCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
             HistoryLeading(entry)
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                Text((if (entry.incoming) "From " else "To ") + entry.peer, style = MaterialTheme.typography.titleSmall,
+                Text(stringResource(if (entry.incoming) R.string.history_from else R.string.history_to, ltr(entry.peer)), style = MaterialTheme.typography.titleSmall,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(shortSummary(entry.files.map { it.name }), style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(statusLine(entry), style = MaterialTheme.typography.bodySmall,
                     color = if (entry.ok) scheme.onSurfaceVariant else if (entry.cancelled) scheme.onSurfaceVariant else scheme.error,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(transportLabel(entry.transport), style = MaterialTheme.typography.labelSmall,
+                    color = scheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(entry.at)), style = MaterialTheme.typography.labelMedium,
                     color = scheme.onSurfaceVariant)
-                Icon(Icons.Rounded.ExpandMore, contentDescription = if (expanded) "Collapse" else "Expand",
+                Icon(Icons.Rounded.ExpandMore, contentDescription = if (expanded) stringResource(R.string.ui_collapse) else stringResource(R.string.ui_expand),
                     tint = scheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp).rotate(chevron))
             }
         }
@@ -229,6 +245,7 @@ private fun TextCard(entry: HistoryUi, expanded: Boolean, onToggle: () -> Unit, 
     menuOpen: Boolean, onMenuDismiss: () -> Unit, actions: HopActions, modifier: Modifier) {
     val scheme = MaterialTheme.colorScheme
     val text = entry.text ?: return
+    val copyLabel = stringResource(R.string.ui_text)
     HopCard(modifier, onClick = onToggle, onLongClick = onLongPress, padding = PaddingValues(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 8.dp)) {
         Row(verticalAlignment = Alignment.Top) {
             Box(Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(if (entry.incoming) scheme.primaryContainer else scheme.secondaryContainer),
@@ -237,19 +254,20 @@ private fun TextCard(entry: HistoryUi, expanded: Boolean, onToggle: () -> Unit, 
                     tint = if (entry.incoming) scheme.onPrimaryContainer else scheme.onSecondaryContainer, modifier = Modifier.size(24.dp))
             }
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                Text((if (entry.incoming) "Text from " else "Text to ") + entry.peer, style = MaterialTheme.typography.titleSmall,
+                Text(stringResource(if (entry.incoming) R.string.history_text_from else R.string.history_text_to, ltr(entry.peer)), style = MaterialTheme.typography.titleSmall,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (expanded) androidx.compose.foundation.text.selection.SelectionContainer {
                     Text(text, style = MaterialTheme.typography.bodyMedium)
                 } else Text(text, style = MaterialTheme.typography.bodyMedium, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                Text(transportLabel(entry.transport), style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
             }
             Text(DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(entry.at)), style = MaterialTheme.typography.labelMedium,
                 color = scheme.onSurfaceVariant)
         }
         Row(Modifier.padding(start = 56.dp, top = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            TextButton(onClick = { actions.copy("Text", text) }) { Text("Copy") }
-            singleLink(text)?.let { link -> TextButton(onClick = { actions.openLink(link) }) { Text("Open link") } }
-            TextButton(onClick = { actions.shareText(text) }) { Text("Share") }
+            TextButton(onClick = { actions.copy(copyLabel, text) }) { Text(stringResource(R.string.ui_copy)) }
+            singleLink(text)?.let { link -> TextButton(onClick = { actions.openLink(link) }) { Text(stringResource(R.string.ui_open_link)) } }
+            TextButton(onClick = { actions.shareText(text) }) { Text(stringResource(R.string.ui_share)) }
         }
         HistoryMenu(entry, actions, menuOpen, onMenuDismiss)
     }
@@ -273,7 +291,7 @@ private fun HistoryLeading(entry: HistoryUi) {
     Box(Modifier.size(48.dp)) {
         val badge: @Composable () -> Unit = {
             Box(Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(bg), contentAlignment = Alignment.Center) {
-                Icon(icon, contentDescription = if (entry.incoming) "Received" else "Sent", tint = fg, modifier = Modifier.size(24.dp))
+                Icon(icon, contentDescription = if (entry.incoming) stringResource(R.string.ui_received) else stringResource(R.string.ui_sent), tint = fg, modifier = Modifier.size(24.dp))
             }
         }
         if (photo?.uri != null) {
@@ -296,12 +314,13 @@ private fun HistoryDetails(entry: HistoryUi, actions: HopActions, onShowAll: () 
         val limit = 8
         for (file in entry.files.take(limit)) FileRow(file, actions)
         if (entry.files.size > limit || entry.count > entry.files.size) {
-            TextButton(onClick = onShowAll) { Text("Show all " + Format.files(entry.count)) }
+            TextButton(onClick = onShowAll) { Text(stringResource(R.string.show_all_count, filesText(entry.count))) }
         }
-        val facts = buildList {
-            if (entry.ok && entry.millis > 0) add(Format.size(entry.bytes) + " in " + Format.duration(maxOf(1, entry.millis / 1000)))
-            if (!entry.folder.isNullOrEmpty()) add("Saved in " + entry.folder + if (entry.incoming) "" else " on " + entry.peer)
-        }
+        val facts = mutableListOf<String>()
+        if (entry.ok && entry.millis > 0) facts.add(stringResource(R.string.history_size_in,
+            sizeText(entry.bytes), durationText(maxOf(1, entry.millis / 1000))))
+        if (!entry.folder.isNullOrEmpty()) facts.add(stringResource(if (entry.incoming) R.string.history_saved_in else R.string.history_saved_in_on,
+            ltr(entry.folder), ltr(entry.peer)))
         if (facts.isNotEmpty()) {
             Text(facts.joinToString("\n"), style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 4.dp, top = 6.dp))
@@ -315,10 +334,10 @@ private fun HistoryDetails(entry: HistoryUi, actions: HopActions, onShowAll: () 
                 OutlinedButton(onClick = { actions.share(entry.files) }) {
                     Icon(Icons.Rounded.Share, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Share")
+                    Text(stringResource(R.string.ui_share))
                 }
             }
-            TextButton(onClick = { actions.removeFromHistory(entry) }) { Text("Remove from list") }
+            TextButton(onClick = { actions.removeFromHistory(entry) }) { Text(stringResource(R.string.ui_remove_from_list)) }
         }
     }
 }
@@ -348,15 +367,16 @@ private fun FileRow(file: HistoryFile, actions: HopActions) {
 @Composable
 private fun HistoryMenu(entry: HistoryUi, actions: HopActions, expanded: Boolean, onDismiss: () -> Unit) {
     val message = entry.text
+    val copyLabel = stringResource(R.string.ui_text)
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
-        if (message != null) DropdownMenuItem(text = { Text("Copy") }, onClick = {
-            onDismiss(); actions.copy("Text", message)
+        if (message != null) DropdownMenuItem(text = { Text(stringResource(R.string.ui_copy)) }, onClick = {
+            onDismiss(); actions.copy(copyLabel, message)
         })
-        if (entry.files.any { it.uri != null } || message != null) DropdownMenuItem(text = { Text("Share") }, onClick = {
+        if (entry.files.any { it.uri != null } || message != null) DropdownMenuItem(text = { Text(stringResource(R.string.ui_share)) }, onClick = {
             onDismiss()
             if (message != null) actions.shareText(message) else actions.share(entry.files)
         })
-        DropdownMenuItem(text = { Text("Remove from list") }, onClick = { onDismiss(); actions.removeFromHistory(entry) })
+        DropdownMenuItem(text = { Text(stringResource(R.string.ui_remove_from_list)) }, onClick = { onDismiss(); actions.removeFromHistory(entry) })
     }
 }
 
@@ -364,14 +384,14 @@ private fun HistoryMenu(entry: HistoryUi, actions: HopActions, expanded: Boolean
 @Composable
 fun AllFilesScreen(entry: HistoryUi, actions: HopActions, onDismiss: () -> Unit) {
     Scaffold(topBar = { TopAppBar(
-        title = { Text((if (entry.incoming) "From " else "To ") + entry.peer) },
-        navigationIcon = { IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") } },
+        title = { Text(stringResource(if (entry.incoming) R.string.history_from else R.string.history_to, ltr(entry.peer))) },
+        navigationIcon = { IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.ui_back)) } },
     ) }) { padding ->
         LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = padding.calculateTopPadding(),
             bottom = padding.calculateBottomPadding() + 32.dp)) {
             item { Text(
-                if (entry.count > entry.files.size) "Showing ${String.format(Locale.getDefault(), "%,d", entry.files.size)} of ${Format.files(entry.count)}"
-                else Format.files(entry.count),
+                if (entry.count > entry.files.size) stringResource(R.string.showing_count, entry.files.size, entry.count.toString())
+                else filesText(entry.count),
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 12.dp),
             ) }

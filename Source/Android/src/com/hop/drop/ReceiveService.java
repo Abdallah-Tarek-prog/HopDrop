@@ -54,7 +54,7 @@ public final class ReceiveService extends Service {
             }
         }
         if (app.peer() == null) {
-            app.notices().receiverProblem("HopDrop couldn't load this phone's identity. Restart the phone and try again.");
+            app.notices().receiverProblem(Language.text(app, R.string.receiver_identity_error));
             stopSelf(startId);
             return START_NOT_STICKY;
         }
@@ -102,8 +102,7 @@ public final class ReceiveService extends Service {
         } catch (Exception error) {
             Log.w("HopDrop", "Receiver could not listen on port 7410", error);
             running = false;
-            app.notices().receiverProblem("Another app is using HopDrop's network port, or the network isn't ready. "
-                    + "Close HopDrop and open it again.");
+            app.notices().receiverProblem(Language.text(app, R.string.receiver_port_error));
         }
         if (discovery == null) {
             discovery = new Discovery(this, app.peer(), app::nearbyChanged);

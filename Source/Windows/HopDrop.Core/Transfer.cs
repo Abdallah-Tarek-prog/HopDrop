@@ -21,7 +21,7 @@ public sealed record SendItem(string Path, string? Folder = null, string? Root =
     public static List<SendItem> From(IEnumerable<string> paths)
     {
         var items = new List<SendItem>();
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var seen = new HashSet<string>(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
         var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = FileAttributes.Hidden | FileAttributes.System | FileAttributes.ReparsePoint };
         foreach (string raw in paths)
         {
@@ -78,6 +78,7 @@ public sealed partial class HopDropPeer
         public IncrementalHash? PartialHash;
         public long PartialWritten;
         public bool Trusted;
+        public string Transport = TransferTransport.Unknown;
         public readonly CancellationTokenSource Expiry = new();
         public void DropPartial()
         {
@@ -162,6 +163,7 @@ public sealed partial class HopDropPeer
         }
         Connection? connection = await ConnectTargetAsync(ct);
         string peerId = connection.Id, peerName = alias ?? connection.Name;
+        string transport = connection.Transport;
         bool folders = connection.Features.Contains("folders"), pages = connection.Features.Contains("pages"), resume = connection.Features.Contains("resume");
         // As many files as this receiver takes in one transfer: one offer message for older receivers, up to 10,000 with "pages".
         var files = new List<OfferedFile>(); var paths = new List<string>();
@@ -195,6 +197,7 @@ public sealed partial class HopDropPeer
                 try
                 {
                     connection ??= await ConnectTargetAsync(transferStop.Token);
+                    transport = TransferTransport.Combine(transport, connection.Transport);
                     await SendFilesAsync(connection, id, files, paths, state, peerName, total, meter, clock, transferStop.Token, merge, backupFolder);
                     break;
                 }
@@ -211,14 +214,14 @@ public sealed partial class HopDropPeer
         {
             if (connection is not null) try { await Messages.WriteAsync(connection.Stream, new { type = "cancel" }); } catch { }
             TransferFinished?.Invoke(Result("cancelled"));
-            try { await AddHistoryAsync(peerId, "sent", "cancelled", shown, state.Folder); } catch { }
+            try { await AddHistoryAsync(peerId, "sent", "cancelled", shown, state.Folder, transport: transport); } catch { }
             throw new HopDropException("cancelled", "Transfer cancelled");
         }
         catch (Exception e)
         {
             string code = e is HopDropException ae ? ae.Code : e is TimeoutException ? "timeout" : "io_error";
             TransferFinished?.Invoke(Result(code));
-            try { await AddHistoryAsync(peerId, "sent", code, shown, state.Folder); } catch { }
+            try { await AddHistoryAsync(peerId, "sent", code, shown, state.Folder, transport: transport); } catch { }
             if (e is HopDropException) throw;
             throw new HopDropException(code, e.Message);
         }
@@ -226,7 +229,7 @@ public sealed partial class HopDropPeer
         // Outside the try: the files arrived, so a failure to write Activity mustn't report the transfer as failed.
         var result = Result(null);
         TransferFinished?.Invoke(result);
-        try { await AddHistoryAsync(peerId, "sent", null, shown, state.Folder); } catch (Exception e) { Error?.Invoke("Activity: " + e.Message); }
+        try { await AddHistoryAsync(peerId, "sent", null, shown, state.Folder, transport: transport); } catch (Exception e) { Error?.Invoke("Activity: " + e.Message); }
         return (result, files.Count);
     }
     /// <summary>A dropped or stalled connection (worth reconnecting), as opposed to an answer from the receiver or a local file problem.</summary>
@@ -463,7 +466,7 @@ public sealed partial class HopDropPeer
         Directory.CreateDirectory(target);
         return target;
     }
-    private async Task ReceiveAsync(Stream stream, JsonElement offer, string peerId, string peerName, string senderName, bool trusted, IReadOnlySet<string> senderFeatures, CancellationToken ct)
+    private async Task ReceiveAsync(Stream stream, JsonElement offer, string peerId, string peerName, string senderName, bool trusted, IReadOnlySet<string> senderFeatures, string transport, CancellationToken ct)
     {
         if (!Guid.TryParse(Messages.String(offer, "transferId"), out var id)) throw new HopDropException("protocol_error", "Invalid transfer id");
         int count = checked((int)Messages.Long(offer, "count"));
@@ -479,6 +482,7 @@ public sealed partial class HopDropPeer
         string? senderFolder = backup ? FileNames.Sanitize(senderName) : null;
         // The same transfer coming back after a dropped connection: skip what's saved, continue the half-received file.
         _interrupted.TryRemove((peerId, id), out var earlier);
+        if (earlier is not null) transport = TransferTransport.Combine(earlier.Transport, transport);
         if (earlier is not null) { earlier.Expiry.Cancel(); trusted = earlier.Trusted; }
         string dir = backup ? Path.Combine(BackupDirectory, senderFolder!) : ReceiveDirectory;
         Directory.CreateDirectory(dir);
@@ -600,7 +604,8 @@ public sealed partial class HopDropPeer
                 try
                 {
                     string target = Path.GetDirectoryName(temp)!;
-                    string finalName = FileNames.Unique(file.Name, candidate => File.Exists(Path.Combine(target, candidate)) || completed.Any(c => string.Equals(c.Path, Path.Combine(target, candidate), StringComparison.OrdinalIgnoreCase)));
+                    string finalName = FileNames.Unique(file.Name, candidate => File.Exists(Path.Combine(target, candidate)) || completed.Any(c => string.Equals(c.Path, Path.Combine(target, candidate),
+                        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)));
                     finalPath = Path.Combine(target, finalName);
                     File.Move(temp!, finalPath); temp = null;
                     savedAs = Path.GetRelativePath(dir, finalPath).Replace('\\', '/');
@@ -616,7 +621,7 @@ public sealed partial class HopDropPeer
         catch (OperationCanceledException) when (transferStop.IsCancellationRequested && !ct.IsCancellationRequested)
         {
             TransferFinished?.Invoke(Result("cancelled"));
-            try { await AddHistoryAsync(peerId, "received", "cancelled", completed.Select(c => c.Path).ToList(), folder); } catch { }
+            try { await AddHistoryAsync(peerId, "received", "cancelled", completed.Select(c => c.Path).ToList(), folder, transport: transport); } catch { }
             try { await Messages.WriteAsync(stream, new { type = "cancel" }, ct); } catch { }
             return;
         }
@@ -625,7 +630,7 @@ public sealed partial class HopDropPeer
             // The connection dropped: keep what arrived (and the open half-received file) for the sender to continue.
             var kept = new Interrupted
             {
-                PeerName = peerName, Folder = folder, Completed = completed, Folders = tops, Clock = clock, Offered = offered, Bytes = done, Trusted = trusted,
+                PeerName = peerName, Folder = folder, Completed = completed, Folders = tops, Clock = clock, Offered = offered, Bytes = done, Trusted = trusted, Transport = transport,
                 Partial = output is null ? null : current, PartialTemp = output is null ? null : temp, PartialOutput = output, PartialHash = output is null ? null : hash, PartialWritten = written
             };
             if (output is null) hash?.Dispose();
@@ -639,7 +644,7 @@ public sealed partial class HopDropPeer
         {
             string code = e is HopDropException ae ? ae.Code : e is TimeoutException ? "timeout" : "io_error";
             TransferFinished?.Invoke(Result(code));
-            try { await AddHistoryAsync(peerId, "received", code, completed.Select(c => c.Path).ToList(), folder); } catch { }
+            try { await AddHistoryAsync(peerId, "received", code, completed.Select(c => c.Path).ToList(), folder, transport: transport); } catch { }
             throw;
         }
         finally
@@ -661,7 +666,7 @@ public sealed partial class HopDropPeer
             }); } catch (Exception e) { Error?.Invoke("Backups: " + e.Message); }
         }
         TransferFinished?.Invoke(Result(null));
-        try { await AddHistoryAsync(peerId, "received", null, completed.Select(c => c.Path).ToList(), folder); } catch (Exception e) { Error?.Invoke("Activity: " + e.Message); }
+        try { await AddHistoryAsync(peerId, "received", null, completed.Select(c => c.Path).ToList(), folder, transport: transport); } catch (Exception e) { Error?.Invoke("Activity: " + e.Message); }
     }
     /// <summary>Gives up on an interrupted incoming transfer the sender didn't come back for.</summary>
     private async Task ExpireAsync((string Peer, Guid Id) key, Interrupted kept)
@@ -673,7 +678,7 @@ public sealed partial class HopDropPeer
         var result = new TransferResult(key.Id, key.Peer, true, kept.Completed.Select(c => c.Path).ToList(), kept.Folder, "disconnected")
         { PeerName = kept.PeerName, Offered = kept.Offered, Bytes = kept.Bytes, Duration = kept.Clock.Elapsed, Trusted = kept.Trusted };
         TransferFinished?.Invoke(result);
-        try { await AddHistoryAsync(key.Peer, "received", "disconnected", result.SavedPaths.ToList(), kept.Folder); } catch { }
+        try { await AddHistoryAsync(key.Peer, "received", "disconnected", result.SavedPaths.ToList(), kept.Folder, transport: kept.Transport); } catch { }
     }
     /// <summary>
     /// Sends text (a link, a note, a copied clipboard) to a paired device, which shows it with Copy / Open instead of saving a file.
@@ -692,7 +697,7 @@ public sealed partial class HopDropPeer
                 await Messages.WriteAsync(connection.Stream, new { type = "text", text, clip = clipboard }, ct);
                 using var reply = await ReadControlAsync(connection.Stream, ct); Messages.ThrowIfError(reply.RootElement);
                 if (Messages.Type(reply.RootElement) != "ok") throw new HopDropException("protocol_error", "Expected ok");
-                try { await AddHistoryAsync(device.Id, "sent", null, [], "", text); } catch (Exception e) { Error?.Invoke("Activity: " + e.Message); }
+                try { await AddHistoryAsync(device.Id, "sent", null, [], "", text, connection.Transport); } catch (Exception e) { Error?.Invoke("Activity: " + e.Message); }
                 return;
             }
             // An older HopDrop: end this connection politely (it expects a request), then send a file instead.
@@ -713,16 +718,17 @@ public sealed partial class HopDropPeer
             catch (Exception e) when (e is IOException or UnauthorizedAccessException) { Error?.Invoke("Text file clean-up: " + e.Message); }
         }
     }
-    private async Task AddHistoryAsync(string peer, string direction, string? result, IEnumerable<string> files, string folder, string? text = null)
+    private async Task AddHistoryAsync(string peer, string direction, string? result, IEnumerable<string> files, string folder, string? text = null, string? transport = null)
     {
         // A folder can hold thousands of files: keep the first ones and the real count, so Activity stays small and quick.
         var all = files.ToList();
         var list = all.Count > HistoryFiles ? all.GetRange(0, HistoryFiles) : all;
         await _history.UpdateAsync(old =>
         {
-            old.Add(new HistoryEntry(DateTimeOffset.UtcNow, peer, direction, result ?? "ok", list, text is null ? folder : null, all.Count > HistoryFiles ? all.Count : null, text));
+            old.Add(new HistoryEntry(DateTimeOffset.UtcNow, peer, direction, result ?? "ok", list, text is null ? folder : null, all.Count > HistoryFiles ? all.Count : null, text, transport));
             if (old.Count > HistoryLimit) old.RemoveRange(0, old.Count - HistoryLimit);
             return old;
         });
+        HistoryChanged?.Invoke();
     }
 }

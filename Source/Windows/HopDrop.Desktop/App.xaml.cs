@@ -35,6 +35,7 @@ public partial class App : System.Windows.Application
             if (Take(args, "--render-scale") is { } scale) RenderScale = double.Parse(scale, System.Globalization.CultureInfo.InvariantCulture);
             string? data = Take(args, "--data");
             DataDirectory = Path.GetFullPath(data ?? HopDropPaths.Default.DataDirectory);
+            L.Apply(Preferences.Language);
             // Store version started at sign-in: the tray, or the hidden receiver when only "Receive in the background" is on.
             int signin = args.IndexOf("--signin");
             if (signin >= 0) args[signin] = Preferences.BackgroundReceive && !Preferences.StartWithWindows ? "--background" : "--minimized";
@@ -151,7 +152,7 @@ public partial class App : System.Windows.Application
                 Shutdown(1);
                 return;
             }
-            System.Windows.MessageBox.Show(ex.Message, "HopDrop couldn't start", System.Windows.MessageBoxButton.OK, MessageBoxImage.Error);
+            System.Windows.MessageBox.Show(ex.Message, L.T("HopDropCouldnTStart"), System.Windows.MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }
     }

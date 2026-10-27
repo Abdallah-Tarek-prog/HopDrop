@@ -1,108 +1,66 @@
 package com.hop.drop;
 
+import android.content.Context;
 import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
+import java.util.Locale;
 import javax.net.ssl.SSLException;
 
-/** Short explanations for errors displayed outside the protocol layer. */
+/** Localized explanations for error codes from the transport and protocol. */
 public final class ErrorText {
-    private ErrorText() {
+    private ErrorText() { }
+
+    public static String forDevice(Context context, Throwable error, String device) {
+        if (error == null) return forDevice(context, (String)null, device);
+        if (error instanceof SocketTimeoutException) return Language.text(context, R.string.error_timeout, device);
+        if (error instanceof ConnectException || error instanceof UnknownHostException)
+            return Language.text(context, R.string.error_network, device);
+        if (error instanceof SSLException) return Language.text(context, R.string.error_secure, device);
+        if (error instanceof FileNotFoundException) return Language.text(context, R.string.error_open_file);
+        if (error instanceof EOFException) return Language.text(context, R.string.error_disconnected_during, device);
+        String result = forDevice(context, error.getMessage(), device);
+        return error instanceof IOException && result.equals(Language.text(context, R.string.error_generic))
+                ? Language.text(context, R.string.error_read_connection) : result;
     }
 
-    public static String forDevice(Throwable error, String device) {
-        if (error == null) {
-            return forDevice((String) null, device);
-        }
-        if (error instanceof SocketTimeoutException) {
-            return device + " stopped responding.";
-        }
-        if (error instanceof ConnectException || error instanceof UnknownHostException) {
-            return "Can't reach " + device + ". Check that both devices are on the same network.";
-        }
-        if (error instanceof SSLException) {
-            return "Couldn't make a secure connection to " + device + ".";
-        }
-        if (error instanceof FileNotFoundException) {
-            return "HopDrop can't open one of the selected files.";
-        }
-        if (error instanceof EOFException) {
-            return device + " disconnected during the transfer.";
-        }
-        String translated = forDevice(error.getMessage(), device);
-        if (error instanceof IOException && translated.equals("Something went wrong. Please try again.")) {
-            return "The transfer stopped because a file or connection could not be read.";
-        }
-        return translated;
-    }
-
-    public static String forDevice(String error, String device) {
-        String name = device == null || device.trim().isEmpty() ? "The device" : device;
+    public static String forDevice(Context context, String error, String device) {
+        String name = device == null || device.trim().isEmpty() ? Language.text(context, R.string.error_device_generic) : device;
         String message = error == null ? "" : error.trim();
         String code = message.split(":", 2)[0].trim();
         switch (code) {
-            case "not_paired":
-                return name + " doesn't know this phone any more. Pair again.";
-            case "identity_mismatch":
-                return "This isn't the device you paired with. Pair again.";
-            case "bad_token":
-                return "That QR code can't be used. Show a new one and scan it again.";
-            case "token_expired":
-                return "That QR code expired. Show a new one and scan it again.";
-            case "busy":
-                return name + " is busy pairing. Try again shortly.";
-            case "rejected":
-            case "user_declined":
-                return "Pairing was cancelled.";
-            case "cancelled":
-                return "The transfer was cancelled.";
-            case "declined":
-                return name + " didn't accept the files.";
-            case "disconnected":
-                return name + " disconnected and didn't come back. Send again to get the rest.";
-            case "no_space":
-                return name + " doesn't have enough free space.";
-            case "checksum_mismatch":
-                return "The file changed during transfer. Try sending it again.";
-            case "io_error":
-                return "The transfer stopped while reading or saving a file.";
-            case "protocol_error":
-                return "HopDrop couldn't understand the response from " + name + ".";
-            case "unsupported_version":
-                return "Update HopDrop on both devices, then try again.";
-            case "timeout":
-                return name + " stopped responding.";
-            case "unreachable":
-                return "Can't reach " + name + ". Open HopDrop on it, or get both on the same Wi-Fi.";
-            case "direct_failed":
-                return message.contains(": ") ? message.substring(message.indexOf(": ") + 2) : "Couldn't connect directly to " + name + ".";
-            case "wifi_off":
-                return "Turn on Wi-Fi so HopDrop can connect directly to " + name + ".";
-            default:
-                break;
+            case "not_paired": return Language.text(context, R.string.error_not_paired, name);
+            case "identity_mismatch": return Language.text(context, R.string.error_identity);
+            case "bad_token": return Language.text(context, R.string.error_qr_invalid);
+            case "token_expired": return Language.text(context, R.string.error_qr_expired);
+            case "busy": return Language.text(context, R.string.error_busy, name);
+            case "rejected": case "user_declined": return Language.text(context, R.string.error_pair_cancelled);
+            case "cancelled": return Language.text(context, R.string.error_transfer_cancelled);
+            case "declined": return Language.text(context, R.string.error_declined, name);
+            case "disconnected": return Language.text(context, R.string.error_disconnected, name);
+            case "no_space": return Language.text(context, R.string.error_peer_space, name);
+            case "checksum_mismatch": return Language.text(context, R.string.error_checksum);
+            case "io_error": return Language.text(context, R.string.error_file_io);
+            case "protocol_error": return Language.text(context, R.string.error_protocol, name);
+            case "unsupported_version": return Language.text(context, R.string.error_version);
+            case "timeout": return Language.text(context, R.string.error_timeout, name);
+            case "unreachable": return Language.text(context, R.string.error_unreachable, name);
+            case "direct_failed": return Language.text(context, R.string.error_direct, name);
+            case "wifi_off": return Language.text(context, R.string.error_wifi_off, name);
+            default: break;
         }
-        String lower = message.toLowerCase(java.util.Locale.ROOT);
-        if (lower.contains("timed out") || lower.contains("timeout")) {
-            return name + " stopped responding.";
-        }
-        if (lower.contains("network") || lower.contains("address") || lower.contains("connect")) {
-            return "Can't reach " + name + ". Check that both devices are on the same network.";
-        }
-        if (lower.contains("permission") || lower.contains("denied")) {
-            return "HopDrop can't access that file or folder. Check its permission.";
-        }
-        if (lower.contains("space") || lower.contains("storage")) {
-            return "There isn't enough free space to save the file.";
-        }
-        if (lower.contains("cancel") || lower.contains("declined")) {
-            return "Pairing was cancelled.";
-        }
-        if (lower.contains("not paired") || lower.contains("no longer paired")) {
-            return name + " doesn't know this device any more. Pair again.";
-        }
-        return "Something went wrong. Please try again.";
+        String lower = message.toLowerCase(Locale.ROOT);
+        if (lower.contains("timed out") || lower.contains("timeout")) return Language.text(context, R.string.error_timeout, name);
+        if (lower.contains("network") || lower.contains("address") || lower.contains("connect"))
+            return Language.text(context, R.string.error_network, name);
+        if (lower.contains("permission") || lower.contains("denied")) return Language.text(context, R.string.error_permission);
+        if (lower.contains("space") || lower.contains("storage")) return Language.text(context, R.string.error_local_space);
+        if (lower.contains("cancel") || lower.contains("declined")) return Language.text(context, R.string.error_pair_cancelled);
+        if (lower.contains("not paired") || lower.contains("no longer paired"))
+            return Language.text(context, R.string.error_no_longer_paired, name);
+        return Language.text(context, R.string.error_generic);
     }
 }

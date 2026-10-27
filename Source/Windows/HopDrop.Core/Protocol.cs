@@ -7,6 +7,7 @@ namespace HopDrop.Core;
 
 internal static class DevicePlatform
 {
+    public static string Current => OperatingSystem.IsLinux() ? "linux" : "windows";
     public static bool IsValid(string value) => value.Length is >= 1 and <= 20
         && value.All(c => c is >= 'a' and <= 'z' or >= '0' and <= '9');
 }

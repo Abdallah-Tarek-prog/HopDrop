@@ -1,0 +1,1108 @@
+<?xml version='1.0' encoding='utf-8'?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <data name="Send" xml:space="preserve">
+    <value>إرسال</value>
+  </data>
+  <data name="Devices" xml:space="preserve">
+    <value>الأجهزة</value>
+  </data>
+  <data name="Activity" xml:space="preserve">
+    <value>سجل النشاط</value>
+  </data>
+  <data name="Settings" xml:space="preserve">
+    <value>الإعدادات</value>
+  </data>
+  <data name="PickFilesThenChooseAPairedDeviceEverythingStaysOnYourLocalNetwork" xml:space="preserve">
+    <value>اختر الملفات، ثم جهازًا مقترنًا. تُنقل الملفات عبر شبكتك المحلية فقط.</value>
+  </data>
+  <data name="DropFilesOrFoldersHere" xml:space="preserve">
+    <value>أفلت الملفات أو المجلدات هنا</value>
+  </data>
+  <data name="BrowseFiles" xml:space="preserve">
+    <value>تصفّح الملفات</value>
+  </data>
+  <data name="AddAFolder" xml:space="preserve">
+    <value>إضافة مجلد</value>
+  </data>
+  <data name="Text" xml:space="preserve">
+    <value>نص</value>
+  </data>
+  <data name="FilesToSend" xml:space="preserve">
+    <value>الملفات المراد إرسالها</value>
+  </data>
+  <data name="ClearAll" xml:space="preserve">
+    <value>مسح الكل</value>
+  </data>
+  <data name="SendTo" xml:space="preserve">
+    <value>إرسال إلى</value>
+  </data>
+  <data name="SendTo2Devices" xml:space="preserve">
+    <value>إرسال إلى جهازين</value>
+  </data>
+  <data name="OtherWays" xml:space="preserve">
+    <value>طرق أخرى</value>
+  </data>
+  <data name="SendWithBluetooth" xml:space="preserve">
+    <value>إرسال عبر البلوتوث</value>
+  </data>
+  <data name="RarelyNeededPhonesReachThisPCDirectlyEvenWithoutASharedWiFiOpensW" xml:space="preserve">
+    <value>يُستخدم عند الحاجة؛ فبإمكان الهاتف الاتصال بهذا الكمبيوتر مباشرةً دون شبكة واي فاي مشتركة. يفتح هذا الخيار نافذة البلوتوث في ويندوز. النقل أبطأ بكثير، ويجب قبول الملف من إشعار البلوتوث على الهاتف.</value>
+  </data>
+  <data name="SendViaBluetooth" xml:space="preserve">
+    <value>إرسال عبر البلوتوث</value>
+  </data>
+  <data name="ChooseFilesToSend" xml:space="preserve">
+    <value>اختر الملفات المراد إرسالها</value>
+  </data>
+  <data name="ChooseFoldersToSend" xml:space="preserve">
+    <value>اختر المجلدات المراد إرسالها</value>
+  </data>
+  <data name="HopDropCouldnTReadThatFolder" xml:space="preserve">
+    <value>تعذّرت قراءة هذا المجلد: </value>
+  </data>
+  <data name="0And1" xml:space="preserve">
+    <value>{0} و{1}</value>
+  </data>
+  <data name="NothingSelectedYet" xml:space="preserve">
+    <value>لم تُحدَّد ملفات بعد</value>
+  </data>
+  <data name="DropFilesOrFoldersAboveOrClickBrowseYouCanAddAsManyAsYouLike" xml:space="preserve">
+    <value>أفلت الملفات أو المجلدات أعلاه، أو انقر على «تصفّح الملفات». يمكنك إضافة أي عدد منها.</value>
+  </data>
+  <data name="RemoveFolder" xml:space="preserve">
+    <value>إزالة المجلد </value>
+  </data>
+  <data name="Folder012" xml:space="preserve">
+    <value>مجلد · {0} · {1} · {2}</value>
+  </data>
+  <data name="Remove" xml:space="preserve">
+    <value>إزالة </value>
+  </data>
+  <data name="And0More" xml:space="preserve">
+    <value>…المتبقي: {0}</value>
+  </data>
+  <data name="NoPairedDevicesYet" xml:space="preserve">
+    <value>لا توجد أجهزة مقترنة بعد</value>
+  </data>
+  <data name="PairOnceInDevicesScanAQRCodeWithYourPhoneAfterThatSendingIsOneCli" xml:space="preserve">
+    <value>اقترن بالجهاز مرة واحدة من صفحة «الأجهزة» بمسح رمز QR بهاتفك. بعدها يمكنك الإرسال في الاتجاهين بنقرة واحدة.</value>
+  </data>
+  <data name="PairADevice" xml:space="preserve">
+    <value>إقران جهاز</value>
+  </data>
+  <data name="Select" xml:space="preserve">
+    <value>تحديد </value>
+  </data>
+  <data name="SendTo0Devices" xml:space="preserve">
+    <value>إرسال إلى {0} من الأجهزة</value>
+  </data>
+  <data name="Online" xml:space="preserve">
+    <value>متصل</value>
+  </data>
+  <data name="Offline" xml:space="preserve">
+    <value>غير متصل</value>
+  </data>
+  <data name="OfflineSeen0" xml:space="preserve">
+    <value>غير متصل · آخر ظهور {0}</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>إلغاء</value>
+  </data>
+  <data name="AddFilesFirst" xml:space="preserve">
+    <value>أضف ملفات أولًا</value>
+  </data>
+  <data name="OfflineSendsWhenItSBack" xml:space="preserve">
+    <value>غير متصل · سيُرسل عند عودة الاتصال</value>
+  </data>
+  <data name="Sent01In2" xml:space="preserve">
+    <value>أُرسل {0} · {1} خلال {2}</value>
+  </data>
+  <data name="ConnectionDroppedReconnecting" xml:space="preserve">
+    <value>انقطع الاتصال · جارٍ إعادة الاتصال…</value>
+  </data>
+  <data name="WaitingFor0ToAccept" xml:space="preserve">
+    <value>في انتظار موافقة {0}…</value>
+  </data>
+  <data name="0Left" xml:space="preserve">
+    <value> · المتبقي: {0}</value>
+  </data>
+  <data name="Connecting" xml:space="preserve">
+    <value>جارٍ الاتصال…</value>
+  </data>
+  <data name="AddAtLeastOneFileFirst" xml:space="preserve">
+    <value>أضف ملفًا واحدًا على الأقل أولًا.</value>
+  </data>
+  <data name="PairOnceAndDevicesRecogniseEachOtherFromThenOnInBothDirections" xml:space="preserve">
+    <value>اقترن مرة واحدة ليتمكّن الجهازان من التعرّف على بعضهما والإرسال في الاتجاهين.</value>
+  </data>
+  <data name="ThisComputer" xml:space="preserve">
+    <value>هذا الكمبيوتر</value>
+  </data>
+  <data name="Ready" xml:space="preserve">
+    <value>جاهز</value>
+  </data>
+  <data name="DirectLinkOn" xml:space="preserve">
+    <value>الاتصال المباشر مفعّل</value>
+  </data>
+  <data name="DirectLinkOff" xml:space="preserve">
+    <value>الاتصال المباشر متوقف</value>
+  </data>
+  <data name="DirectLinkStarting" xml:space="preserve">
+    <value>جارٍ بدء الاتصال المباشر</value>
+  </data>
+  <data name="DirectLinkWaiting" xml:space="preserve">
+    <value>الاتصال المباشر في الانتظار</value>
+  </data>
+  <data name="ReadyToReceiveFromPairedDevicesWhileHopDropIsRunningAlsoFromTheTr" xml:space="preserve">
+    <value>جاهز للاستلام من الأجهزة المقترنة ما دام HopDrop يعمل، حتى عند تصغيره إلى منطقة الإعلام.</value>
+  </data>
+  <data name="WiFi" xml:space="preserve">
+    <value>واي فاي</value>
+  </data>
+  <data name="NotConnectedToALocalNetworkJoinWiFiOrTurnOnWindowsMobileHotspot" xml:space="preserve">
+    <value>لا يوجد اتصال بشبكة محلية. اتصل بشبكة واي فاي، أو فعّل نقطة الاتصال المحمولة في ويندوز.</value>
+  </data>
+  <data name="Copy" xml:space="preserve">
+    <value>نسخ </value>
+  </data>
+  <data name="PairAPhone" xml:space="preserve">
+    <value>إقران هاتف</value>
+  </data>
+  <data name="PairedDevices" xml:space="preserve">
+    <value>الأجهزة المقترنة</value>
+  </data>
+  <data name="PairingIsPermanentPairedDevicesStayPairedUntilYouRemoveThemHereOr" xml:space="preserve">
+    <value>يستمر الاقتران حتى تُزيل الجهاز من هنا أو من الجهاز الآخر.</value>
+  </data>
+  <data name="NearbyDevices" xml:space="preserve">
+    <value>الأجهزة القريبة</value>
+  </data>
+  <data name="Refresh" xml:space="preserve">
+    <value>تحديث</value>
+  </data>
+  <data name="PairByIPAddress" xml:space="preserve">
+    <value>الإقران بعنوان IP</value>
+  </data>
+  <data name="ScanTheQRCodeAboveWithHopDropOnYourPhoneOrPickANearbyDeviceBelow" xml:space="preserve">
+    <value>امسح رمز QR أعلاه باستخدام HopDrop على هاتفك، أو اختر جهازًا قريبًا من القائمة أدناه.</value>
+  </data>
+  <data name="Rename" xml:space="preserve">
+    <value>إعادة تسمية</value>
+  </data>
+  <data name="RenameDevice" xml:space="preserve">
+    <value>إعادة تسمية الجهاز</value>
+  </data>
+  <data name="ChooseANameForThisDeviceOnThisPC" xml:space="preserve">
+    <value>اختر اسمًا لهذا الجهاز يظهر على هذا الكمبيوتر</value>
+  </data>
+  <data name="UseAtMost40Characters" xml:space="preserve">
+    <value>استخدم 40 حرفًا كحد أقصى.</value>
+  </data>
+  <data name="Remove_c3812fc4" xml:space="preserve">
+    <value>إزالة</value>
+  </data>
+  <data name="Remove0YouLlNeedToPairAgainToSendFilesBetweenTheseDevices" xml:space="preserve">
+    <value>هل تريد إزالة {0}؟ ستحتاج إلى الاقتران مجددًا لإرسال الملفات بين الجهازين.</value>
+  </data>
+  <data name="RemoveDevice" xml:space="preserve">
+    <value>إزالة الجهاز</value>
+  </data>
+  <data name="0Paired1MMMDYyyy" xml:space="preserve">
+    <value>{0} · تاريخ الاقتران: {1:d MMM yyyy}</value>
+  </data>
+  <data name="OnlineNow" xml:space="preserve">
+    <value>متصل الآن</value>
+  </data>
+  <data name="TrustFilesFromThisDevice" xml:space="preserve">
+    <value>الوثوق بالملفات الواردة من هذا الجهاز</value>
+  </data>
+  <data name="TrustedFilesArriveWithoutAskingAndOpenWithoutWindowsDownloadedFil" xml:space="preserve">
+    <value>جهاز موثوق: تُستلم ملفاته دون طلب الموافقة، وتُفتح دون تحذيرات ويندوز الخاصة بالملفات التي تم تنزيلها. استخدم هذا الخيار لأجهزتك فقط.</value>
+  </data>
+  <data name="Searching" xml:space="preserve">
+    <value>جارٍ البحث…</value>
+  </data>
+  <data name="NearbyDevicesNeedTheSameWiFiThePairingQRAboveWorksWithoutItYouCan" xml:space="preserve">
+    <value>يتطلّب العثور على الأجهزة القريبة الاتصال بشبكة الواي فاي نفسها. أما رمز الإقران أعلاه فيعمل دون ذلك. يمكنك أيضًا الإقران بعنوان IP.</value>
+  </data>
+  <data name="Paired" xml:space="preserve">
+    <value>مقترن</value>
+  </data>
+  <data name="Pair" xml:space="preserve">
+    <value>إقران</value>
+  </data>
+  <data name="ReadyToSend" xml:space="preserve">
+    <value> · جاهز للإرسال</value>
+  </data>
+  <data name="PairByComparingA6DigitNumber" xml:space="preserve">
+    <value> · اقترن بمطابقة رقم من 6 أرقام</value>
+  </data>
+  <data name="ClickToShowABiggerCode" xml:space="preserve">
+    <value>انقر لتكبير الرمز</value>
+  </data>
+  <data name="ScanWithHopDropOnYourPhone" xml:space="preserve">
+    <value>امسح الرمز باستخدام HopDrop على هاتفك</value>
+  </data>
+  <data name="OnYourPhoneHopDropPairScanClickTheCodeToMakeItBigger" xml:space="preserve">
+    <value>على هاتفك: افتح HopDrop، ثم اختر «إقران»، ثم «مسح الرمز». انقر على الرمز لتكبيره.</value>
+  </data>
+  <data name="YourPhoneDoesnTNeedToBeOnTheSameWiFi" xml:space="preserve">
+    <value>لا يحتاج هاتفك إلى الاتصال بشبكة الواي فاي نفسها.</value>
+  </data>
+  <data name="EachCodeWorksOnceANewOneAppearsEvery5Minutes" xml:space="preserve">
+    <value>يُستخدم كل رمز مرة واحدة. يظهر رمز جديد كل 5 دقائق.</value>
+  </data>
+  <data name="CodeValidFor0100" xml:space="preserve">
+    <value>الوقت المتبقي لصلاحية الرمز: {0}:{1:00}</value>
+  </data>
+  <data name="PairAnotherDevice" xml:space="preserve">
+    <value>إقران جهاز آخر</value>
+  </data>
+  <data name="PairedWith" xml:space="preserve">
+    <value>تم الاقتران مع </value>
+  </data>
+  <data name="YouCanSendFilesBothWaysNowNoCodesNeededNextTime" xml:space="preserve">
+    <value>يمكنك الآن إرسال الملفات في الاتجاهين، دون الحاجة إلى رمز في المرات القادمة.</value>
+  </data>
+  <data name="TypeTheOtherDeviceSAddressOnAPhoneItSUnderHopDropDevicesThisPhone" xml:space="preserve">
+    <value>أدخل عنوان الجهاز الآخر. على الهاتف، ستجده في HopDrop ضمن «الأجهزة»، ثم «هذا الهاتف».</value>
+  </data>
+  <data name="EnterALocalAddressLike192168123" xml:space="preserve">
+    <value>أدخل عنوانًا محليًا مثل ‎192.168.1.23‎</value>
+  </data>
+  <data name="PortMustBeBetween1And65535" xml:space="preserve">
+    <value>يجب أن يكون رقم المنفذ بين 1 و65535.</value>
+  </data>
+  <data name="TheDevice" xml:space="preserve">
+    <value>الجهاز</value>
+  </data>
+  <data name="EverythingYouSentAndReceivedNewestFirst" xml:space="preserve">
+    <value>كل ما أرسلته واستلمته، من الأحدث إلى الأقدم.</value>
+  </data>
+  <data name="ClearList" xml:space="preserve">
+    <value>مسح السجل</value>
+  </data>
+  <data name="ClearTheActivityListReceivedFilesStayWhereTheyAre" xml:space="preserve">
+    <value>هل تريد مسح سجل النشاط؟ ستبقى الملفات المستلمة في أماكنها.</value>
+  </data>
+  <data name="ClearActivity" xml:space="preserve">
+    <value>مسح سجل النشاط</value>
+  </data>
+  <data name="NoTransfersYet" xml:space="preserve">
+    <value>لا توجد عمليات نقل بعد</value>
+  </data>
+  <data name="FilesYouSendAndReceiveWillAppearHere" xml:space="preserve">
+    <value>ستظهر هنا الملفات التي ترسلها وتستلمها.</value>
+  </data>
+  <data name="SendFiles" xml:space="preserve">
+    <value>إرسال ملفات</value>
+  </data>
+  <data name="Bluetooth" xml:space="preserve">
+    <value>البلوتوث</value>
+  </data>
+  <data name="ARemovedDevice" xml:space="preserve">
+    <value>جهاز أُزيل من القائمة</value>
+  </data>
+  <data name="Copy_e21f935f" xml:space="preserve">
+    <value>نسخ</value>
+  </data>
+  <data name="OpenLink" xml:space="preserve">
+    <value>فتح الرابط</value>
+  </data>
+  <data name="ReceivingFrom0Stopped" xml:space="preserve">
+    <value>توقف الاستلام من {0}</value>
+  </data>
+  <data name="CouldnTSendTo0" xml:space="preserve">
+    <value>تعذّر الإرسال إلى {0}</value>
+  </data>
+  <data name="0Done" xml:space="preserve">
+    <value> (اكتمل: {0})</value>
+  </data>
+  <data name="SavedIn0" xml:space="preserve">
+    <value> · مكان الحفظ: {0}</value>
+  </data>
+  <data name="Cancelled" xml:space="preserve">
+    <value> · أُلغيت العملية</value>
+  </data>
+  <data name="Open" xml:space="preserve">
+    <value>فتح</value>
+  </data>
+  <data name="ShowInFolder" xml:space="preserve">
+    <value>إظهار في المجلد</value>
+  </data>
+  <data name="HowHopDropLooksWhereFilesGoAndHowItRunsOnThisPC" xml:space="preserve">
+    <value>مظهر HopDrop، ومكان حفظ الملفات، وطريقة عمله على هذا الكمبيوتر.</value>
+  </data>
+  <data name="General" xml:space="preserve">
+    <value>عام</value>
+  </data>
+  <data name="Save" xml:space="preserve">
+    <value>حفظ</value>
+  </data>
+  <data name="Use140Characters" xml:space="preserve">
+    <value>استخدم من حرف واحد إلى 40 حرفًا.</value>
+  </data>
+  <data name="NameSaved" xml:space="preserve">
+    <value>حُفظ الاسم</value>
+  </data>
+  <data name="OtherDevicesNowSeeThisPCAs0" xml:space="preserve">
+    <value>سيظهر هذا الكمبيوتر للأجهزة الأخرى باسم {0}.</value>
+  </data>
+  <data name="ThisPCSName" xml:space="preserve">
+    <value>اسم هذا الكمبيوتر</value>
+  </data>
+  <data name="ShownToPhonesAndOtherComputers" xml:space="preserve">
+    <value>الاسم الذي يظهر للهواتف وأجهزة الكمبيوتر الأخرى.</value>
+  </data>
+  <data name="UseWindowsSetting" xml:space="preserve">
+    <value>اتباع إعداد ويندوز</value>
+  </data>
+  <data name="Light" xml:space="preserve">
+    <value>فاتح</value>
+  </data>
+  <data name="Dark" xml:space="preserve">
+    <value>داكن</value>
+  </data>
+  <data name="Appearance" xml:space="preserve">
+    <value>المظهر</value>
+  </data>
+  <data name="LightDarkOrFollowWindows" xml:space="preserve">
+    <value>مظهر فاتح أو داكن، أو بحسب إعداد ويندوز.</value>
+  </data>
+  <data name="Receiving" xml:space="preserve">
+    <value>الاستلام</value>
+  </data>
+  <data name="Change" xml:space="preserve">
+    <value>تغيير…</value>
+  </data>
+  <data name="ChooseWhereHopDropSavesReceivedFiles" xml:space="preserve">
+    <value>اختر مكان حفظ الملفات المستلمة</value>
+  </data>
+  <data name="Default" xml:space="preserve">
+    <value>الافتراضي</value>
+  </data>
+  <data name="ThisDriveCanTMarkFilesAsDownloadedSoWindowsWonTWarnBeforeOpeningF" xml:space="preserve">
+    <value>لا يدعم هذا القرص تمييز الملفات التي تم تنزيلها؛ لذلك لن يعرض ويندوز تحذيرًا قبل فتح الملفات الواردة من أجهزة لم تحددها كأجهزة موثوقة.</value>
+  </data>
+  <data name="ReceiveFolder" xml:space="preserve">
+    <value>مجلد الاستلام</value>
+  </data>
+  <data name="FilesFromPhonesAndOtherPCsAreSavedHere" xml:space="preserve">
+    <value>تُحفظ هنا الملفات الواردة من الهواتف وأجهزة الكمبيوتر الأخرى.</value>
+  </data>
+  <data name="Backups" xml:space="preserve">
+    <value>النسخ الاحتياطية</value>
+  </data>
+  <data name="ChooseWhereHopDropSavesBackups" xml:space="preserve">
+    <value>اختر مكان حفظ النسخ الاحتياطية</value>
+  </data>
+  <data name="SaveBackupsIn" xml:space="preserve">
+    <value>مكان حفظ النسخ الاحتياطية</value>
+  </data>
+  <data name="NoBackupsReceivedYet" xml:space="preserve">
+    <value>لم تُستلم نسخ احتياطية بعد</value>
+  </data>
+  <data name="OpenFolder" xml:space="preserve">
+    <value>فتح المجلد</value>
+  </data>
+  <data name="BackupFolderIsnTAvailable" xml:space="preserve">
+    <value>مجلد النسخ الاحتياطي غير متاح.</value>
+  </data>
+  <data name="ForgetEntry" xml:space="preserve">
+    <value>إزالة من السجل</value>
+  </data>
+  <data name="CouldnTLoadBackups" xml:space="preserve">
+    <value>تعذّر تحميل النسخ الاحتياطية: </value>
+  </data>
+  <data name="AskBeforeReceiving" xml:space="preserve">
+    <value>طلب الموافقة قبل الاستلام</value>
+  </data>
+  <data name="ANotificationAsksYouToAcceptOrDeclineFilesFromPairedDevicesDevice" xml:space="preserve">
+    <value>يظهر إشعار لقبول الملفات الواردة من الأجهزة المقترنة أو رفضها. لا تُطلب الموافقة للأجهزة التي تحددها كأجهزة موثوقة في صفحة «الأجهزة».</value>
+  </data>
+  <data name="CloseToTheTray" xml:space="preserve">
+    <value>التصغير إلى منطقة الإعلام عند الإغلاق</value>
+  </data>
+  <data name="ClosingTheWindowKeepsHopDropSIconInTheTrayNextToTheClockSoPhonesC" xml:space="preserve">
+    <value>عند إغلاق النافذة، يبقى HopDrop في منطقة الإعلام بجوار الساعة لاستقبال الملفات من الهواتف. لإنهائه، استخدم قائمة أيقونته هناك.</value>
+  </data>
+  <data name="ReceiveInTheBackground" xml:space="preserve">
+    <value>الاستلام في الخلفية</value>
+  </data>
+  <data name="PhonesCanSendToThisPCEvenAfterYouQuitHopDropAndAfterARestartHopDr" xml:space="preserve">
+    <value>يمكن للهواتف الإرسال إلى هذا الكمبيوتر حتى بعد إغلاق HopDrop أو إعادة تشغيل الكمبيوتر. يستمر مستقبِل خفيف في العمل دون نافذة أو أيقونة، ويُشعرك بوصول الملفات. </value>
+  </data>
+  <data name="ToStopItOpenHopDropAndChooseQuitAndStopReceivingInTheTrayMenu" xml:space="preserve">
+    <value>لإيقافه، افتح HopDrop واختر «إنهاء وإيقاف الاستلام» من قائمة الأيقونة في منطقة الإعلام.</value>
+  </data>
+  <data name="StartWithWindows" xml:space="preserve">
+    <value>التشغيل مع ويندوز</value>
+  </data>
+  <data name="HopDropStartsHiddenInTheTrayWhenYouSignInSoThisPCCanReceiveWithou" xml:space="preserve">
+    <value>يبدأ HopDrop في منطقة الإعلام عند تسجيل الدخول، ليتمكّن هذا الكمبيوتر من الاستلام دون فتح النافذة.</value>
+  </data>
+  <data name="On" xml:space="preserve">
+    <value>مفعّل · </value>
+  </data>
+  <data name="Off" xml:space="preserve">
+    <value>متوقف</value>
+  </data>
+  <data name="WaitingForAPairedPhoneOrPairing" xml:space="preserve">
+    <value>في انتظار هاتف مقترن أو بدء الإقران</value>
+  </data>
+  <data name="Starting" xml:space="preserve">
+    <value>جارٍ البدء…</value>
+  </data>
+  <data name="WindowsFirewallMayBlockPhonesOnThisDirectLink" xml:space="preserve">
+    <value>قد يمنع جدار حماية ويندوز الهواتف من الاتصال عبر هذا الاتصال المباشر.</value>
+  </data>
+  <data name="AllowDirectLink" xml:space="preserve">
+    <value>السماح بالاتصال المباشر</value>
+  </data>
+  <data name="DirectConnection" xml:space="preserve">
+    <value>الاتصال المباشر</value>
+  </data>
+  <data name="PhonesCanReachThisPCWithoutASharedWiFiNeighboursWiFiListsShowAPro" xml:space="preserve">
+    <value>يمكن للهواتف الاتصال بهذا الكمبيوتر دون شبكة واي فاي مشتركة. ستظهر للأجهزة القريبة شبكة محمية باسم </value>
+  </data>
+  <data name="Clipboard" xml:space="preserve">
+    <value>الحافظة</value>
+  </data>
+  <data name="PutTextFromMyDevicesOnTheClipboard" xml:space="preserve">
+    <value>نسخ النص الوارد من أجهزتي إلى الحافظة</value>
+  </data>
+  <data name="TextCopiedOnYourPhoneIsReadyToPasteHere" xml:space="preserve">
+    <value>يصبح النص المنسوخ على هاتفك جاهزًا للصقه هنا.</value>
+  </data>
+  <data name="ShareWhatICopy" xml:space="preserve">
+    <value>مشاركة ما أنسخه</value>
+  </data>
+  <data name="TextYouCopyHereGoesToYourPairedPhonesThatAreOnline" xml:space="preserve">
+    <value>يُرسل النص الذي تنسخه هنا إلى هواتفك المقترنة والمتصلة.</value>
+  </data>
+  <data name="Privacy" xml:space="preserve">
+    <value>الخصوصية</value>
+  </data>
+  <data name="EveryoneOnTheNetwork" xml:space="preserve">
+    <value>جميع الأجهزة على الشبكة</value>
+  </data>
+  <data name="OnlyMyPairedDevices" xml:space="preserve">
+    <value>أجهزتي المقترنة فقط</value>
+  </data>
+  <data name="WhoCanSeeThisPCSName" xml:space="preserve">
+    <value>من يمكنه رؤية اسم هذا الكمبيوتر</value>
+  </data>
+  <data name="HopDropTellsDevicesOnTheSameNetworkThatThisPCIsHereOnlyMyPairedDe" xml:space="preserve">
+    <value>يُعلن HopDrop عن هذا الكمبيوتر للأجهزة على الشبكة نفسها. يخفي خيار «أجهزتي المقترنة فقط» اسمه عن الأجهزة الأخرى، </value>
+  </data>
+  <data name="ExceptWhileTheDevicesPageIsOpenForPairingPairedDevicesStillFindAn" xml:space="preserve">
+    <value>إلا عندما تكون صفحة «الأجهزة» مفتوحة للإقران. تظل أجهزتك المقترنة قادرة على العثور عليه والاتصال به.</value>
+  </data>
+  <data name="WindowsIntegration" xml:space="preserve">
+    <value>التكامل مع ويندوز</value>
+  </data>
+  <data name="ExplorerShareMenu" xml:space="preserve">
+    <value>قائمة المشاركة في مستكشف الملفات</value>
+  </data>
+  <data name="RightClickFilesInFileExplorerShareHopDropTheyOpenHereReadyToSend" xml:space="preserve">
+    <value>انقر بزر الفأرة الأيمن على الملفات في مستكشف الملفات، ثم اختر «مشاركة»، ثم HopDrop. ستظهر هنا جاهزة للإرسال.</value>
+  </data>
+  <data name="ExplorerSendToMenu" xml:space="preserve">
+    <value>قائمة «إرسال إلى» في مستكشف الملفات</value>
+  </data>
+  <data name="RightClickFilesInFileExplorerSendToHopDrop" xml:space="preserve">
+    <value>انقر بزر الفأرة الأيمن على الملفات في مستكشف الملفات، ثم اختر «إرسال إلى»، ثم HopDrop.</value>
+  </data>
+  <data name="AlsoOnPublicNetworksSomeHotspotsAreMarkedPublic" xml:space="preserve">
+    <value>السماح أيضًا على الشبكات العامة (قد تُصنَّف بعض نقاط الاتصال كشبكات عامة)</value>
+  </data>
+  <data name="CouldnTReadWindowsFirewallIfPhonesCanTFindThisPCClickAllow" xml:space="preserve">
+    <value>تعذّرت قراءة إعدادات جدار حماية ويندوز. إذا لم تعثر الهواتف على هذا الكمبيوتر، فانقر على «السماح».</value>
+  </data>
+  <data name="AllowedOnPrivateAndPublicNetworks" xml:space="preserve">
+    <value>مسموح على الشبكات الخاصة والعامة.</value>
+  </data>
+  <data name="AllowedOnPrivateNetworksPublicNetworksMayBlockPhones" xml:space="preserve">
+    <value>مسموح على الشبكات الخاصة. قد تمنع الشبكات العامة الاتصال بالهواتف.</value>
+  </data>
+  <data name="WindowsFirewallMayBlockPhonesFromReachingHopDropClickAllowNeedsAd" xml:space="preserve">
+    <value>قد يمنع جدار حماية ويندوز الهواتف من الوصول إلى HopDrop. انقر على «السماح»؛ يتطلّب ذلك صلاحية المسؤول.</value>
+  </data>
+  <data name="WindowsFirewall" xml:space="preserve">
+    <value>جدار حماية ويندوز</value>
+  </data>
+  <data name="AllowHopDrop" xml:space="preserve">
+    <value>السماح لـ HopDrop</value>
+  </data>
+  <data name="AIAgents" xml:space="preserve">
+    <value>مساعدو الذكاء الاصطناعي</value>
+  </data>
+  <data name="Copied" xml:space="preserve">
+    <value>نُسخ. </value>
+  </data>
+  <data name="CouldnTUseTheClipboardTryAgain" xml:space="preserve">
+    <value>تعذّر استخدام الحافظة. حاول مجددًا.</value>
+  </data>
+  <data name="CopyForClaudeCode" xml:space="preserve">
+    <value>نسخ إعداد Claude Code</value>
+  </data>
+  <data name="PasteItInATerminalAndPressEnter" xml:space="preserve">
+    <value>الصقه في الطرفية واضغط على Enter.</value>
+  </data>
+  <data name="CopyForCodex" xml:space="preserve">
+    <value>نسخ إعداد Codex</value>
+  </data>
+  <data name="CopyMCPSettingsJSON" xml:space="preserve">
+    <value>نسخ إعدادات MCP بصيغة JSON</value>
+  </data>
+  <data name="PasteItIntoTheAgentSMCPSettingsClaudeDesktopCursorAndOthers" xml:space="preserve">
+    <value>الصقه في إعدادات MCP للمساعد، مثل Claude Desktop أو Cursor.</value>
+  </data>
+  <data name="ThenAskYourAgentThingsLikeSendReportPdfToMyPhoneOrWaitForThePhoto" xml:space="preserve">
+    <value>يمكنك بعدها أن تطلب من مساعدك «أرسل report.pdf إلى هاتفي» أو «انتظر الصورة التي سأرسلها من هاتفي». للبرامج النصية والمساعدين دون MCP، استخدم الأمر: ‎HopDrop.exe agent help‎</value>
+  </data>
+  <data name="ThisCopyOfHopDropIsnTInstalledIfYouMoveHopDropExeCopyTheSetupAgai" xml:space="preserve">
+    <value>هذه النسخة من HopDrop غير مثبّتة. إذا نقلت HopDrop.exe، فانسخ إعداد الاتصال بالمساعد مجددًا.</value>
+  </data>
+  <data name="LetAIAgentsUseHopDrop" xml:space="preserve">
+    <value>السماح لمساعدي الذكاء الاصطناعي باستخدام HopDrop</value>
+  </data>
+  <data name="AIAssistantsOnThisPCClaudeCodexCursorAndOthersThatSupportMCPCanLi" xml:space="preserve">
+    <value>يمكن لمساعدي الذكاء الاصطناعي على هذا الكمبيوتر، مثل Claude وCodex وCursor وغيرها من البرامج الداعمة لـ MCP، عرض أجهزتك المقترنة وإرسال الملفات والمجلدات إليها والعثور على الملفات التي استلمتها. </value>
+  </data>
+  <data name="TheyCanTPairNewDevicesChangeSettingsOrAcceptFilesForYouAndYouSeeT" xml:space="preserve">
+    <value>لا يمكنهم إقران أجهزة جديدة أو تغيير الإعدادات أو قبول الملفات نيابةً عنك. تظهر عمليات النقل التي يجرونها هنا مثل عملياتك.</value>
+  </data>
+  <data name="Receive" xml:space="preserve">
+    <value>استلام</value>
+  </data>
+  <data name="BluetoothFileTransfer" xml:space="preserve">
+    <value>نقل الملفات عبر البلوتوث</value>
+  </data>
+  <data name="ForWhenThereSNoSharedNetworkReceiveHopDropOpensWindowsBluetoothWi" xml:space="preserve">
+    <value>عند عدم توفّر شبكة مشتركة، يفتح HopDrop نافذة البلوتوث في ويندوز بوضع الاستلام، وينقل الملفات الواردة إلى مجلد الاستلام. </value>
+  </data>
+  <data name="ThePhoneMustBePairedWithThisPCInWindowsBluetoothSettingsMuchSlowe" xml:space="preserve">
+    <value>يجب إقران الهاتف بهذا الكمبيوتر من إعدادات البلوتوث في ويندوز. النقل أبطأ بكثير من الواي فاي.</value>
+  </data>
+  <data name="About" xml:space="preserve">
+    <value>حول التطبيق</value>
+  </data>
+  <data name="PrivateFileTransferOnYourOwnNetworkNoCloudNoAccountsDeviceID01" xml:space="preserve">
+    <value>نقل خاص للملفات عبر شبكتك، دون خدمات سحابية أو حسابات. معرّف الجهاز: {0} {1}.</value>
+  </data>
+  <data name="RestartToUpdate" xml:space="preserve">
+    <value>إعادة التشغيل للتحديث</value>
+  </data>
+  <data name="CheckNow" xml:space="preserve">
+    <value>التحقق الآن</value>
+  </data>
+  <data name="Updates" xml:space="preserve">
+    <value>التحديثات</value>
+  </data>
+  <data name="HopDropChecksOnceADayAndInstallsUpdatesWhenYouReNotUsingIt" xml:space="preserve">
+    <value>يتحقّق HopDrop من التحديثات مرة يوميًا ويثبّتها عندما لا تستخدمه.</value>
+  </data>
+  <data name="TheMicrosoftStoreKeepsHopDropUpToDate" xml:space="preserve">
+    <value>يتولّى متجر Microsoft تحديث HopDrop.</value>
+  </data>
+  <data name="ThisCopyRunsWithoutBeingInstalledSoItDoesnTUpdateItselfInstallHop" xml:space="preserve">
+    <value>تعمل هذه النسخة دون تثبيت، لذا لا تُحدّث نفسها. ثبّت HopDrop باستخدام ملف الإعداد للحصول على التحديثات التلقائية.</value>
+  </data>
+  <data name="ADevice" xml:space="preserve">
+    <value>جهاز</value>
+  </data>
+  <data name="0SavedIn1" xml:space="preserve">
+    <value>{0} · مكان الحفظ: {1}</value>
+  </data>
+  <data name="0In1" xml:space="preserve">
+    <value>{0} خلال {1}</value>
+  </data>
+  <data name="0Of1FilesDone" xml:space="preserve">
+    <value>الملفات المكتملة: {0} من {1}</value>
+  </data>
+  <data name="ConnectingTo0" xml:space="preserve">
+    <value>جارٍ الاتصال بـ {0}…</value>
+  </data>
+  <data name="GettingReadyToSend0" xml:space="preserve">
+    <value>جارٍ التجهيز للإرسال · {0}</value>
+  </data>
+  <data name="WaitingFor0ToReconnect" xml:space="preserve">
+    <value>في انتظار إعادة اتصال {0}…</value>
+  </data>
+  <data name="ReconnectingTo0" xml:space="preserve">
+    <value>جارٍ إعادة الاتصال بـ {0}…</value>
+  </data>
+  <data name="TheConnectionDroppedHopDropContinuesWhereItStopped" xml:space="preserve">
+    <value>انقطع الاتصال. سيستأنف HopDrop النقل من حيث توقف.</value>
+  </data>
+  <data name="0WillStartSendingOnceTheyAcceptOn1" xml:space="preserve">
+    <value>بانتظار الموافقة على {1} لبدء الإرسال · {0}</value>
+  </data>
+  <data name="ReadyToReceive" xml:space="preserve">
+    <value>جاهز للاستلام</value>
+  </data>
+  <data name="HopDropCanTStartAtSignIn" xml:space="preserve">
+    <value>تعذّر تشغيل HopDrop عند تسجيل الدخول</value>
+  </data>
+  <data name="SendFilesWithHopDrop" xml:space="preserve">
+    <value>إرسال الملفات باستخدام HopDrop</value>
+  </data>
+  <data name="0WantsToPair" xml:space="preserve">
+    <value>يريد {0} الاقتران</value>
+  </data>
+  <data name="CompareThe6DigitNumberOnBothScreens" xml:space="preserve">
+    <value>طابق الرقم المكوّن من 6 أرقام على الشاشتين.</value>
+  </data>
+  <data name="ShowNumber" xml:space="preserve">
+    <value>عرض الرقم</value>
+  </data>
+  <data name="ConnectionDroppedWaitingFor0ToReconnect" xml:space="preserve">
+    <value>انقطع الاتصال · في انتظار إعادة اتصال {0}…</value>
+  </data>
+  <data name="0DidnTAcceptTheFiles" xml:space="preserve">
+    <value>لم يوافق {0} على استلام الملفات.</value>
+  </data>
+  <data name="0DisconnectedAndDidnTComeBackSendAgainToGetTheRest" xml:space="preserve">
+    <value>انقطع اتصال {0} ولم يُستأنف. أعد الإرسال لنقل الملفات المتبقية.</value>
+  </data>
+  <data name="0DoesnTKnowThisPCAnyMorePairAgain" xml:space="preserve">
+    <value>لم يعد هذا الكمبيوتر مقترنًا لدى {0}. أعد الاقتران.</value>
+  </data>
+  <data name="ThisIsnTTheDeviceYouPairedWithPairAgain" xml:space="preserve">
+    <value>هذا ليس الجهاز الذي اقترنت به. أعد الاقتران.</value>
+  </data>
+  <data name="ThatQRCodeCanTBeUsedShowANewOneAndScanItAgain" xml:space="preserve">
+    <value>لا يمكن استخدام رمز QR هذا. اعرض رمزًا جديدًا وامسحه.</value>
+  </data>
+  <data name="ThatQRCodeExpiredShowANewOneAndScanItAgain" xml:space="preserve">
+    <value>انتهت صلاحية رمز QR. اعرض رمزًا جديدًا وامسحه.</value>
+  </data>
+  <data name="0IsBusyPairingTryAgainShortly" xml:space="preserve">
+    <value>يجري {0} عملية إقران أخرى. حاول مجددًا بعد قليل.</value>
+  </data>
+  <data name="PairingWasCancelled" xml:space="preserve">
+    <value>أُلغيت عملية الإقران.</value>
+  </data>
+  <data name="TheTransferWasCancelled" xml:space="preserve">
+    <value>أُلغيت عملية النقل.</value>
+  </data>
+  <data name="0DoesnTHaveEnoughFreeSpace" xml:space="preserve">
+    <value>لا تتوفّر مساحة كافية على {0}.</value>
+  </data>
+  <data name="AFileChangedDuringTheTransferTrySendingItAgain" xml:space="preserve">
+    <value>تغيّر أحد الملفات أثناء النقل. حاول إرساله مجددًا.</value>
+  </data>
+  <data name="TheTransferStoppedWhileReadingOrSavingAFile" xml:space="preserve">
+    <value>توقف النقل أثناء قراءة ملف أو حفظه.</value>
+  </data>
+  <data name="HopDropCouldnTUnderstandTheResponseFrom0UpdateHopDropOnBothDevice" xml:space="preserve">
+    <value>تعذّر فهم استجابة {0}. حدّث HopDrop على الجهازين.</value>
+  </data>
+  <data name="UpdateHopDropOnBothDevicesThenTryAgain" xml:space="preserve">
+    <value>حدّث HopDrop على الجهازين، ثم حاول مجددًا.</value>
+  </data>
+  <data name="0StoppedRespondingCheckThatItSStillOnTheSameNetwork" xml:space="preserve">
+    <value>توقف {0} عن الاستجابة. تأكّد من اتصاله بالشبكة نفسها.</value>
+  </data>
+  <data name="SomethingWentWrongPleaseTryAgain" xml:space="preserve">
+    <value>حدث خطأ. حاول مجددًا.</value>
+  </data>
+  <data name="CanTReach0MakeSureHopDropIsOpenOnItAndBothDevicesAreOnTheSameWiFi" xml:space="preserve">
+    <value>تعذّر الوصول إلى {0}. تأكّد من فتح HopDrop عليه واتصال الجهازين بشبكة الواي فاي أو نقطة الاتصال نفسها.</value>
+  </data>
+  <data name="CouldnTMakeASecureConnectionTo0" xml:space="preserve">
+    <value>تعذّر إنشاء اتصال آمن مع {0}.</value>
+  </data>
+  <data name="HopDropCouldnTReadOrSaveAFileCheckItsPermissionAndFreeSpace" xml:space="preserve">
+    <value>تعذّرت قراءة ملف أو حفظه. تحقّق من أذونات الوصول والمساحة المتاحة.</value>
+  </data>
+  <data name="CouldnTFinishSendingTo0" xml:space="preserve">
+    <value>تعذّر إكمال الإرسال إلى {0}</value>
+  </data>
+  <data name="SavedIn01" xml:space="preserve">
+    <value>مكان الحفظ: {0}{1}</value>
+  </data>
+  <data name="0WantsToSendYou1" xml:space="preserve">
+    <value>يريد {0} الإرسال إليك · {1}</value>
+  </data>
+  <data name="AcceptToSaveThemInYourReceiveFolder" xml:space="preserve">
+    <value>وافق لحفظ الملفات في مجلد الاستلام.</value>
+  </data>
+  <data name="Accept" xml:space="preserve">
+    <value>قبول</value>
+  </data>
+  <data name="Decline" xml:space="preserve">
+    <value>رفض</value>
+  </data>
+  <data name="Received0ViaBluetooth" xml:space="preserve">
+    <value>استُلم {0} عبر البلوتوث</value>
+  </data>
+  <data name="SavedIn" xml:space="preserve">
+    <value>مكان الحفظ: </value>
+  </data>
+  <data name="WaitingForBluetoothFiles" xml:space="preserve">
+    <value>في انتظار ملفات عبر البلوتوث</value>
+  </data>
+  <data name="SendFromYourPhoneWithBluetoothAndPickThisPCFilesAreSavedIn0" xml:space="preserve">
+    <value>أرسل من هاتفك عبر البلوتوث واختر هذا الكمبيوتر. تُحفظ الملفات في {0}.</value>
+  </data>
+  <data name="OpenHopDrop" xml:space="preserve">
+    <value>فتح HopDrop</value>
+  </data>
+  <data name="SendFiles_4f967e3b" xml:space="preserve">
+    <value>إرسال ملفات…</value>
+  </data>
+  <data name="ReceiveViaBluetooth" xml:space="preserve">
+    <value>استلام عبر البلوتوث</value>
+  </data>
+  <data name="CloseHopDropKeepReceiving" xml:space="preserve">
+    <value>إغلاق HopDrop مع استمرار الاستلام</value>
+  </data>
+  <data name="QuitAndStopReceiving" xml:space="preserve">
+    <value>إنهاء وإيقاف الاستلام</value>
+  </data>
+  <data name="QuitHopDrop" xml:space="preserve">
+    <value>إنهاء HopDrop</value>
+  </data>
+  <data name="SendClipboard" xml:space="preserve">
+    <value>إرسال محتوى الحافظة</value>
+  </data>
+  <data name="SendClipboardTo" xml:space="preserve">
+    <value>إرسال محتوى الحافظة إلى </value>
+  </data>
+  <data name="ClipboardIsEmpty" xml:space="preserve">
+    <value>الحافظة فارغة</value>
+  </data>
+  <data name="CopySomeTextAndTryAgain" xml:space="preserve">
+    <value>انسخ نصًا، ثم حاول مجددًا.</value>
+  </data>
+  <data name="NoPairedDevices" xml:space="preserve">
+    <value>لا توجد أجهزة مقترنة</value>
+  </data>
+  <data name="PairADeviceFirst" xml:space="preserve">
+    <value>اقترن بجهاز أولًا.</value>
+  </data>
+  <data name="HopDropIsStillReceiving" xml:space="preserve">
+    <value>ما زال HopDrop يستقبل الملفات</value>
+  </data>
+  <data name="PhonesCanKeepSendingToThisPCToStopOpenHopDropAndUseSettingsOrQuit" xml:space="preserve">
+    <value>يمكن للهواتف مواصلة الإرسال إلى هذا الكمبيوتر. لإيقاف الاستلام، افتح HopDrop واستخدم الإعدادات أو اختر الإنهاء من قائمة الأيقونة في منطقة الإعلام.</value>
+  </data>
+  <data name="Windows" xml:space="preserve">
+    <value>ويندوز</value>
+  </data>
+  <data name="Android" xml:space="preserve">
+    <value>أندرويد</value>
+  </data>
+  <data name="Linux" xml:space="preserve">
+    <value>لينكس</value>
+  </data>
+  <data name="UnknownSize" xml:space="preserve">
+    <value>الحجم غير معروف</value>
+  </data>
+  <data name="0B" xml:space="preserve">
+    <value>{0} بايت</value>
+  </data>
+  <data name="000KB" xml:space="preserve">
+    <value>{0:0.0} كيلوبايت</value>
+  </data>
+  <data name="000MB" xml:space="preserve">
+    <value>{0:0.0} ميغابايت</value>
+  </data>
+  <data name="0000GB" xml:space="preserve">
+    <value>{0:0.00} غيغابايت</value>
+  </data>
+  <data name="0S" xml:space="preserve">
+    <value>{0} ث</value>
+  </data>
+  <data name="0Min1S" xml:space="preserve">
+    <value>{0} د و{1} ث</value>
+  </data>
+  <data name="0Min" xml:space="preserve">
+    <value>{0} د</value>
+  </data>
+  <data name="0H1Min" xml:space="preserve">
+    <value>{0} س و{1} د</value>
+  </data>
+  <data name="Folder" xml:space="preserve">
+    <value> (مجلد)</value>
+  </data>
+  <data name="NoFiles" xml:space="preserve">
+    <value>لا توجد ملفات</value>
+  </data>
+  <data name="01More" xml:space="preserve">
+    <value>{0} و{1} أخرى</value>
+  </data>
+  <data name="0More" xml:space="preserve">
+    <value>
+و{0} أخرى</value>
+  </data>
+  <data name="0Of1" xml:space="preserve">
+    <value>{0} من {1}</value>
+  </data>
+  <data name="JustNow" xml:space="preserve">
+    <value>الآن</value>
+  </data>
+  <data name="0MinAgo" xml:space="preserve">
+    <value>قبل {0} د</value>
+  </data>
+  <data name="0HAgo" xml:space="preserve">
+    <value>قبل {0} س</value>
+  </data>
+  <data name="0DaysAgo" xml:space="preserve">
+    <value>قبل {0} من الأيام</value>
+  </data>
+  <data name="Version0IsReady" xml:space="preserve">
+    <value>الإصدار {0} جاهز.</value>
+  </data>
+  <data name="CheckingForUpdates" xml:space="preserve">
+    <value>جارٍ التحقّق من التحديثات…</value>
+  </data>
+  <data name="HopDropIsUpToDate" xml:space="preserve">
+    <value>تستخدم أحدث إصدار من HopDrop.</value>
+  </data>
+  <data name="DownloadingVersion0" xml:space="preserve">
+    <value>جارٍ تنزيل الإصدار {0}…</value>
+  </data>
+  <data name="HopDropUpdateReady" xml:space="preserve">
+    <value>تحديث HopDrop جاهز</value>
+  </data>
+  <data name="Version0InstallsTheNextTimeHopDropRestartsOrNowFromSettings" xml:space="preserve">
+    <value>سيُثبَّت الإصدار {0} عند إعادة تشغيل HopDrop، أو يمكنك تثبيته الآن من الإعدادات.</value>
+  </data>
+  <data name="CouldnTCheckForUpdatesCheckTheInternetConnectionAndTryAgain" xml:space="preserve">
+    <value>تعذّر التحقّق من التحديثات. تحقّق من اتصال الإنترنت، ثم حاول مجددًا.</value>
+  </data>
+  <data name="ThisPCSWiFiCanTCreateADirectLink" xml:space="preserve">
+    <value>لا يدعم محوّل الواي فاي في هذا الكمبيوتر إنشاء اتصال مباشر</value>
+  </data>
+  <data name="WiFiDirect" xml:space="preserve">
+    <value>واي فاي مباشر</value>
+  </data>
+  <data name="WiFiIsOff" xml:space="preserve">
+    <value>الواي فاي متوقف</value>
+  </data>
+  <data name="MobileHotspotOrAnotherAppIsUsingThisPCSWiFiDirect" xml:space="preserve">
+    <value>تستخدم نقطة الاتصال المحمولة أو تطبيق آخر ميزة واي فاي مباشر على هذا الكمبيوتر</value>
+  </data>
+  <data name="SendCancelled" xml:space="preserve">
+    <value>أُلغي الإرسال</value>
+  </data>
+  <data name="TheFilesAreNoLongerOnThisPC" xml:space="preserve">
+    <value>لم تعد الملفات موجودة على هذا الكمبيوتر.</value>
+  </data>
+  <data name="SentTextTo" xml:space="preserve">
+    <value>أُرسل نص إلى </value>
+  </data>
+  <data name="SentTo" xml:space="preserve">
+    <value>أُرسلت الملفات إلى </value>
+  </data>
+  <data name="OpenHopDropOnYourPhoneAndTapConnect" xml:space="preserve">
+    <value>افتح HopDrop على هاتفك واضغط على «اتصال»</value>
+  </data>
+  <data name="ConnectBothDevicesToTheSameWiFi" xml:space="preserve">
+    <value>وصّل الجهازين بشبكة الواي فاي نفسها</value>
+  </data>
+  <data name="UseTheSameWiFiOrTurnOnSettingsDirectConnection" xml:space="preserve">
+    <value>استخدم شبكة الواي فاي نفسها، أو فعّل «الاتصال المباشر» من الإعدادات</value>
+  </data>
+  <data name="YourDevice" xml:space="preserve">
+    <value>جهازك</value>
+  </data>
+  <data name="CouldnTSavePendingSends" xml:space="preserve">
+    <value>تعذّر حفظ عمليات الإرسال المعلّقة</value>
+  </data>
+  <data name="WindowsHasHopDropTurnedOffAtSignInTurnItOnInTaskManagerStartupApp" xml:space="preserve">
+    <value>عطّل ويندوز تشغيل HopDrop عند تسجيل الدخول. فعّله من «تطبيقات بدء التشغيل» في «إدارة المهام».</value>
+  </data>
+  <data name="WindowsDoesnTAllowHopDropToStartAtSignInOnThisPC" xml:space="preserve">
+    <value>لا يسمح ويندوز بتشغيل HopDrop عند تسجيل الدخول على هذا الكمبيوتر.</value>
+  </data>
+  <data name="HopDropCouldnTSetItselfToStartAtSignIn" xml:space="preserve">
+    <value>تعذّر إعداد HopDrop للتشغيل عند تسجيل الدخول.</value>
+  </data>
+  <data name="HopDropCouldnTStart" xml:space="preserve">
+    <value>تعذّر بدء HopDrop</value>
+  </data>
+  <data name="BluetoothReceivingStoppedClickFinishInTheBluetoothWindowIfAFileIs" xml:space="preserve">
+    <value>توقف الاستلام عبر البلوتوث. إذا كان هناك ملف في الانتظار، فانقر على «إنهاء» في نافذة البلوتوث.</value>
+  </data>
+  <data name="WindowsBluetoothIsnTAvailableOnThisPCTurnOnBluetoothInWindowsSett" xml:space="preserve">
+    <value>البلوتوث غير متاح على هذا الكمبيوتر. فعّله من إعدادات ويندوز.</value>
+  </data>
+  <data name="ClickReceiveFilesInTheBluetoothWindowThenSendFromYourPhone" xml:space="preserve">
+    <value>انقر على «استلام ملفات» في نافذة البلوتوث، ثم أرسل من هاتفك.</value>
+  </data>
+  <data name="ABluetoothFileArrivedClickFinishInTheBluetoothWindowToSaveIt" xml:space="preserve">
+    <value>وصل ملف عبر البلوتوث. انقر على «إنهاء» في نافذة البلوتوث لحفظه.</value>
+  </data>
+  <data name="ClickFinishInTheBluetoothWindowToSaveTheFile" xml:space="preserve">
+    <value>انقر على «إنهاء» في نافذة البلوتوث لحفظ الملف.</value>
+  </data>
+  <data name="TheBluetoothFileWasSavedIn0" xml:space="preserve">
+    <value>حُفظ الملف الوارد عبر البلوتوث في {0}.</value>
+  </data>
+  <data name="PairDevice" xml:space="preserve">
+    <value>إقران جهاز</value>
+  </data>
+  <data name="TheyMatch" xml:space="preserve">
+    <value>الرقمان متطابقان</value>
+  </data>
+  <data name="Continue" xml:space="preserve">
+    <value>متابعة</value>
+  </data>
+  <data name="PairingCode" xml:space="preserve">
+    <value>رمز الإقران</value>
+  </data>
+  <data name="OnYourPhoneHopDropPairScan" xml:space="preserve">
+    <value>على هاتفك: افتح HopDrop، ثم اختر «إقران»، ثم «مسح الرمز»</value>
+  </data>
+  <data name="ClickAnywhereOrPressEscToClose" xml:space="preserve">
+    <value>انقر في أي مكان أو اضغط على Esc للإغلاق.</value>
+  </data>
+  <data name="SendText" xml:space="preserve">
+    <value>إرسال نص</value>
+  </data>
+  <data name="FromYourClipboardYouCanEditIt" xml:space="preserve">
+    <value>هذا النص من الحافظة. يمكنك تعديله.</value>
+  </data>
+  <data name="TypeOrPasteTextToSend" xml:space="preserve">
+    <value>اكتب النص المراد إرساله أو الصقه.</value>
+  </data>
+  <data name="TypeOrPasteText" xml:space="preserve">
+    <value>اكتب نصًا أو الصقه</value>
+  </data>
+  <data name="Language" xml:space="preserve">
+    <value>اللغة</value>
+  </data>
+  <data name="LanguageDescription" xml:space="preserve">
+    <value>الإنجليزية هي اللغة الافتراضية. اختر لغة واجهة HopDrop.</value>
+  </data>
+  <data name="TransportLocalNetwork" xml:space="preserve">
+    <value>الشبكة المحلية</value>
+  </data>
+  <data name="TransportDirectLink" xml:space="preserve">
+    <value>الاتصال المباشر</value>
+  </data>
+  <data name="TransportBluetooth" xml:space="preserve">
+    <value>البلوتوث</value>
+  </data>
+  <data name="TransportMixed" xml:space="preserve">
+    <value>اتصالات متعددة</value>
+  </data>
+  <data name="TransportUnknown" xml:space="preserve">
+    <value>طريقة الاتصال غير مسجّلة</value>
+  </data>
+  <data name="TextFrom" xml:space="preserve">
+    <value>نص من {0}</value>
+  </data>
+  <data name="TextTo" xml:space="preserve">
+    <value>نص إلى {0}</value>
+  </data>
+  <data name="ReceivedFilesFrom" xml:space="preserve">
+    <value>استلام من {1} · {0}</value>
+  </data>
+  <data name="SentFilesTo" xml:space="preserve">
+    <value>إرسال إلى {1} · {0}</value>
+  </data>
+  <data name="ReceivingCancelled" xml:space="preserve">
+    <value>أُلغي الاستلام من {0}</value>
+  </data>
+  <data name="SendingCancelled" xml:space="preserve">
+    <value>أُلغي الإرسال إلى {0}</value>
+  </data>
+  <data name="PairWith" xml:space="preserve">
+    <value>الاقتران مع {0}</value>
+  </data>
+  <data name="SameNumber" xml:space="preserve">
+    <value>هل يظهر الرقم نفسه على {0}؟</value>
+  </data>
+  <data name="FilesZero" xml:space="preserve">
+    <value>لا توجد ملفات</value>
+  </data>
+  <data name="FilesOne" xml:space="preserve">
+    <value>ملف واحد</value>
+  </data>
+  <data name="FilesTwo" xml:space="preserve">
+    <value>ملفان</value>
+  </data>
+  <data name="FilesFew" xml:space="preserve">
+    <value>{0:N0} ملفات</value>
+  </data>
+  <data name="FilesMany" xml:space="preserve">
+    <value>{0:N0} ملفًا</value>
+  </data>
+  <data name="FilesOther" xml:space="preserve">
+    <value>{0:N0} ملف</value>
+  </data>
+  <data name="FoldersZero" xml:space="preserve">
+    <value>لا توجد مجلدات</value>
+  </data>
+  <data name="FoldersOne" xml:space="preserve">
+    <value>مجلد واحد</value>
+  </data>
+  <data name="FoldersTwo" xml:space="preserve">
+    <value>مجلدان</value>
+  </data>
+  <data name="FoldersFew" xml:space="preserve">
+    <value>{0:N0} مجلدات</value>
+  </data>
+  <data name="FoldersMany" xml:space="preserve">
+    <value>{0:N0} مجلدًا</value>
+  </data>
+  <data name="FoldersOther" xml:space="preserve">
+    <value>{0:N0} مجلد</value>
+  </data>
+  <data name="SpeedPerSecond" xml:space="preserve">
+    <value>{0}/ث</value>
+  </data>
+  <data name="ReceivingStopped" xml:space="preserve">
+    <value>توقف الاستلام من {0}</value>
+  </data>
+  <data name="SendingStopped" xml:space="preserve">
+    <value>توقف الإرسال إلى {0}</value>
+  </data>
+  <data name="ReceivingFilesFrom" xml:space="preserve">
+    <value>جارٍ الاستلام من {1} · {0}</value>
+  </data>
+  <data name="SendingFilesTo" xml:space="preserve">
+    <value>جارٍ الإرسال إلى {1} · {0}</value>
+  </data>
+  <data name="FileProgress" xml:space="preserve">
+    <value>{0} · {1} من {2}</value>
+  </data>
+  <data name="SavedInFolder" xml:space="preserve">
+    <value>مكان الحفظ: {0}</value>
+  </data>
+  <data name="SavedOnDevice" xml:space="preserve">
+    <value>مكان الحفظ على {1}: {0}</value>
+  </data>
+  <data name="SavedFileProgress" xml:space="preserve">
+    <value>الملفات المحفوظة: {0} من {1}</value>
+  </data>
+  <data name="DeliveredFileProgress" xml:space="preserve">
+    <value>الملفات التي وصلت: {0} من {1}</value>
+  </data>
+  <data name="BackupLastRun" xml:space="preserve">
+    <value>{0} · آخر تشغيل: {1:g}</value>
+  </data>
+  <data name="CopiedFrom" xml:space="preserve">
+    <value>نُسخ من {0}</value>
+  </data>
+  <data name="TrayReceiving" xml:space="preserve">
+    <value>استلام من {0} · {1}</value>
+  </data>
+  <data name="TraySending" xml:space="preserve">
+    <value>إرسال إلى {0} · {1}</value>
+  </data>
+  <data name="ToastFileProgress" xml:space="preserve">
+    <value>{0} ({1} من {2})</value>
+  </data>
+</root>

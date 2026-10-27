@@ -63,7 +63,8 @@ public final class TransferService extends Service {
     }
 
     private Notification summary(HopApp app, int count) {
-        return app.notification("transfers", "Sending with HopDrop", count + (count == 1 ? " send" : " sends") + " in progress", true, -1)
+        return app.notification("transfers", Language.text(app, R.string.notification_sending_summary),
+                Language.wrap(app).getResources().getQuantityString(R.plurals.sends_in_progress, count, count), true, -1)
                 .setSmallIcon(R.drawable.ic_direction_out).setGroup(Notices.OUTGOING_GROUP).setGroupSummary(true)
                 .setShowWhen(false).build();
     }

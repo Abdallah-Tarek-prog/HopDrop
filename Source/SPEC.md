@@ -22,6 +22,17 @@ Velopack package id, the firewall rule, sign-in entry, pipes and mutexes, MCP se
   stays plain Java with platform APIs, so it also runs on the desktop JVM for tests. minSdk 26, targetSdk 36, compileSdk 37.
   Third-party code only where section 8 allows it.
 - **Windows is .NET 10 + WPF.** Third-party NuGet packages only where section 8 allows it.
+- **Linux:** a separate Avalonia frontend on .NET 10 reuses `HopDrop.Core` and the shared local agent service. Linux Mint is
+  the physical test target; WSL Ubuntu provides development checks. Support local transfers, offline queues, received backups,
+  clipboard controls, desktop integration, Arabic and AI agents. A user-started NetworkManager hotspot advertises the existing
+  `DirectLinkInfo`; unlike Windows Wi-Fi Direct, it may disconnect the adapter's current Wi-Fi. BlueZ confirms outbound OBEX
+  delivery before Activity is recorded. Incoming native Bluetooth transfers belong to Blueman and cannot be recorded without
+  a verified completion callback. Radio behavior remains unverified on physical Mint hardware. See `Linux/FEATURE_PARITY.md`.
+- **Language:** English is the explicit default on every OS. Settings can select Arabic with a persisted preference,
+  translated UI, Arabic plural forms and right-to-left layout. Paths, addresses and pairing codes retain their order.
+- **Activity method:** record the observed connection for files and text: `local_network`, `direct_link`, `bluetooth`,
+  `mixed`, or `unknown`. Missing metadata in old history is not evidence of Wi-Fi. OS Bluetooth handoff alone must not
+  create a successful transfer record.
 - **Local only.** No cloud, no accounts, no telemetry, never route over mobile data (section 5).
 - **Report honestly.** In your final message, list what you built, what you ran, what passed, what you could not
   test and why, and any deviation from this spec. Never claim something works if you did not run it.
@@ -639,6 +650,7 @@ Approved by the owner on 2026-09-29, from official registries only (nuget.org, M
 - NuGet: `WPF-UI` (Fluent controls), `H.NotifyIcon.Wpf` or WinForms `NotifyIcon` (tray), `CommunityToolkit.WinUI.Notifications` or equivalent (toasts), `QRCoder` (QR images), `xunit` (tests), the .NET runtime packs needed for a self-contained publish, and for Stage 6 a Bluetooth library if needed (e.g. `InTheHand.Net.Bluetooth`) or the Windows SDK projection.
 - Maven: `com.google.zxing:core` (QR scan/encode on Android, Apache-2.0) — the jar goes in `Source/Android/libs/` with its license.
 - NuGet `Velopack` (installer and automatic updates, MIT), approved by the owner on 2026-10-03.
+- Linux frontend: `Avalonia.Desktop` and `Avalonia.Themes.Fluent` 12.1.4, reusing `QRCoder` 1.8.0 and the shared .NET engine.
 - Font **Roboto** (variable, `Source/Android/res/font/roboto.ttf`, SIL Open Font License 1.1, licence in
   `Source/Android/libs/Roboto-OFL.txt`), downloaded from github.com/google/fonts (`ofl/roboto`), approved by the owner on
   2026-10-19; it replaces Plus Jakarta Sans in the phone app. The Windows app uses the system's Segoe UI Variable.

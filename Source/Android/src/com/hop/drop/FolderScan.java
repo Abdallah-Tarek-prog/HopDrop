@@ -52,21 +52,22 @@ final class FolderScan {
     private FolderScan() {
     }
 
-    static String name(ContentResolver resolver, Uri tree) {
+    static String name(android.content.Context context, Uri tree) {
         String id = DocumentsContract.getTreeDocumentId(tree);
-        try (Cursor c = resolver.query(DocumentsContract.buildDocumentUriUsingTree(tree, id),
+        try (Cursor c = context.getContentResolver().query(DocumentsContract.buildDocumentUriUsingTree(tree, id),
                 new String[]{Document.COLUMN_DISPLAY_NAME}, null, null, null)) {
             if (c != null && c.moveToFirst() && !c.isNull(0)) return c.getString(0);
         } catch (RuntimeException ignored) {
         }
-        return "Folder";
+        return Language.text(context, R.string.ui_folder);
     }
 
     /** Every file in the folder and its subfolders, leaving out hidden ".name" files and folders. */
-    static List<Item> files(ContentResolver resolver, Uri tree) {
+    static List<Item> files(android.content.Context context, Uri tree) {
+        ContentResolver resolver = context.getContentResolver();
         List<Item> found = new ArrayList<>();
         ArrayDeque<String[]> pending = new ArrayDeque<>();
-        pending.add(new String[]{DocumentsContract.getTreeDocumentId(tree), name(resolver, tree)});
+        pending.add(new String[]{DocumentsContract.getTreeDocumentId(tree), name(context, tree)});
         String[] columns = {Document.COLUMN_DOCUMENT_ID, Document.COLUMN_DISPLAY_NAME, Document.COLUMN_MIME_TYPE,
                 Document.COLUMN_SIZE, Document.COLUMN_LAST_MODIFIED};
         while (!pending.isEmpty() && found.size() < LIMIT) {

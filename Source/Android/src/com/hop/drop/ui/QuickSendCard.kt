@@ -1,5 +1,9 @@
 package com.hop.drop.ui
 
+import com.hop.drop.R
+
+import androidx.compose.ui.res.stringResource
+
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -49,9 +53,9 @@ internal fun QuickSendCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 LogoMark(26.dp)
                 Spacer(Modifier.width(10.dp))
-                Text("Quick send", style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.ui_quick_send), style = MaterialTheme.typography.titleLarge)
             }
-            Text("Send to", style = MaterialTheme.typography.labelLarge, color = scheme.onSurfaceVariant,
+            Text(stringResource(R.string.ui_send_to), style = MaterialTheme.typography.labelLarge, color = scheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 16.dp, bottom = 6.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(devices, key = { it.id }) { device ->
@@ -63,9 +67,9 @@ internal fun QuickSendCard(
                 }
             }
             Column(Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                QuickOption(Icons.Rounded.ContentPaste, "Clipboard", clipboardDetail, clipboardAvailable, null, onClipboard)
-                QuickOption(Icons.Rounded.Image, "Latest photo", photoDetail, photoAvailable, photoPreview, onPhoto)
-                QuickOption(Icons.AutoMirrored.Rounded.InsertDriveFile, "Files", "Choose…", true, null, onFiles)
+                QuickOption(Icons.Rounded.ContentPaste, stringResource(R.string.ui_clipboard), clipboardDetail, clipboardAvailable, null, onClipboard)
+                QuickOption(Icons.Rounded.Image, stringResource(R.string.ui_latest_photo), photoDetail, photoAvailable, photoPreview, onPhoto)
+                QuickOption(Icons.AutoMirrored.Rounded.InsertDriveFile, stringResource(R.string.ui_files), stringResource(R.string.ui_choose), true, null, onFiles)
             }
         }
     }

@@ -123,6 +123,8 @@ public sealed partial class HopDropPeer : IAsyncDisposable
     public event Action<IncomingOffer>? OfferReceived;
     /// <summary>A paired device sent text (a link, a note, or its clipboard).</summary>
     public event Action<TextMessage>? TextReceived;
+    /// <summary>Activity has been saved and can be read by the interface.</summary>
+    public event Action? HistoryChanged;
     /// <summary>A paired device just connected to this one (so it's reachable now, at the address it came from). Its id.</summary>
     public event Action<string>? DeviceContacted;
 
@@ -205,7 +207,9 @@ public sealed partial class HopDropPeer : IAsyncDisposable
     /// <summary>Short display name of the receive folder, e.g. "Downloads\HopDrop".</summary>
     public string ReceiveFolderLabel => FolderLabel(ReceiveDirectory);
     /// <summary>Records files that arrived outside HopDrop's own protocol (Windows' Bluetooth wizard).</summary>
-    public Task RecordBluetoothAsync(IReadOnlyList<string> files) => AddHistoryAsync("bluetooth", "received", null, files.ToList(), ReceiveFolderLabel);
+    public Task RecordBluetoothAsync(IReadOnlyList<string> files) => AddHistoryAsync("bluetooth", "received", null, files.ToList(), ReceiveFolderLabel, transport: TransferTransport.Bluetooth);
+    /// <summary>Records only files whose Bluetooth stack has confirmed delivery.</summary>
+    public Task RecordBluetoothSentAsync(IReadOnlyList<string> files) => AddHistoryAsync("bluetooth", "sent", null, files.ToList(), "", transport: TransferTransport.Bluetooth);
     public IReadOnlyList<NearbyDevice> Nearby => _discovery?.Nearby ?? [];
     public Task QueryNearbyAsync(CancellationToken ct = default) => _discovery?.QueryAsync(ct) ?? Task.CompletedTask;
     public async Task StartAsync(CancellationToken ct = default)
@@ -229,10 +233,15 @@ public sealed partial class HopDropPeer : IAsyncDisposable
     {
         var list = (addresses ?? NetworkAddresses.QrAddresses()).ToArray();
         if (list.Length == 0) list = [IPAddress.Loopback];
-        return new PairUri(Id, Name, "windows", Port, list, TokenCodec.Decode(_token.Issue()), DirectLink).ToString();
+        return new PairUri(Id, Name, DevicePlatform.Current, Port, list, TokenCodec.Decode(_token.Issue()), DirectLink).ToString();
     }
     public void CloseQr() => _token.Invalidate();
-    public void CancelTransfer(Guid id) { if (_transfers.TryGetValue(id, out var cts)) cts.Cancel(); }
+    public void CancelTransfer(Guid id)
+    {
+        if (!_transfers.TryGetValue(id, out var cts)) return;
+        try { cts.Cancel(); }
+        catch (ObjectDisposedException) { /* The transfer finished after the lookup. */ }
+    }
     public async Task UnpairAsync(string id, CancellationToken ct = default)
     {
         var device = (await DevicesAsync(ct)).FirstOrDefault(d => d.Id == id);
@@ -300,11 +309,13 @@ public sealed partial class HopDropPeer : IAsyncDisposable
                     string type = Messages.Type(request.RootElement);
                     if (!paired && type is "ping" or "offer" or "unpair" or "text") throw new HopDropException("not_paired", "Pair this device first");
                     var address = ((IPEndPoint)client.Client.RemoteEndPoint!).Address;
+                    string transport = TransferTransport.ForConnection(((IPEndPoint?)client.Client.LocalEndPoint)?.Address,
+                        address, DirectLink, paired ? HelloLink(hello.RootElement) : null);
                     if (paired && type is "ping" or "offer" or "text") await NoteContactAsync(known!, address);
                     switch (type)
                     {
                         case "ping": await Messages.WriteAsync(ssl, new { type = "pong" }, stop); break;
-                        case "text": await ReceiveTextAsync(ssl, request.RootElement, peerId, known?.Alias ?? h.Name, stop); break;
+                        case "text": await ReceiveTextAsync(ssl, request.RootElement, peerId, known?.Alias ?? h.Name, transport, stop); break;
                         case "unpair": await RemoveDeviceAsync(peerId, stop); await Messages.WriteAsync(ssl, new { type = "ok" }, stop); break;
                         case "pair_qr":
                             string outcome = _token.Consume(Messages.String(request.RootElement, "token"));
@@ -313,7 +324,7 @@ public sealed partial class HopDropPeer : IAsyncDisposable
                             await Messages.WriteAsync(ssl, new { type = "pair_ok" }, stop); break;
                         case "pair_sas": await RespondSasAsync(ssl, peerId, h.Name, h.Platform, address, stop); break;
                         case "offer":
-                            await ReceiveAsync(ssl, request.RootElement, peerId, known?.Alias ?? h.Name, h.Name, known?.Trusted == true, h.Features, stop); break;
+                            await ReceiveAsync(ssl, request.RootElement, peerId, known?.Alias ?? h.Name, h.Name, known?.Trusted == true, h.Features, transport, stop); break;
                         default: throw new HopDropException("protocol_error", "Unknown request");
                     }
                 }
@@ -357,8 +368,8 @@ public sealed partial class HopDropPeer : IAsyncDisposable
     {
         var features = _options.Features ?? Features;
         object hello = paired && DirectLink is { Valid: true } link
-            ? new { type = "hello", proto = 2, id = Id, name = Name, platform = "windows", app = AppVersion, paired, features, link = new { ssid = link.Ssid, key = link.Key, ip = link.Address } }
-            : new { type = "hello", proto = 2, id = Id, name = Name, platform = "windows", app = AppVersion, paired, features };
+            ? new { type = "hello", proto = 2, id = Id, name = Name, platform = DevicePlatform.Current, app = AppVersion, paired, features, link = new { ssid = link.Ssid, key = link.Key, ip = link.Address } }
+            : new { type = "hello", proto = 2, id = Id, name = Name, platform = DevicePlatform.Current, app = AppVersion, paired, features };
         return Messages.WriteAsync(stream, hello, ct);
     }
     /// <summary>Bigger socket buffers keep Wi-Fi busy between writes; no Nagle delay, so the small replies between files go out at once.</summary>
@@ -388,14 +399,14 @@ public sealed partial class HopDropPeer : IAsyncDisposable
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException) { Error?.Invoke("Devices: " + e.Message); }
         DeviceContacted?.Invoke(device.Id);
     }
-    private async Task ReceiveTextAsync(Stream stream, JsonElement request, string peerId, string peerName, CancellationToken ct)
+    private async Task ReceiveTextAsync(Stream stream, JsonElement request, string peerId, string peerName, string transport, CancellationToken ct)
     {
         string text = Messages.String(request, "text");
         if (text.Length is < 1 or > Framing.MaxJson) throw new HopDropException("protocol_error", "Invalid text");
         bool clip = request.TryGetProperty("clip", out var c) && c.ValueKind == JsonValueKind.True;
         await Messages.WriteAsync(stream, new { type = "ok" }, ct);
         TextReceived?.Invoke(new TextMessage(peerId, peerName, text, clip, DateTimeOffset.UtcNow));
-        try { await AddHistoryAsync(peerId, "received", null, [], "", text); } catch (Exception e) { Error?.Invoke("Activity: " + e.Message); }
+        try { await AddHistoryAsync(peerId, "received", null, [], "", text, transport); } catch (Exception e) { Error?.Invoke("Activity: " + e.Message); }
     }
     /// <summary>Text longer than this (UTF-16 units) travels as a .txt file instead (a control message holds at most 64 KiB).</summary>
     public const int MaxText = 16_000;
@@ -410,10 +421,11 @@ public sealed partial class HopDropPeer : IAsyncDisposable
         public string Platform { get; }
         public IPAddress Address { get; }
         public DirectLinkInfo? Link { get; }
+        public string Transport { get; }
         /// <summary>Extensions both sides support.</summary>
         public IReadOnlySet<string> Features { get; }
-        public Connection(TcpClient client, SslStream stream, string id, string name, string platform, IPAddress address, IReadOnlySet<string> features, DirectLinkInfo? link)
-        { _client = client; Stream = stream; Id = id; Name = name; Platform = platform; Address = address; Features = features; Link = link; }
+        public Connection(TcpClient client, SslStream stream, string id, string name, string platform, IPAddress address, IReadOnlySet<string> features, DirectLinkInfo? link, string transport)
+        { _client = client; Stream = stream; Id = id; Name = name; Platform = platform; Address = address; Features = features; Link = link; Transport = transport; }
         public void Dispose() { Stream.Dispose(); _client.Dispose(); }
     }
     private async Task<Connection> ConnectAsync(IPAddress address, int port, string? expectedId, CancellationToken ct)
@@ -440,7 +452,9 @@ public sealed partial class HopDropPeer : IAsyncDisposable
                     using var doc = await ReadControlAsync(ssl, ct);
                     var h = ValidateHello(doc.RootElement, id, _options.Features ?? Features);
                     if (expectedId is not null && id != expectedId) throw new HopDropException("identity_mismatch", "This isn't the device you paired with");
-                    return new(client, ssl, id, h.Name, h.Platform, address, h.Features, paired ? HelloLink(doc.RootElement) : null);
+                    var peerLink = paired ? HelloLink(doc.RootElement) : null;
+                    return new(client, ssl, id, h.Name, h.Platform, address, h.Features, peerLink,
+                        TransferTransport.ForConnection(((IPEndPoint?)client.Client.LocalEndPoint)?.Address, address, DirectLink, peerLink));
                 }
             }
             catch { ssl.Dispose(); throw; }
@@ -546,7 +560,7 @@ public sealed partial class HopDropPeer : IAsyncDisposable
     {
         _serverStop?.Cancel(); _listener?.Stop();
         if (_acceptTask is not null) { try { await _acceptTask; } catch (OperationCanceledException) { } }
-        foreach (var c in _transfers.Values) c.Cancel();
+        foreach (var id in _transfers.Keys) CancelTransfer(id);
         if (_discovery is not null) await _discovery.DisposeAsync();
         await Task.WhenAll(_handlers.Keys.ToArray());
         _serverStop?.Dispose(); _sasGate.Dispose(); _namingGate.Dispose(); Identity.Dispose();

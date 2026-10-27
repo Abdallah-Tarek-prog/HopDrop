@@ -2,6 +2,7 @@ package com.hop.drop
 
 import android.app.Activity
 import android.content.Intent
+import android.content.Context
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
@@ -14,6 +15,7 @@ import com.hop.drop.core.Peer
  * closes: one tap from any app. Picked as "HopDrop", it opens the Send screen with the files or text, as before.
  */
 class ShareActivity : Activity() {
+    override fun attachBaseContext(newBase: Context) = super.attachBaseContext(Language.wrap(newBase))
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val app = application as HopApp
@@ -23,14 +25,14 @@ class ShareActivity : Activity() {
             startActivity(Intent(intent).setClass(this, MainActivity::class.java).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
         } else {
             val job = jobFor(app, device, intent)
-            if (job == null) Toast.makeText(this, "There was nothing to send.", Toast.LENGTH_SHORT).show()
+            if (job == null) Toast.makeText(this, R.string.quick_nothing_to_send, Toast.LENGTH_SHORT).show()
             else {
                 try {
                     startForegroundService(job.intent(this))
                     Shortcuts.used(this, device.id)
-                    Toast.makeText(this, "Sending to " + device.label(), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, getString(R.string.quick_sending_to, Language.ltr(this, device.label())), Toast.LENGTH_SHORT).show()
                 } catch (e: RuntimeException) {
-                    Toast.makeText(this, "HopDrop couldn't start sending. Open HopDrop and try again.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, R.string.quick_send_unavailable, Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -48,7 +50,7 @@ class ShareActivity : Activity() {
             val files = uris.distinct()
             val text = intent.getStringExtra(Intent.EXTRA_TEXT)
             if (files.isEmpty() && text.isNullOrEmpty()) return null
-            val job = Sends.Job(device.id, if (files.isEmpty()) "your text" else Format.files(files.size))
+            val job = Sends.Job(device.id, if (files.isEmpty()) app.getString(R.string.your_text) else Language.files(app, files.size))
             if (files.isEmpty()) {
                 if (text!!.length <= Peer.MAX_TEXT) job.texts.add(text)
                 else job.files.add(SharedTextProvider.create(app, text))

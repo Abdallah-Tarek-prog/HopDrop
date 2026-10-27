@@ -227,16 +227,16 @@ internal static class Ui
 {
     public static FontFamily Font { get; } = new("Segoe UI Variable Text, Segoe UI Variable, Segoe UI");
     public static TextBlock Label(string text, double size = 14, bool bold = false) => new()
-    { Text = text, FontFamily = Font, FontSize = size, Foreground = Palette.Text, FontWeight = bold ? FontWeights.SemiBold : FontWeights.Normal, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
+    { Text = text, TextAlignment = TextAlignment.Left, FlowDirection = L.Direction, FontFamily = Font, FontSize = size, Foreground = Palette.Text, FontWeight = bold ? FontWeights.SemiBold : FontWeights.Normal, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
     public static TextBlock Subtle(string text, double size = 14) => new()
-    { Text = text, FontFamily = Font, FontSize = size, Foreground = Palette.Muted, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) };
+    { Text = text, TextAlignment = TextAlignment.Left, FlowDirection = L.Direction, FontFamily = Font, FontSize = size, Foreground = Palette.Muted, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) };
     public static TextBlock Section(string text) { var t = Label(text, 20, true); t.Margin = new Thickness(0, 22, 0, 10); return t; }
     public static TextBlock Colored(string text, Brush brush, double size = 14, bool bold = false) { var t = Label(text, size, bold); t.Foreground = brush; return t; }
 
     /// <summary>A page: title, one-line purpose, then content, centred with a readable maximum width.</summary>
     public static StackPanel Page(string title, string subtitle)
     {
-        var panel = new StackPanel { Margin = new Thickness(32, 20, 32, 32), MaxWidth = 980 };
+        var panel = new StackPanel { FlowDirection = L.Direction, Language = L.Language, Margin = new Thickness(32, 20, 32, 32), MaxWidth = 980 };
         panel.Children.Add(Label(title, 28, true));
         var sub = Subtle(subtitle, 14); sub.Margin = new Thickness(0, 2, 0, 8); panel.Children.Add(sub);
         return panel;
@@ -352,19 +352,19 @@ internal static class Ui
 /// <summary>Human-readable sizes, speeds and durations (same wording as the Android app).</summary>
 internal static class Fmt
 {
-    public static string PlatformName(string platform) => platform switch { "windows" => "Windows", "android" => "Android", "linux" => "Linux", _ => platform };
-    public static string Size(long bytes) => bytes < 0 ? "Unknown size" : bytes < 1024 ? $"{bytes} B" : bytes < 1024 * 1024 ? $"{bytes / 1024d:0.0} KB"
-        : bytes < 1024L * 1024 * 1024 ? $"{bytes / 1048576d:0.0} MB" : $"{bytes / 1073741824d:0.00} GB";
-    public static string Speed(double bytesPerSecond) => Size((long)bytesPerSecond) + "/s";
+    public static string PlatformName(string platform) => platform switch { "windows" => L.T("Windows"), "android" => L.T("Android"), "linux" => L.T("Linux"), _ => platform };
+    public static string Size(long bytes) => bytes < 0 ? L.T("UnknownSize") : bytes < 1024 ? L.T("0B", bytes) : bytes < 1024 * 1024 ? L.T("000KB", bytes / 1024d)
+        : bytes < 1024L * 1024 * 1024 ? L.T("000MB", bytes / 1048576d) : L.T("0000GB", bytes / 1073741824d);
+    public static string Speed(double bytesPerSecond) => L.T("SpeedPerSecond", Size((long)bytesPerSecond));
     public static string Duration(TimeSpan time)
     {
         long s = (long)Math.Ceiling(time.TotalSeconds);
-        if (s < 60) return $"{Math.Max(1, s)} s";
+        if (s < 60) return L.T("0S", Math.Max(1, s));
         long m = s / 60;
-        return m < 10 ? $"{m} min {s % 60} s" : m < 60 ? $"{m} min" : $"{m / 60} h {m % 60} min";
+        return m < 10 ? L.T("0Min1S", m, s % 60) : m < 60 ? L.T("0Min", m) : L.T("0H1Min", m / 60, m % 60);
     }
-    public static string Files(int count) => $"{count.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)} {(count == 1 ? "file" : "files")}";
-    public static string Folders(int count) => $"{count.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)} {(count == 1 ? "folder" : "folders")}";
+    public static string Files(int count) => L.Count("Files", count);
+    public static string Folders(int count) => L.Count("Folders", count);
     /// <summary>
     /// "a.jpg, b.pdf +3" (at most <paramref name="max"/> entries). Files that came inside a sent folder count once, as
     /// "Photos folder": a relative path ("Photos/2024/a.jpg") by its first part, a full path by its first folder under <paramref name="root"/>.
@@ -384,17 +384,17 @@ internal static class Fmt
             relative = relative.Replace('\\', '/');
             int slash = relative.IndexOf('/');
             if (slash <= 0) shown.Add(relative);
-            else if (folders.Add(relative[..slash])) shown.Add(relative[..slash] + " folder");
+            else if (folders.Add(relative[..slash])) shown.Add(relative[..slash] + L.T("Folder"));
         }
-        if (shown.Count == 0) return "No files";
+        if (shown.Count == 0) return L.T("NoFiles");
         // One line ("a.jpg + 2 more") for rows and notifications, one name per line for longer lists. Never comma lists.
-        if (max <= 2) return shown.Count == 1 ? shown[0] : shown.Count == 2 ? $"{shown[0]} and {shown[1]}" : $"{shown[0]} + {shown.Count - 1} more";
-        return shown.Count <= max ? string.Join("\n", shown) : string.Join("\n", shown.Take(max)) + $"\n+ {shown.Count - max} more";
+        if (max <= 2) return shown.Count == 1 ? shown[0] : shown.Count == 2 ? L.T("0And1", shown[0], shown[1]) : L.T("01More", shown[0], shown.Count - 1);
+        return shown.Count <= max ? string.Join("\n", shown) : string.Join("\n", shown.Take(max)) + L.T("0More", shown.Count - max);
     }
-    public static string Amount(long done, long total) => total < 0 ? Size(done) : $"{Size(done)} of {Size(total)}";
+    public static string Amount(long done, long total) => total < 0 ? Size(done) : L.T("0Of1", Size(done), Size(total));
     public static string Ago(DateTimeOffset time)
     {
         var span = DateTimeOffset.Now - time;
-        return span.TotalMinutes < 1 ? "just now" : span.TotalHours < 1 ? $"{(int)span.TotalMinutes} min ago" : span.TotalDays < 1 ? $"{(int)span.TotalHours} h ago" : $"{(int)span.TotalDays} days ago";
+        return span.TotalMinutes < 1 ? L.T("JustNow") : span.TotalHours < 1 ? L.T("0MinAgo", (int)span.TotalMinutes) : span.TotalDays < 1 ? L.T("0HAgo", (int)span.TotalHours) : L.T("0DaysAgo", (int)span.TotalDays);
     }
 }

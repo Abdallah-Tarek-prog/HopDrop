@@ -1,0 +1,397 @@
+<?xml version='1.0' encoding='utf-8'?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <data xml:space="preserve" name="send">
+    <value>إرسال</value>
+  </data>
+  <data xml:space="preserve" name="devices">
+    <value>الأجهزة</value>
+  </data>
+  <data xml:space="preserve" name="activity">
+    <value>النشاط</value>
+  </data>
+  <data xml:space="preserve" name="settings">
+    <value>الإعدادات</value>
+  </data>
+  <data xml:space="preserve" name="ready">
+    <value>جاهز للاستقبال</value>
+  </data>
+  <data xml:space="preserve" name="offline">
+    <value>لا توجد أجهزة قريبة</value>
+  </data>
+  <data xml:space="preserve" name="send_title">
+    <value>إرسال محتوى</value>
+  </data>
+  <data xml:space="preserve" name="send_intro">
+    <value>اختر ملفات أو مجلدًا أو اكتب رسالة، ثم حدد جهازًا مقترنًا للإرسال إليه.</value>
+  </data>
+  <data xml:space="preserve" name="files">
+    <value>إضافة ملفات</value>
+  </data>
+  <data xml:space="preserve" name="folder">
+    <value>إضافة مجلد</value>
+  </data>
+  <data xml:space="preserve" name="drop">
+    <value>أو أسقط الملفات والمجلدات هنا</value>
+  </data>
+  <data xml:space="preserve" name="selected">
+    <value>المحتوى المحدد</value>
+  </data>
+  <data xml:space="preserve" name="nothing_selected">
+    <value>لم تحدد أي محتوى بعد</value>
+  </data>
+  <data xml:space="preserve" name="remove">
+    <value>إزالة</value>
+  </data>
+  <data xml:space="preserve" name="clear">
+    <value>مسح</value>
+  </data>
+  <data xml:space="preserve" name="message">
+    <value>رسالة</value>
+  </data>
+  <data xml:space="preserve" name="message_hint">
+    <value>ألصق رابطًا أو اكتب رسالة قصيرة</value>
+  </data>
+  <data xml:space="preserve" name="send_to">
+    <value>إرسال إلى</value>
+  </data>
+  <data xml:space="preserve" name="send_now">
+    <value>إرسال الآن</value>
+  </data>
+  <data xml:space="preserve" name="choose_device">
+    <value>اختر جهازًا مقترنًا</value>
+  </data>
+  <data xml:space="preserve" name="pair_title">
+    <value>إقران جهاز</value>
+  </data>
+  <data xml:space="preserve" name="pair_intro">
+    <value>امسح هذا الرمز في HopDrop على هاتفك، أو أدخل رابط الإقران الخاص بالجهاز الآخر.</value>
+  </data>
+  <data xml:space="preserve" name="show_qr">
+    <value>عرض رمز الإقران</value>
+  </data>
+  <data xml:space="preserve" name="pair_link">
+    <value>الإقران عبر رابط</value>
+  </data>
+  <data xml:space="preserve" name="pair_address">
+    <value>الإقران عبر عنوان IP</value>
+  </data>
+  <data xml:space="preserve" name="pair_link_hint">
+    <value>ألصق رابط hopdrop://pair</value>
+  </data>
+  <data xml:space="preserve" name="address_hint">
+    <value>عنوان IPv4، ويمكن إضافة :المنفذ</value>
+  </data>
+  <data xml:space="preserve" name="pair">
+    <value>إقران</value>
+  </data>
+  <data xml:space="preserve" name="paired">
+    <value>الأجهزة المقترنة</value>
+  </data>
+  <data xml:space="preserve" name="nearby">
+    <value>الأجهزة القريبة</value>
+  </data>
+  <data xml:space="preserve" name="refresh">
+    <value>تحديث</value>
+  </data>
+  <data xml:space="preserve" name="unpair">
+    <value>نسيان الجهاز</value>
+  </data>
+  <data xml:space="preserve" name="trust">
+    <value>الوثوق بملفات هذا الجهاز</value>
+  </data>
+  <data xml:space="preserve" name="online">
+    <value>قريب الآن</value>
+  </data>
+  <data xml:space="preserve" name="last_seen">
+    <value>آخر ظهور</value>
+  </data>
+  <data xml:space="preserve" name="my_device">
+    <value>هذا الحاسوب</value>
+  </data>
+  <data xml:space="preserve" name="network">
+    <value>الشبكة المحلية</value>
+  </data>
+  <data xml:space="preserve" name="no_address">
+    <value>لم يُعثر على عنوان محلي. اتصل بشبكة Wi-Fi أو Ethernet.</value>
+  </data>
+  <data xml:space="preserve" name="history_empty">
+    <value>ستظهر عمليات النقل هنا.</value>
+  </data>
+  <data xml:space="preserve" name="received">
+    <value>مستلم</value>
+  </data>
+  <data xml:space="preserve" name="sent">
+    <value>مُرسل</value>
+  </data>
+  <data xml:space="preserve" name="failed">
+    <value>فشل</value>
+  </data>
+  <data xml:space="preserve" name="open">
+    <value>فتح</value>
+  </data>
+  <data xml:space="preserve" name="show_folder">
+    <value>إظهار في المجلد</value>
+  </data>
+  <data xml:space="preserve" name="method">
+    <value>طريقة الاتصال</value>
+  </data>
+  <data xml:space="preserve" name="local_network">
+    <value>الشبكة المحلية</value>
+  </data>
+  <data xml:space="preserve" name="direct_link">
+    <value>اتصال مباشر</value>
+  </data>
+  <data xml:space="preserve" name="bluetooth">
+    <value>بلوتوث</value>
+  </data>
+  <data xml:space="preserve" name="mixed">
+    <value>عدة طرق اتصال</value>
+  </data>
+  <data xml:space="preserve" name="unknown">
+    <value>طريقة الاتصال غير مسجّلة</value>
+  </data>
+  <data xml:space="preserve" name="language">
+    <value>اللغة</value>
+  </data>
+  <data xml:space="preserve" name="language_intro">
+    <value>اختر لغة واجهة HopDrop.</value>
+  </data>
+  <data xml:space="preserve" name="english">
+    <value>الإنجليزية</value>
+  </data>
+  <data xml:space="preserve" name="arabic">
+    <value>العربية</value>
+  </data>
+  <data xml:space="preserve" name="receive_folder">
+    <value>حفظ الملفات المستلمة في</value>
+  </data>
+  <data xml:space="preserve" name="change">
+    <value>تغيير…</value>
+  </data>
+  <data xml:space="preserve" name="default">
+    <value>استخدام الافتراضي</value>
+  </data>
+  <data xml:space="preserve" name="ask">
+    <value>السؤال قبل استلام ملفات من أجهزة غير موثوقة</value>
+  </data>
+  <data xml:space="preserve" name="visibility">
+    <value>الظهور لكل الأجهزة القريبة</value>
+  </data>
+  <data xml:space="preserve" name="close_tray">
+    <value>متابعة الاستقبال عند إغلاق النافذة</value>
+  </data>
+  <data xml:space="preserve" name="close_tray_note">
+    <value>يتطلّب توفّر منطقة الإعلام في سطح المكتب. اختر «إنهاء HopDrop» من قائمة أيقونته لإيقافه.</value>
+  </data>
+  <data xml:space="preserve" name="capability">
+    <value>تنتقل ملفاتك بين أجهزتك مباشرةً. استخدم الشبكة المحلية أو نقطة اتصال HopDrop أو أجهزة Bluetooth المقترنة.</value>
+  </data>
+  <data xml:space="preserve" name="cancel">
+    <value>إلغاء</value>
+  </data>
+  <data xml:space="preserve" name="confirm">
+    <value>تأكيد</value>
+  </data>
+  <data xml:space="preserve" name="decline">
+    <value>رفض</value>
+  </data>
+  <data xml:space="preserve" name="accept">
+    <value>قبول</value>
+  </data>
+  <data xml:space="preserve" name="pair_request">
+    <value>طلب إقران</value>
+  </data>
+  <data xml:space="preserve" name="match_code">
+    <value>تحقق من تطابق هذه الأرقام على الجهازين:</value>
+  </data>
+  <data xml:space="preserve" name="offer_title">
+    <value>ملفات واردة</value>
+  </data>
+  <data xml:space="preserve" name="offer_message">
+    <value>طلب إرسال من {0} · {1}</value>
+  </data>
+  <data xml:space="preserve" name="file_one">
+    <value>ملف واحد</value>
+  </data>
+  <data xml:space="preserve" name="file_two">
+    <value>ملفان</value>
+  </data>
+  <data xml:space="preserve" name="file_many">
+    <value>{0} ملفًا</value>
+  </data>
+  <data xml:space="preserve" name="progress">
+    <value>نقل جارٍ</value>
+  </data>
+  <data xml:space="preserve" name="waiting">
+    <value>بانتظار الموافقة</value>
+  </data>
+  <data xml:space="preserve" name="reconnecting">
+    <value>تجري إعادة الاتصال</value>
+  </data>
+  <data xml:space="preserve" name="done">
+    <value>اكتمل النقل</value>
+  </data>
+  <data xml:space="preserve" name="copy">
+    <value>نسخ الرابط</value>
+  </data>
+  <data xml:space="preserve" name="copy_text">
+    <value>نسخ النص</value>
+  </data>
+  <data xml:space="preserve" name="new_code">
+    <value>رمز جديد</value>
+  </data>
+  <data xml:space="preserve" name="qr_expires">
+    <value>تنتهي صلاحية هذا الرمز بعد خمس دقائق. أبقِ هذه النافذة مفتوحة أثناء الإقران.</value>
+  </data>
+  <data xml:space="preserve" name="text_received">
+    <value>رسالة من {0}</value>
+  </data>
+  <data xml:space="preserve" name="error">
+    <value>حدث خطأ</value>
+  </data>
+  <data xml:space="preserve" name="quit">
+    <value>إنهاء HopDrop</value>
+  </data>
+  <data xml:space="preserve" name="show">
+    <value>إظهار HopDrop</value>
+  </data>
+  <data xml:space="preserve" name="status">
+    <value>الحالة</value>
+  </data>
+  <data xml:space="preserve" name="id">
+    <value>معرّف الجهاز</value>
+  </data>
+  <data xml:space="preserve" name="name">
+    <value>اسم الجهاز</value>
+  </data>
+  <data xml:space="preserve" name="save">
+    <value>حفظ</value>
+  </data>
+  <data xml:space="preserve" name="no_paired">
+    <value>لا توجد أجهزة مقترنة بعد. أقرن جهازًا لبدء الإرسال.</value>
+  </data>
+  <data xml:space="preserve" name="transfer_error">
+    <value>فشل النقل: {0}</value>
+  </data>
+  <data xml:space="preserve" name="invalid_address">
+    <value>أدخل عنوان IPv4 ومنفذًا صالحين.</value>
+  </data>
+  <data xml:space="preserve" name="connection_note">
+    <value>يجب أن يكون الجهازان على الشبكة المحلية نفسها أو نقطة الاتصال نفسها.</value>
+  </data>
+  <data xml:space="preserve" name="text">
+    <value>نص</value>
+  </data>
+  <data xml:space="preserve" name="files_label">
+    <value>ملفات</value>
+  </data>
+  <data xml:space="preserve" name="waiting_device">
+    <value>الجهاز غير متاح. أبقِ HopDrop مفتوحًا وأعد المحاولة بعد اتصاله.</value>
+  </data>
+  <data xml:space="preserve" name="file_zero">
+    <value>لا توجد ملفات</value>
+  </data>
+  <data xml:space="preserve" name="file_few">
+    <value>{0} ملفات</value>
+  </data>
+  <data xml:space="preserve" name="file_other">
+    <value>{0} ملف</value>
+  </data>
+  <data xml:space="preserve" name="error_network">
+    <value>تعذّر الوصول إلى الجهاز. تأكّد من فتح HopDrop واتصال الجهازين بالشبكة نفسها.</value>
+  </data>
+  <data xml:space="preserve" name="error_not_paired">
+    <value>أعد الاقتران بهذا الجهاز قبل الإرسال.</value>
+  </data>
+  <data xml:space="preserve" name="error_identity">
+    <value>هذا ليس الجهاز الذي اقترنت به. أعد الاقتران.</value>
+  </data>
+  <data xml:space="preserve" name="error_declined">
+    <value>رفض الجهاز الآخر عملية النقل.</value>
+  </data>
+  <data xml:space="preserve" name="error_space">
+    <value>لا تتوفّر مساحة كافية على الجهاز المستقبِل.</value>
+  </data>
+  <data xml:space="preserve" name="error_cancelled">
+    <value>أُلغيت عملية النقل.</value>
+  </data>
+  <data xml:space="preserve" name="error_file">
+    <value>تعذّرت قراءة الملف أو حفظه. تحقّق من أذونات الوصول والمساحة المتاحة.</value>
+  </data>
+  <data xml:space="preserve" name="error_protocol">
+    <value>حدّث HopDrop على الجهازين، ثم حاول مجددًا.</value>
+  </data>
+  <data xml:space="preserve" name="error_unknown">
+    <value>تعذّر إكمال العملية. تحقّق من الاتصال وحاول مجددًا.</value>
+  </data>
+  <data xml:space="preserve" name="error_identity_storage">
+    <value>تعذّر فتح هوية الجهاز المحفوظة. افتح قفل مخزن المفاتيح وتحقّق من إمكانية الوصول إلى مجلد بيانات HopDrop.</value>
+  </data>
+  <data xml:space="preserve" name="paste_clipboard"><value>لصق نص الحافظة</value></data>
+  <data xml:space="preserve" name="queued"><value>بانتظار اتصال الجهاز مجددًا</value></data>
+  <data xml:space="preserve" name="queue_title"><value>في انتظار الإرسال</value></data>
+  <data xml:space="preserve" name="queue_note"><value>تبقى عمليات الإرسال إلى الأجهزة غير المتصلة هنا بعد إغلاق HopDrop. يمكنك إلغاؤها في أي وقت.</value></data>
+  <data xml:space="preserve" name="queue_item"><value>{0} · {1}</value></data>
+  <data xml:space="preserve" name="queue_interrupted"><value>توقّف الإرسال قبل إغلاق HopDrop. راجعه قبل إعادة المحاولة.</value></data>
+  <data xml:space="preserve" name="retry"><value>إعادة المحاولة</value></data>
+  <data xml:space="preserve" name="retry_note"><value>قد تكون بعض الملفات قد وصلت بالفعل. هل تريد إعادة محاولة الإرسال؟</value></data>
+  <data xml:space="preserve" name="rename"><value>تغيير اسم الجهاز</value></data>
+  <data xml:space="preserve" name="clear_history"><value>مسح سجل النشاط</value></data>
+  <data xml:space="preserve" name="clear_history_note"><value>هل تريد مسح سجل النشاط؟ ستبقى الملفات المستلمة محفوظة على الجهاز.</value></data>
+  <data xml:space="preserve" name="appearance"><value>المظهر</value></data>
+  <data xml:space="preserve" name="system"><value>حسب إعدادات النظام</value></data>
+  <data xml:space="preserve" name="light"><value>فاتح</value></data>
+  <data xml:space="preserve" name="dark"><value>داكن</value></data>
+  <data xml:space="preserve" name="startup"><value>التكامل مع سطح المكتب</value></data>
+  <data xml:space="preserve" name="start_session"><value>تشغيل HopDrop عند تسجيل الدخول</value></data>
+  <data xml:space="preserve" name="background_receive"><value>متابعة الاستقبال في الخلفية</value></data>
+  <data xml:space="preserve" name="background_note"><value>يبدأ HopDrop مع جلسة سطح المكتب ويستمر في العمل بعد إغلاق النافذة. اختر «إنهاء» من أيقونة شريط النظام لإيقاف الاستقبال.</value></data>
+  <data xml:space="preserve" name="file_manager"><value>إضافة «إرسال عبر HopDrop» إلى مدير الملفات</value></data>
+  <data xml:space="preserve" name="file_manager_note"><value>يدعم Nemo في Linux Mint، وبرامج Nautilus النصية، وقوائم خدمات Dolphin. تُفتح الملفات المحددة في HopDrop لتختار الجهاز المستلم.</value></data>
+  <data xml:space="preserve" name="clipboard_title"><value>الحافظة</value></data>
+  <data xml:space="preserve" name="clipboard_receive"><value>نسخ نص الحافظة المستلم إلى حافظة جهازي</value></data>
+  <data xml:space="preserve" name="clipboard_share"><value>مشاركة النص المنسوخ تلقائيًا مع أجهزة Android القريبة</value></data>
+  <data xml:space="preserve" name="clipboard_warning"><value>يُرسل النص المنسوخ إلى أجهزة Android المقترنة عندما تكون قريبة. تُستثنى تنسيقات كلمات المرور المعلّمة بأنها خاصة، لكن بعض التطبيقات قد لا تميّز النصوص الحساسة. عطّل هذا الخيار عند نسخ معلومات سرية.</value></data>
+  <data xml:space="preserve" name="clipboard_wayland"><value>لا تتوفر مشاركة الحافظة تلقائيًا في جلسات Wayland. استخدم «لصق نص الحافظة» في صفحة الإرسال لاختيار ما تريد إرساله.</value></data>
+  <data xml:space="preserve" name="agents_title"><value>وكلاء الذكاء الاصطناعي</value></data>
+  <data xml:space="preserve" name="agents_note"><value>اسمح للوكلاء المحليين الذين يعملون بحسابك بعرض الأجهزة المقترنة وإرسال الملفات وقراءة سجل النقل. لا يمكن للوكلاء إقران الأجهزة أو تغيير الإعدادات أو الموافقة على استقبال الملفات.</value></data>
+  <data xml:space="preserve" name="agents_enable"><value>السماح لوكلاء الذكاء الاصطناعي المحليين</value></data>
+  <data xml:space="preserve" name="copy_config"><value>نسخ إعدادات MCP</value></data>
+  <data xml:space="preserve" name="backups"><value>النسخ الاحتياطية المستلمة</value></data>
+  <data xml:space="preserve" name="backup_note"><value>تُحفظ هنا النسخ الاحتياطية لمجلدات Android مع الحفاظ على بنية المجلدات. يؤثر تغيير هذا الموقع في النسخ المستلمة لاحقًا.</value></data>
+  <data xml:space="preserve" name="backup_item"><value>{0} · {1}</value></data>
+  <data xml:space="preserve" name="forget"><value>إزالة من القائمة</value></data>
+  <data xml:space="preserve" name="forget_note"><value>هل تريد إزالة هذه النسخة الاحتياطية من القائمة؟ ستبقى ملفاتها محفوظة على الجهاز.</value></data>
+  <data xml:space="preserve" name="hotspot_note"><value>أنشئ نقطة اتصال Wi-Fi مؤقتة لهاتف غير متصل بشبكتك. يتطلب ذلك NetworkManager ومحوّل شبكة يدعم وضع نقطة الاتصال.</value></data>
+  <data xml:space="preserve" name="checking_hardware"><value>جارٍ التحقق من التوفر…</value></data>
+  <data xml:space="preserve" name="hotspot_ready"><value>وضع نقطة الاتصال متاح</value></data>
+  <data xml:space="preserve" name="hotspot_active"><value>نقطة اتصال HopDrop نشطة</value></data>
+  <data xml:space="preserve" name="hotspot_start"><value>تشغيل نقطة الاتصال</value></data>
+  <data xml:space="preserve" name="hotspot_stop"><value>إيقاف نقطة الاتصال</value></data>
+  <data xml:space="preserve" name="hotspot_stopped"><value>توقفت نقطة الاتصال</value></data>
+  <data xml:space="preserve" name="hotspot_disconnect"><value>قد يؤدي تشغيل نقطة الاتصال على هذا المحوّل إلى قطع اتصال Wi-Fi الحالي. هل تريد المتابعة؟</value></data>
+  <data xml:space="preserve" name="hotspot_confirm"><value>هل تريد تشغيل نقطة اتصال HopDrop مؤقتة؟ امسح رمز الاقتران بهاتفك للاتصال بها.</value></data>
+  <data xml:space="preserve" name="radio_unavailable"><value>لا تتوفر الأجهزة اللاسلكية أو خدمة النظام المطلوبة. تحقّق من NetworkManager لاتصال Wi-Fi، أو من BlueZ وخدمة OBEX لاتصال Bluetooth.</value></data>
+  <data xml:space="preserve" name="bluetooth_send"><value>إرسال الملفات عبر Bluetooth</value></data>
+  <data xml:space="preserve" name="bluetooth_receive"><value>فتح مستقبل Bluetooth في النظام</value></data>
+  <data xml:space="preserve" name="bluetooth_note"><value>يستخدم أجهزة Bluetooth المقترنة بالنظام. لا يُسجّل التسليم إلا بعد تأكيد BlueZ له. يتولى Blueman استقبال ملفات Bluetooth عبر واجهة النظام، ولا يمكن إضافتها إلى سجل نشاط HopDrop.</value></data>
+  <data xml:space="preserve" name="bluetooth_receive_note"><value>وافق على استقبال الملفات في واجهة Blueman التابعة للنظام. لا يستطيع HopDrop تأكيد اكتمال هذه العمليات أو إضافتها إلى سجل نشاطه.</value></data>
+  <data xml:space="preserve" name="bluetooth_receive_unavailable"><value>يلزم محوّل Bluetooth قيد التشغيل وخدمة BlueZ OBEX وتطبيق Blueman مع تفعيل إضافة نقل الملفات.</value></data>
+  <data xml:space="preserve" name="bluetooth_files_only"><value>حدّد ملفًا واحدًا أو أكثر أولًا. لا يحافظ Bluetooth على بنية المجلدات؛ استخدم الشبكة المحلية أو نقطة الاتصال لإرسال المجلدات.</value></data>
+  <data xml:space="preserve" name="bluetooth_pair_first"><value>أقرن الجهاز المستلم من إعدادات Bluetooth في النظام أولًا.</value></data>
+  <data xml:space="preserve" name="bluetooth_choose"><value>اختر جهاز Bluetooth مقترنًا</value></data>
+  <data xml:space="preserve" name="bluetooth_unconfirmed"><value>تعذّر تأكيد التسليم. تحقّق من الجهاز المستلم قبل إعادة المحاولة.</value></data>
+  <data xml:space="preserve" name="bluetooth_failed"><value>تعذّر تسليم الملف عبر Bluetooth. تحقّق من الاقتران وموافقة المستلم وخدمة Bluetooth في النظام.</value></data>
+  <data xml:space="preserve" name="updates"><value>التحديثات</value></data>
+  <data xml:space="preserve" name="updates_note"><value>تُثبّت تحديثات Linux من حزمة جديدة. افتح صفحة الإصدارات للتحقق من النسخ المتاحة.</value></data>
+  <data xml:space="preserve" name="release_page"><value>فتح صفحة الإصدارات</value></data>
+  <data xml:space="preserve" name="open_link"><value>فتح الرابط</value></data>
+  <data xml:space="preserve" name="transfer_stats"><value>الملف {0} من {1} · {2} كيبيبايت/ثانية</value></data>
+  <data xml:space="preserve" name="details"><value>التفاصيل</value></data>
+</root>

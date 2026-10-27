@@ -34,7 +34,7 @@ public partial class App
     private void AttachPeer(HopDropPeer peer)
     {
         _bluetooth = new BluetoothWizard(() => peer.ReceiveDirectory, files => Dispatcher.InvokeAsync(() => OnBluetoothReceived(files)),
-            message => Dispatcher.InvokeAsync(() => Platform.Notify("Bluetooth", message)));
+            message => Dispatcher.InvokeAsync(() => Platform.Notify(L.T("Bluetooth"), message)));
         peer.IncomingPairing += request => Dispatcher.InvokeAsync(async () => (await EnsureWindowAsync()).OnIncomingPairing(request));
         peer.OfferReceived += offer => Dispatcher.InvokeAsync(() => OnOffer(offer));
         peer.PairedDevicesChanged += list => Dispatcher.InvokeAsync(() => { _pairedDevices = list.ToList(); Link.SetPairedPhones(list); WindowInstance?.OnPairedChanged(list); });
@@ -63,7 +63,7 @@ public partial class App
         Updates.Activity();
         UpdateTrayText();
         if (WindowInstance is not null) WindowInstance.OnTransferFinished(r);
-        else Platform.TransferToast(r, r.PeerName.Length > 0 ? r.PeerName : "a device", _peer?.ReceiveDirectory);
+        else Platform.TransferToast(r, r.PeerName.Length > 0 ? r.PeerName : L.T("ADevice"), _peer?.ReceiveDirectory);
     }
     private async void OnTextReceived(TextMessage message)
     {
@@ -96,7 +96,7 @@ public partial class App
     {
         if (_bluetooth is null) return;
         _bluetooth.Receive();
-        Platform.Notify("Waiting for Bluetooth files", $"Send from your phone with Bluetooth and pick this PC. Files are saved in {_peer?.ReceiveFolderLabel}.");
+        Platform.Notify(L.T("WaitingForBluetoothFiles"), L.T("SendFromYourPhoneWithBluetoothAndPickThisPCFilesAreSavedIn0", _peer?.ReceiveFolderLabel));
     }
     private async void OnBluetoothReceived(IReadOnlyList<string> files)
     {
@@ -140,27 +140,27 @@ public partial class App
         bool keepsReceiving = Preferences.BackgroundReceive;
         var items = new List<TrayMenu.Item>
         {
-            new("Open HopDrop", SymbolRegular.Open24, () => _ = OpenAsync([])),
-            new("Send files…", SymbolRegular.Send24, () => _ = OpenAsync(["--page", "send", "--browse"])),
-            new("Pair a phone", SymbolRegular.QrCode24, () => _ = OpenAsync(["--page", "devices"])),
+            new(L.T("OpenHopDrop"), SymbolRegular.Open24, () => _ = OpenAsync([])),
+            new(L.T("SendFiles_4f967e3b"), SymbolRegular.Send24, () => _ = OpenAsync(["--page", "send", "--browse"])),
+            new(L.T("PairAPhone"), SymbolRegular.QrCode24, () => _ = OpenAsync(["--page", "devices"])),
             ClipboardTrayItem(),
             new("", default, () => { }, Separator: true),
-            new("Receive via Bluetooth", SymbolRegular.Bluetooth24, ReceiveBluetooth),
-            new("Send via Bluetooth", SymbolRegular.BluetoothConnected24, BluetoothWizard.Send),
+            new(L.T("ReceiveViaBluetooth"), SymbolRegular.Bluetooth24, ReceiveBluetooth),
+            new(L.T("SendViaBluetooth"), SymbolRegular.BluetoothConnected24, BluetoothWizard.Send),
             new("", default, () => { }, Separator: true),
         };
-        if (keepsReceiving) items.Add(new("Close HopDrop (keep receiving)", SymbolRegular.Dismiss24, () => Quit(true)));
-        items.Add(new(keepsReceiving ? "Quit and stop receiving" : "Quit HopDrop", SymbolRegular.Power24, () => Quit(false)));
+        if (keepsReceiving) items.Add(new(L.T("CloseHopDropKeepReceiving"), SymbolRegular.Dismiss24, () => Quit(true)));
+        items.Add(new(keepsReceiving ? L.T("QuitAndStopReceiving") : L.T("QuitHopDrop"), SymbolRegular.Power24, () => Quit(false)));
         return items;
     }
     private TrayMenu.Item ClipboardTrayItem()
     {
         var device = _pairedDevices.FirstOrDefault(d => d.Id == Preferences.LastDevice) ?? _pairedDevices.FirstOrDefault();
-        return new(device is null ? "Send clipboard" : "Send clipboard to " + (device.Alias ?? device.Name), SymbolRegular.Copy24, async () =>
+        return new(device is null ? L.T("SendClipboard") : L.T("SendClipboardTo") + (device.Alias ?? device.Name), SymbolRegular.Copy24, async () =>
         {
             string? text = ClipboardShare.ReadText();
-            if (string.IsNullOrEmpty(text)) { Platform.Notify("Clipboard is empty", "Copy some text and try again."); return; }
-            if (device is null) { Platform.Notify("No paired devices", "Pair a device first."); return; }
+            if (string.IsNullOrEmpty(text)) { Platform.Notify(L.T("ClipboardIsEmpty"), L.T("CopySomeTextAndTryAgain")); return; }
+            if (device is null) { Platform.Notify(L.T("NoPairedDevices"), L.T("PairADeviceFirst")); return; }
             try { await Queue.SendTextAsync(device.Id, text, true); } catch (Exception ex) { Debug.WriteLine(ex); }
         });
     }
@@ -178,8 +178,8 @@ public partial class App
     private string TrayStatus()
     {
         var moving = _active.Values.Where(p => !p.WaitingForApproval).ToList();
-        return moving.Count == 0 ? "Ready to receive"
-            : string.Join(" · ", moving.Select(p => $"{(p.Incoming ? "Receiving" : "Sending")} {(p.Percent < 0 ? "" : p.Percent + "% ")}{(p.Incoming ? "from" : "to")} {p.PeerName}"));
+        return moving.Count == 0 ? L.T("ReadyToReceive")
+            : string.Join(" · ", moving.Select(p => L.T(p.Incoming ? "TrayReceiving" : "TraySending", p.PeerName, p.Percent < 0 ? "" : p.Percent + "%")));
     }
 
     // ---- Window ----
@@ -234,7 +234,7 @@ public partial class App
             if (!Preferences.BackgroundNoticeShown)
             {
                 Preferences.BackgroundNoticeShown = true;
-                Platform.Notify("HopDrop is still receiving", "Phones can keep sending to this PC. To stop, open HopDrop and use Settings or Quit in the tray menu.");
+                Platform.Notify(L.T("HopDropIsStillReceiving"), L.T("PhonesCanKeepSendingToThisPCToStopOpenHopDropAndUseSettingsOrQuit"));
             }
             _ = app.Dispatcher.InvokeAsync(Platform.TrimMemory, DispatcherPriority.ApplicationIdle);
             return;

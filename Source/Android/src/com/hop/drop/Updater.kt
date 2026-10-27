@@ -19,6 +19,7 @@ import java.net.URL
  * Android itself also refuses an update signed with a different key, so a tampered download can't be installed.
  */
 object Updater {
+    class UpdateError(val messageId: Int) : IOException()
     private const val LATEST = "https://api.github.com/repos/Abdallah-Tarek-prog/HopDrop/releases/latest"
     private const val APK = "HopDrop.apk"
     private const val DAY = 24L * 60 * 60 * 1000
@@ -120,11 +121,11 @@ object Updater {
     private fun verify(context: Context, apk: File) {
         val pm = context.packageManager
         val flags = if (Build.VERSION.SDK_INT >= 28) PackageManager.GET_SIGNING_CERTIFICATES else @Suppress("DEPRECATION") PackageManager.GET_SIGNATURES
-        val downloaded = pm.getPackageArchiveInfo(apk.path, flags) ?: throw IOException("The download is not a valid app.")
+        val downloaded = pm.getPackageArchiveInfo(apk.path, flags) ?: throw UpdateError(R.string.update_invalid_app)
         val installed = pm.getPackageInfo(context.packageName, flags)
-        if (downloaded.packageName != context.packageName) throw IOException("The download is a different app.")
-        if (signatures(downloaded) != signatures(installed)) throw IOException("The download isn't signed by HopDrop.")
-        if (versionCode(downloaded) <= versionCode(installed)) throw IOException("The download is not newer than this version.")
+        if (downloaded.packageName != context.packageName) throw UpdateError(R.string.update_wrong_app)
+        if (signatures(downloaded) != signatures(installed)) throw UpdateError(R.string.update_wrong_signature)
+        if (versionCode(downloaded) <= versionCode(installed)) throw UpdateError(R.string.update_not_newer)
     }
 
     @Suppress("DEPRECATION")

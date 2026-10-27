@@ -20,7 +20,13 @@ import java.util.List;
 
 public final class LocalSockets implements Peer.Sockets {
     private final ConnectivityManager manager;
-    public LocalSockets(Context c){manager=c.getSystemService(ConnectivityManager.class);}
+    private final Context context;
+    public LocalSockets(Context c){context=c.getApplicationContext();manager=c.getSystemService(ConnectivityManager.class);}
+    @Override public String transport(InetAddress local){
+        if(local==null||local.isLoopbackAddress())return "unknown";
+        return context instanceof com.hop.drop.HopApp&&((com.hop.drop.HopApp)context).directLink().owns(local)
+                ? "direct_link" : "local_network";
+    }
     private static boolean privateIp(InetAddress a){byte[] b=a.getAddress();if(b.length!=4)return false;int x=b[0]&255,y=b[1]&255;return x==10||x==172&&y>=16&&y<=31||x==192&&y==168||x==169&&y==254;}
     private static boolean subnet(InetAddress target,InetAddress local,int bits){byte[] a=target.getAddress(),b=local.getAddress();if(a.length!=4||b.length!=4)return false;for(int i=0;i<4;i++){int n=Math.min(8,bits-i*8);if(n<=0)break;int mask=255<<(8-n);if(((a[i]^b[i])&mask)!=0)return false;}return true;}
     public Socket connect(String address,int port)throws IOException{

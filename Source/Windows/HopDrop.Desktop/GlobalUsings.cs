@@ -4,3 +4,4 @@ global using Brush = System.Windows.Media.Brush;
 global using Brushes = System.Windows.Media.Brushes;
 global using ProgressBar = System.Windows.Controls.ProgressBar;
 global using Point = System.Windows.Point;
+global using FlowDirection = System.Windows.FlowDirection;

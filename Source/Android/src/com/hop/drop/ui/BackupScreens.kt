@@ -1,5 +1,9 @@
 package com.hop.drop.ui
 
+import com.hop.drop.R
+
+import androidx.compose.ui.res.stringResource
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -61,24 +65,27 @@ import java.util.Date
 import java.util.Locale
 
 private const val ALL = 15
-private val kinds = listOf(1 to "Photos", 2 to "Videos", 4 to "Documents", 8 to "Audio")
+private val kinds = listOf(1 to R.string.ui_photos, 2 to R.string.ui_videos, 4 to R.string.ui_documents, 8 to R.string.ui_audio)
 private fun time(minute: Int) = "%02d:%02d".format(minute / 60, minute % 60)
-private fun last(value: Long) = if (value == 0L) "Never" else DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(value))
+@Composable
+private fun last(value: Long) = if (value == 0L) stringResource(R.string.ui_never) else DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(value))
 
 /** "All files", "Photos", "Photos and videos", or "Photos · Videos · Audio". */
+@Composable
 private fun what(mask: Int): String {
-    if (mask == ALL) return "All files"
-    val names = kinds.filter { (mask and it.first) != 0 }.map { it.second }
+    if (mask == ALL) return stringResource(R.string.ui_all_files)
+    val names = kinds.filter { (mask and it.first) != 0 }.map { stringResource(it.second) }
     return when (names.size) {
         1 -> names[0]
-        2 -> names[0] + " and " + names[1].lowercase(Locale.getDefault())
+        2 -> stringResource(R.string.selection_and, names[0], names[1])
         else -> names.joinToString(" · ")
     }
 }
 
+@Composable
 private fun whenText(b: BackupUi): String {
-    val schedule = if (b.timed) "Between " + time(b.from) + " and " + time(b.to) else "Whenever possible"
-    return if (b.charging) "$schedule · while charging" else schedule
+    val schedule = if (b.timed) stringResource(R.string.backup_between, time(b.from), time(b.to)) else stringResource(R.string.ui_whenever_possible)
+    return if (b.charging) stringResource(R.string.backup_while_charging, schedule) else schedule
 }
 
 /** Settings → Auto-backup: the phone's backups (several folders, each to one device), and one backup's own screen. */
@@ -90,7 +97,7 @@ fun AutoBackupsScreen(state: HopUiState, actions: HopActions, onBack: () -> Unit
     var removing by remember { mutableStateOf(false) }
     var pickTime by remember { mutableStateOf<Int?>(null) }
     BackHandler(enabled = choosingDevice) { choosingDevice = false }
-    val title = if (choosingDevice) "Send to" else selected?.folder ?: "Auto-backup"
+    val title = if (choosingDevice) stringResource(R.string.ui_send_to) else selected?.folder ?: stringResource(R.string.ui_auto_backup)
     fun back() {
         if (choosingDevice) choosingDevice = false
         else if (selected != null) state.backupOpen = null
@@ -99,7 +106,7 @@ fun AutoBackupsScreen(state: HopUiState, actions: HopActions, onBack: () -> Unit
     Scaffold(
         topBar = {
             TopAppBar(title = { Text(title) }, navigationIcon = {
-                IconButton(onClick = ::back) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") }
+                IconButton(onClick = ::back) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.ui_back)) }
             }, colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface))
         },
         containerColor = MaterialTheme.colorScheme.surface,
@@ -114,48 +121,48 @@ fun AutoBackupsScreen(state: HopUiState, actions: HopActions, onBack: () -> Unit
             }
         }
     }
-    if (removing && selected != null) HopModal(onDismissRequest = { removing = false }, paneTitle = "Remove backup?",
-        title = { Text("Remove this backup?") }, text = { Text("The files already backed up stay where they are.") },
+    if (removing && selected != null) HopModal(onDismissRequest = { removing = false }, paneTitle = stringResource(R.string.ui_remove_backup),
+        title = { Text(stringResource(R.string.ui_remove_this_backup)) }, text = { Text(stringResource(R.string.ui_the_files_already_backed_up_stay_where_they_are)) },
         confirmButton = { Button(onClick = { actions.removeBackup(selected.id); removing = false },
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Remove") } },
-        dismissButton = { TextButton(onClick = { removing = false }) { Text("Cancel") } })
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text(stringResource(R.string.ui_remove)) } },
+        dismissButton = { TextButton(onClick = { removing = false }) { Text(stringResource(R.string.ui_cancel)) } })
     if (pickTime != null && selected != null) {
         val which = pickTime!!
         val initial = if (which == 0) selected.from else selected.to
         val picker = rememberTimePickerState(initialHour = initial / 60, initialMinute = initial % 60, is24Hour = true)
-        HopModal(onDismissRequest = { pickTime = null }, paneTitle = if (which == 0) "Start time" else "End time",
-            title = { Text(if (which == 0) "Start time" else "End time") }, text = { TimePicker(state = picker) },
+        HopModal(onDismissRequest = { pickTime = null }, paneTitle = if (which == 0) stringResource(R.string.ui_start_time) else stringResource(R.string.ui_end_time),
+            title = { Text(if (which == 0) stringResource(R.string.ui_start_time) else stringResource(R.string.ui_end_time)) }, text = { TimePicker(state = picker) },
             confirmButton = { Button(onClick = {
                 val value = picker.hour * 60 + picker.minute
                 actions.setBackupWindow(selected.id, true, if (which == 0) value else selected.from, if (which == 1) value else selected.to)
                 pickTime = null
-            }) { Text("Save") } },
-            dismissButton = { TextButton(onClick = { pickTime = null }) { Text("Cancel") } })
+            }) { Text(stringResource(R.string.ui_save)) } },
+            dismissButton = { TextButton(onClick = { pickTime = null }) { Text(stringResource(R.string.ui_cancel)) } })
     }
 }
 
 @Composable
 private fun BackupList(state: HopUiState, actions: HopActions) {
     val backups = state.settings.backups
-    Text("New files in a folder go to one of your devices by themselves, whenever both are on the same Wi-Fi.",
+    Text(stringResource(R.string.ui_new_files_in_a_folder_go_to_one_of_your_devices_by_them),
         style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 12.dp))
-    if (backups.isEmpty()) HopCard { EmptyState(Icons.Rounded.Backup, "No backups yet", "Pick a folder, then the device it goes to.") }
+    if (backups.isEmpty()) HopCard { EmptyState(Icons.Rounded.Backup, stringResource(R.string.ui_no_backups_yet), stringResource(R.string.ui_pick_a_folder_then_the_device_it_goes_to)) }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         for (b in backups) HopCard(onClick = { state.backupOpen = b.id }, padding = PaddingValues(start = 16.dp, top = 14.dp, end = 12.dp, bottom = 14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).padding(end = 12.dp)) {
-                    Text(b.folder ?: "Folder", style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(what(b.kinds) + " to " + (b.device ?: "a device"), style = MaterialTheme.typography.bodyMedium,
+                    Text(b.folder ?: stringResource(R.string.ui_folder), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(stringResource(R.string.backup_to, what(b.kinds), b.device?.let { ltr(it) } ?: stringResource(R.string.a_device)), style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(if (b.on) whenText(b) + (b.status?.let { " · $it" } ?: "") else "Off", style = MaterialTheme.typography.bodySmall,
+                    Text(if (b.on) whenText(b) + (b.status?.let { " · $it" } ?: "") else stringResource(R.string.ui_off), style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(b.on, onCheckedChange = { actions.setBackupOn(b.id, it) })
             }
         }
     }
-    Button(onClick = { actions.chooseBackupFolder() }, modifier = Modifier.fillMaxWidth().padding(top = 16.dp).height(52.dp)) { Text("Add a backup") }
+    Button(onClick = { actions.chooseBackupFolder() }, modifier = Modifier.fillMaxWidth().padding(top = 16.dp).height(52.dp)) { Text(stringResource(R.string.ui_add_a_backup)) }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -165,42 +172,42 @@ private fun BackupEditor(b: BackupUi, actions: HopActions, onDevice: () -> Unit,
     HopCard(padding = PaddingValues(start = 16.dp, top = 12.dp, end = 12.dp, bottom = 12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f).padding(end = 12.dp)) {
-                Text("Back up this folder", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.ui_back_up_this_folder), style = MaterialTheme.typography.titleMedium)
                 val detail = when {
-                    !b.on -> "Off"
-                    b.lastRun == 0L -> (b.status ?: "On") + " · not run yet"
-                    else -> (b.status ?: "On") + " · last run " + last(b.lastRun)
+                    !b.on -> stringResource(R.string.ui_off)
+                    b.lastRun == 0L -> stringResource(R.string.backup_not_run, b.status ?: stringResource(R.string.ui_on))
+                    else -> stringResource(R.string.backup_last_run, b.status ?: stringResource(R.string.ui_on), last(b.lastRun))
                 }
                 Text(detail, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
             }
             Switch(b.on, onCheckedChange = { actions.setBackupOn(b.id, it) })
         }
     }
-    SectionHeader("Folder and device")
+    SectionHeader(stringResource(R.string.ui_folder_and_device))
     HopCard(padding = PaddingValues(vertical = 4.dp)) {
-        PickRow(Icons.Rounded.Folder, "Folder", b.folder ?: "Pick a folder") { actions.chooseBackupFolder(b.id) }
+        PickRow(Icons.Rounded.Folder, stringResource(R.string.ui_folder), b.folder ?: stringResource(R.string.ui_pick_a_folder)) { actions.chooseBackupFolder(b.id) }
         HorizontalDivider(Modifier.padding(start = 56.dp), color = scheme.outlineVariant)
-        PickRow(Icons.Rounded.Devices, "Send to", b.device ?: "Pick a device", onDevice)
+        PickRow(Icons.Rounded.Devices, stringResource(R.string.ui_send_to), b.device ?: stringResource(R.string.ui_pick_a_device), onDevice)
     }
-    SectionHeader("What")
+    SectionHeader(stringResource(R.string.ui_what))
     HopCard {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(selected = b.kinds == ALL, onClick = { actions.setBackupKinds(b.id, ALL) }, label = { Text("All files") })
+            FilterChip(selected = b.kinds == ALL, onClick = { actions.setBackupKinds(b.id, ALL) }, label = { Text(stringResource(R.string.ui_all_files)) })
             for ((bit, name) in kinds) FilterChip(selected = b.kinds != ALL && (b.kinds and bit) != 0, onClick = {
                 val next = if (b.kinds == ALL) bit else b.kinds xor bit
                 actions.setBackupKinds(b.id, if (next == 0) ALL else next)
-            }, label = { Text(name) })
+            }, label = { Text(stringResource(name)) })
         }
     }
-    SectionHeader("When")
+    SectionHeader(stringResource(R.string.ui_when))
     HopCard(padding = PaddingValues(vertical = 4.dp)) {
-        ChoiceRow("Whenever possible", selected = !b.timed) { actions.setBackupWindow(b.id, false, b.from, b.to) }
-        ChoiceRow("Only between", selected = b.timed) {
+        ChoiceRow(stringResource(R.string.ui_whenever_possible), selected = !b.timed) { actions.setBackupWindow(b.id, false, b.from, b.to) }
+        ChoiceRow(stringResource(R.string.ui_only_between), selected = b.timed) {
             actions.setBackupWindow(b.id, true, b.from, if (b.from == b.to) (b.from + 300) % 1440 else b.to)
         }
         if (b.timed) Row(Modifier.padding(start = 56.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedButton(onClick = { onTime(0) }) { Text(time(b.from)) }
-            Text("and", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 10.dp))
+            Text(stringResource(R.string.ui_and), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 10.dp))
             OutlinedButton(onClick = { onTime(1) }) { Text(time(b.to)) }
         }
         HorizontalDivider(Modifier.padding(start = 16.dp), color = scheme.outlineVariant)
@@ -209,14 +216,14 @@ private fun BackupEditor(b: BackupUi, actions: HopActions, onDevice: () -> Unit,
                 .padding(start = 16.dp, end = 12.dp, top = 10.dp, bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Only while charging", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.ui_only_while_charging), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
             Switch(b.charging, onCheckedChange = null)
         }
     }
     Button(onClick = { actions.backupNow(b.id) }, modifier = Modifier.fillMaxWidth().padding(top = 20.dp).height(52.dp)) {
         Icon(Icons.Rounded.Backup, contentDescription = null, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
-        Text("Back up now")
+        Text(stringResource(R.string.ui_back_up_now))
     }
     OutlinedButton(
         onClick = onRemove, colors = ButtonDefaults.outlinedButtonColors(contentColor = scheme.error),
@@ -225,7 +232,7 @@ private fun BackupEditor(b: BackupUi, actions: HopActions, onDevice: () -> Unit,
     ) {
         Icon(Icons.Rounded.DeleteOutline, contentDescription = null, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
-        Text("Remove backup")
+        Text(stringResource(R.string.ui_remove_backup_66))
     }
 }
 
@@ -258,7 +265,7 @@ private fun DevicePicker(devices: List<DeviceUi>, current: String?, onPick: (Str
             Row(verticalAlignment = Alignment.CenterVertically) {
                 DeviceAvatar(d.platform, d.online)
                 Text(d.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
-                if (d.id == current) Icon(Icons.Rounded.Check, contentDescription = "Chosen", tint = MaterialTheme.colorScheme.primary)
+                if (d.id == current) Icon(Icons.Rounded.Check, contentDescription = stringResource(R.string.ui_chosen), tint = MaterialTheme.colorScheme.primary)
             }
         }
     }
@@ -272,42 +279,42 @@ fun ReceivedBackupsScreen(state: HopUiState, actions: HopActions, onBack: () -> 
     val scheme = MaterialTheme.colorScheme
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Backups received") }, navigationIcon = {
-                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") }
+            TopAppBar(title = { Text(stringResource(R.string.ui_backups_received)) }, navigationIcon = {
+                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.ui_back)) }
             }, colors = TopAppBarDefaults.topAppBarColors(containerColor = scheme.surface))
         },
         containerColor = scheme.surface,
     ) { padding ->
         Column(Modifier.padding(padding).verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = 32.dp)) {
-            SectionHeader("Save backups in")
+            SectionHeader(stringResource(R.string.ui_save_backups_in))
             HopCard {
-                Text(state.settings.backupPlace, style = MaterialTheme.typography.bodyLarge)
-                Text("Each device gets its own folder in there.", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                Text(ltr(state.settings.backupPlace), style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(R.string.ui_each_device_gets_its_own_folder_in_there), style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
                 Row(Modifier.padding(top = 8.dp)) {
-                    TextButton(onClick = actions::chooseBackupPlace) { Text("Change") }
-                    if (state.settings.backupPlace != "Download/HopDrop/Backups") TextButton(onClick = actions::resetBackupPlace) { Text("Use default") }
+                    TextButton(onClick = actions::chooseBackupPlace) { Text(stringResource(R.string.ui_change)) }
+                    if (state.settings.backupPlace != "Download/HopDrop/Backups") TextButton(onClick = actions::resetBackupPlace) { Text(stringResource(R.string.ui_use_default)) }
                 }
             }
-            SectionHeader("From your devices")
+            SectionHeader(stringResource(R.string.ui_from_your_devices))
             if (state.settings.receivedBackups.isEmpty()) HopCard {
-                EmptyState(Icons.Rounded.Backup, "No backups received yet", "When another device backs up to this phone, it shows here.")
+                EmptyState(Icons.Rounded.Backup, stringResource(R.string.ui_no_backups_received_yet), stringResource(R.string.ui_when_another_device_backs_up_to_this_phone_it_shows_her))
             }
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 for (b in state.settings.receivedBackups) HopCard(padding = PaddingValues(start = 16.dp, top = 14.dp, end = 8.dp, bottom = 6.dp)) {
                     Text(b.device + " · " + b.folder, style = MaterialTheme.typography.titleMedium)
-                    Text(String.format(Locale.getDefault(), "%,d", b.count) + (if (b.count == 1) " file" else " files") + " · last " + last(b.lastRun),
+                    Text(stringResource(R.string.backup_last, filesText(b.count), last(b.lastRun)),
                         style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
-                    Text(b.place + "/" + FileNames.sanitize(b.device) + "/" + FileNames.sanitize(b.folder), style = MaterialTheme.typography.bodySmall,
+                    Text(ltr(b.place + "/" + FileNames.sanitize(b.device) + "/" + FileNames.sanitize(b.folder)), style = MaterialTheme.typography.bodySmall,
                         color = scheme.onSurfaceVariant)
-                    TextButton(onClick = { forgetting = b }, modifier = Modifier.align(Alignment.End)) { Text("Forget") }
+                    TextButton(onClick = { forgetting = b }, modifier = Modifier.align(Alignment.End)) { Text(stringResource(R.string.ui_forget)) }
                 }
             }
         }
     }
     forgetting?.let { entry ->
-        HopModal(onDismissRequest = { forgetting = null }, paneTitle = "Forget this backup?",
-            title = { Text("Forget this backup?") }, text = { Text("It leaves this list. Its files stay where they are.") },
-            confirmButton = { Button(onClick = { actions.forgetReceivedBackup(entry.id, entry.folder, entry.location); forgetting = null }) { Text("Forget") } },
-            dismissButton = { TextButton(onClick = { forgetting = null }) { Text("Cancel") } })
+        HopModal(onDismissRequest = { forgetting = null }, paneTitle = stringResource(R.string.ui_forget_this_backup),
+            title = { Text(stringResource(R.string.ui_forget_this_backup)) }, text = { Text(stringResource(R.string.ui_it_leaves_this_list_its_files_stay_where_they_are)) },
+            confirmButton = { Button(onClick = { actions.forgetReceivedBackup(entry.id, entry.folder, entry.location); forgetting = null }) { Text(stringResource(R.string.ui_forget)) } },
+            dismissButton = { TextButton(onClick = { forgetting = null }) { Text(stringResource(R.string.ui_cancel)) } })
     }
 }

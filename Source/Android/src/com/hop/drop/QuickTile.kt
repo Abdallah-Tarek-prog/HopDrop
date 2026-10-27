@@ -17,7 +17,7 @@ class QuickTile : TileService() {
         val devices = (application as HopApp).book().all()
         tile.state = if (devices.isEmpty()) Tile.STATE_UNAVAILABLE else Tile.STATE_INACTIVE
         tile.label = "HopDrop"
-        if (Build.VERSION.SDK_INT >= 29) tile.subtitle = if (devices.isEmpty()) "Pair a device first" else "Quick send"
+        if (Build.VERSION.SDK_INT >= 29) tile.subtitle = Language.text(this, if (devices.isEmpty()) R.string.quick_pair_tile else R.string.quick_send)
         tile.icon = Icon.createWithResource(this, R.drawable.ic_notification)
         tile.updateTile()
     }

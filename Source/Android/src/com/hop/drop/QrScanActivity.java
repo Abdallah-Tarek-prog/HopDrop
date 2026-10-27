@@ -80,6 +80,7 @@ import java.util.Map;
  * from a laptop screen to focus; a tap focuses on that spot.
  */
 public final class QrScanActivity extends Activity implements TextureView.SurfaceTextureListener {
+    @Override protected void attachBaseContext(Context base) { super.attachBaseContext(Language.wrap(base)); }
     private static final int CAMERA_PERMISSION = 71;
     /** Largest analysed frame: enough detail for a dense code on a small laptop screen, small enough to decode fast. */
     private static final int MAX_WIDTH = 1920, MAX_HEIGHT = 1080;
@@ -147,12 +148,12 @@ public final class QrScanActivity extends Activity implements TextureView.Surfac
         top.setGravity(Gravity.CENTER_VERTICAL);
         ImageView close = new ImageView(this);
         close.setImageResource(R.drawable.ic_action_remove);
-        close.setContentDescription("Close");
+        close.setContentDescription(getString(R.string.scan_close));
         close.setPadding(dp(12), dp(12), dp(12), dp(12));
         close.setBackground(pill(0x66000000));
         close.setOnClickListener(view -> finish());
         top.addView(close, new LinearLayout.LayoutParams(dp(48), dp(48)));
-        TextView title = text("Scan the QR code", 19, true);
+        TextView title = text(getString(R.string.scan_title), 19, true);
         title.setPadding(dp(14), 0, 0, 0);
         top.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
         root.addView(top, new FrameLayout.LayoutParams(-1, -2, Gravity.TOP));
@@ -165,7 +166,7 @@ public final class QrScanActivity extends Activity implements TextureView.Surfac
         zoomChip.setMinWidth(dp(64));
         zoomChip.setPadding(dp(16), dp(9), dp(16), dp(9));
         zoomChip.setBackground(pill(0x80000000));
-        zoomChip.setContentDescription("Zoom");
+        zoomChip.setContentDescription(getString(R.string.scan_zoom));
         zoomChip.setVisibility(View.GONE);
         zoomChip.setOnClickListener(view -> toggleZoom());
         bottom.addView(zoomChip, new LinearLayout.LayoutParams(-2, -2));
@@ -174,9 +175,9 @@ public final class QrScanActivity extends Activity implements TextureView.Surfac
         LinearLayout.LayoutParams messageParams = new LinearLayout.LayoutParams(-1, -2);
         messageParams.topMargin = dp(16);
         bottom.addView(message, messageParams);
-        addLink(bottom, "Show my code", "show_qr");
-        addLink(bottom, "Compare numbers instead", "fallback");
-        addLink(bottom, "Enter an address", "address");
+        addLink(bottom, getString(R.string.scan_show_code), "show_qr");
+        addLink(bottom, getString(R.string.scan_compare), "fallback");
+        addLink(bottom, getString(R.string.scan_enter_address), "address");
         root.addView(bottom, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
 
         permissionPanel = permissionPanel();
@@ -337,14 +338,14 @@ public final class QrScanActivity extends Activity implements TextureView.Surfac
                         opening = false;
                         if (camera == device) camera = null;
                         if (resumed) say(error == ERROR_CAMERA_IN_USE || error == ERROR_MAX_CAMERAS_IN_USE
-                                ? "Another app is using the camera. Close it, then come back here."
-                                : "The camera stopped. Close this screen and try again.", true);
+                                ? getString(R.string.scan_camera_busy)
+                                : getString(R.string.scan_camera_stopped), true);
                     });
                 }
             }, cameraHandler);
         } catch (CameraAccessException | SecurityException | IllegalStateException | IllegalArgumentException error) {
             opening = false;
-            say("The camera couldn't start. Check that HopDrop may use the camera.", true);
+            say(getString(R.string.scan_camera_permission_error), true);
         }
     }
 
@@ -425,11 +426,11 @@ public final class QrScanActivity extends Activity implements TextureView.Surfac
 
                 @Override
                 public void onConfigureFailed(CameraCaptureSession failed) {
-                    main.post(() -> say("The camera couldn't start. Close this screen and try again.", true));
+                    main.post(() -> say(getString(R.string.scan_camera_start_error), true));
                 }
             }, cameraHandler);
         } catch (CameraAccessException | IllegalStateException | IllegalArgumentException error) {
-            say("The camera couldn't start. Close this screen and try again.", true);
+            say(getString(R.string.scan_camera_start_error), true);
         }
     }
 
@@ -689,7 +690,7 @@ public final class QrScanActivity extends Activity implements TextureView.Surfac
             long now = SystemClock.elapsedRealtime();
             if (now - lastWrongCode > 3000) {
                 lastWrongCode = now;
-                main.post(() -> say("That's not a HopDrop pairing code.", true));
+                main.post(() -> say(getString(R.string.scan_wrong_code), true));
             }
             return;
         }
@@ -699,7 +700,7 @@ public final class QrScanActivity extends Activity implements TextureView.Surfac
             long now = SystemClock.elapsedRealtime();
             if (now - lastWrongCode > 3000) {
                 lastWrongCode = now;
-                main.post(() -> say("This code is from another HopDrop version. Update both devices.", true));
+                main.post(() -> say(getString(R.string.scan_wrong_version), true));
             }
             return;
         }
@@ -719,7 +720,7 @@ public final class QrScanActivity extends Activity implements TextureView.Surfac
         overlay.success(shown);
         overlay.performHapticFeedback(Build.VERSION.SDK_INT >= 30 ? HapticFeedbackConstants.CONFIRM
                 : HapticFeedbackConstants.VIRTUAL_KEY);
-        say("Code found", false);
+        say(getString(R.string.scan_found), false);
         main.postDelayed(() -> {
             setResult(RESULT_OK, new Intent().putExtra("uri", uri));
             finish();
@@ -752,11 +753,11 @@ public final class QrScanActivity extends Activity implements TextureView.Surfac
         background.setColor(0xF2141A25);
         background.setCornerRadius(dp(24));
         panel.setBackground(background);
-        panel.addView(text("Allow the camera", 20, true));
-        TextView body = text("HopDrop uses the camera only to read the pairing code. Nothing is recorded or saved.", 15, false);
+        panel.addView(text(getString(R.string.scan_allow_title), 20, true));
+        TextView body = text(getString(R.string.scan_allow_body), 15, false);
         body.setPadding(0, dp(8), 0, dp(18));
         panel.addView(body);
-        TextView allow = text("Allow camera", 16, true);
+        TextView allow = text(getString(R.string.scan_allow_button), 16, true);
         allow.setGravity(Gravity.CENTER);
         allow.setPadding(dp(20), dp(13), dp(20), dp(13));
         allow.setBackground(pill(getColor(R.color.brand)));
@@ -770,12 +771,12 @@ public final class QrScanActivity extends Activity implements TextureView.Surfac
                     startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                             Uri.parse("package:" + getPackageName())));
                 } catch (RuntimeException error) {
-                    say("Allow the camera for HopDrop in the phone's settings.", true);
+                    say(getString(R.string.scan_allow_settings), true);
                 }
             }
         });
         panel.addView(allow, new LinearLayout.LayoutParams(-1, -2));
-        TextView cancel = text("Not now", 15, true);
+        TextView cancel = text(getString(R.string.scan_not_now), 15, true);
         cancel.setGravity(Gravity.CENTER);
         cancel.setPadding(dp(20), dp(12), dp(20), dp(4));
         cancel.setOnClickListener(view -> finish());
@@ -832,7 +833,7 @@ public final class QrScanActivity extends Activity implements TextureView.Surfac
             hit.setStyle(Paint.Style.STROKE);
             hit.setStrokeWidth(dp(4));
             hit.setColor(0xFF34D399);
-            setContentDescription("Camera preview. Tap to focus, pinch to zoom.");
+            setContentDescription(getString(R.string.scan_preview_description));
         }
 
         @Override

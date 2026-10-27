@@ -28,7 +28,7 @@ object Shortcuts {
             val sorted = devices.sortedByDescending { it.lastSeen }.take((max - 1).coerceAtLeast(0))
             val shortcuts = mutableListOf<ShortcutInfoCompat>()
             if (devices.isNotEmpty()) shortcuts += ShortcutInfoCompat.Builder(context, "clipboard")
-                .setShortLabel("Send clipboard")
+                .setShortLabel(Language.text(context, R.string.send_clipboard))
                 .setIcon(icon(context, R.drawable.ic_glyph_clipboard))
                 .setIntent(Intent(context, QuickSendActivity::class.java).setAction(Intent.ACTION_VIEW).putExtra("clipboard", true))
                 .setRank(0)
@@ -36,7 +36,7 @@ object Shortcuts {
             shortcuts += sorted.mapIndexed { rank, d ->
                 ShortcutInfoCompat.Builder(context, PREFIX + d.id)
                     .setShortLabel(d.label())
-                    .setLongLabel("Send to " + d.label())
+                    .setLongLabel(Language.text(context, R.string.send_to_count, Language.ltr(context, d.label())))
                     .setIcon(icon(context, if (d.platform == "android") R.drawable.ic_glyph_phone else R.drawable.ic_glyph_laptop))
                     .setIntent(Intent(context, MainActivity::class.java).setAction(Intent.ACTION_VIEW).putExtra("device", d.id))
                     .setCategories(setOf(SHARE_TARGET))

@@ -39,7 +39,7 @@ internal static class Updates
     public static void Start()
     {
         if (!Installed || _timer is not null) return;
-        if (Manager?.UpdatePendingRestart is { } pending) { ReadyVersion = pending.Version.ToString(); Status = $"Version {ReadyVersion} is ready."; }
+        if (Manager?.UpdatePendingRestart is { } pending) { ReadyVersion = pending.Version.ToString(); Status = L.T("Version0IsReady", ReadyVersion); }
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(1) };
         _timer.Tick += async (_, _) => { _timer.Interval = CheckEvery; await CheckAsync(false); };
         _timer.Start();
@@ -57,19 +57,19 @@ internal static class Updates
         _checking = true;
         try
         {
-            if (manual) { Status = "Checking for updates…"; Changed?.Invoke(); }
+            if (manual) { Status = L.T("CheckingForUpdates"); Changed?.Invoke(); }
             var update = await manager.CheckForUpdatesAsync();
-            if (update is null) { if (manual) Status = "HopDrop is up to date."; return; }
-            Status = $"Downloading version {update.TargetFullRelease.Version}…"; Changed?.Invoke();
+            if (update is null) { if (manual) Status = L.T("HopDropIsUpToDate"); return; }
+            Status = L.T("DownloadingVersion0", update.TargetFullRelease.Version); Changed?.Invoke();
             await manager.DownloadUpdatesAsync(update);
             ReadyVersion = update.TargetFullRelease.Version.ToString();
-            Status = $"Version {ReadyVersion} is ready.";
-            Platform.Notify("HopDrop update ready", $"Version {ReadyVersion} installs the next time HopDrop restarts, or now from Settings.");
+            Status = L.T("Version0IsReady", ReadyVersion);
+            Platform.Notify(L.T("HopDropUpdateReady"), L.T("Version0InstallsTheNextTimeHopDropRestartsOrNowFromSettings", ReadyVersion));
         }
         catch (Exception e)
         {
             Debug.WriteLine(e);
-            if (manual) Status = "Couldn't check for updates. Check the internet connection and try again.";
+            if (manual) Status = L.T("CouldnTCheckForUpdatesCheckTheInternetConnectionAndTryAgain");
         }
         finally { _checking = false; Changed?.Invoke(); }
     }

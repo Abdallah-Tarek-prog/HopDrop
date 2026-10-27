@@ -19,7 +19,7 @@ internal sealed class DirectLink : IDisposable
     private int _generation, _pollGeneration;
     private HashSet<string> _upBefore = [];
     private string _ssid = "", _key = "";
-    private const string CannotCreate = "This PC's Wi-Fi can't create a direct link";
+    private static string CannotCreate => L.T("ThisPCSWiFiCanTCreateADirectLink");
     private System.Windows.Threading.DispatcherTimer? _retry;
     private int _failures;
     public DirectLinkState State { get; private set; } = DirectLinkState.Waiting;
@@ -107,7 +107,7 @@ internal sealed class DirectLink : IDisposable
     }
     private static IEnumerable<(string Adapter, IPAddress Address)> DirectAddresses() => NetworkInterface.GetAllNetworkInterfaces()
         .Where(n => n.OperationalStatus == OperationalStatus.Up &&
-            (n.Description.Contains("Wi-Fi Direct", StringComparison.OrdinalIgnoreCase) || n.Name.Contains("Wi-Fi Direct", StringComparison.OrdinalIgnoreCase)))
+            (n.Description.Contains(L.T("WiFiDirect"), StringComparison.OrdinalIgnoreCase) || n.Name.Contains(L.T("WiFiDirect"), StringComparison.OrdinalIgnoreCase)))
         .SelectMany(n => n.GetIPProperties().UnicastAddresses.Select(a => (Adapter: n.Id, a.Address)))
         .Where(a => a.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork && !IPAddress.IsLoopback(a.Address) && NetworkAddresses.IsPrivateOrLoopback(a.Address));
     private void StatusChanged(WiFiDirectAdvertisementPublisher sender, WiFiDirectAdvertisementPublisherStatusChangedEventArgs args)
@@ -123,8 +123,8 @@ internal sealed class DirectLink : IDisposable
                 // Windows' Mobile hotspot takes Wi-Fi Direct for itself; phones can join that hotspot instead.
                 Fail(args.Error switch
                 {
-                    WiFiDirectError.RadioNotAvailable => "Wi-Fi is off",
-                    WiFiDirectError.ResourceInUse => "Mobile hotspot (or another app) is using this PC's Wi-Fi Direct",
+                    WiFiDirectError.RadioNotAvailable => L.T("WiFiIsOff"),
+                    WiFiDirectError.ResourceInUse => L.T("MobileHotspotOrAnotherAppIsUsingThisPCSWiFiDirect"),
                     _ => CannotCreate,
                 });
             }

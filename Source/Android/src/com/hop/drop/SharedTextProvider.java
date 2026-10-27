@@ -27,7 +27,7 @@ public final class SharedTextProvider extends ContentProvider {
             return target;}
         if(n==null||!n.matches("[0-9a-f-]{36}\\.txt"))throw new FileNotFoundException("Invalid shared text");return new File(new File(getContext().getCacheDir(),"shared"),n);}
     public boolean onCreate(){return true;}
-    public Cursor query(Uri uri,String[] projection,String selection,String[] args,String order){try{File f=file(uri);MatrixCursor c=new MatrixCursor(new String[]{OpenableColumns.DISPLAY_NAME,OpenableColumns.SIZE});String name=uri.getQueryParameter("name");c.addRow(new Object[]{name==null?"Shared text.txt":com.hop.drop.core.FileNames.sanitize(name),f.length()});return c;}catch(Exception e){return null;}}
+    public Cursor query(Uri uri,String[] projection,String selection,String[] args,String order){try{File f=file(uri);MatrixCursor c=new MatrixCursor(new String[]{OpenableColumns.DISPLAY_NAME,OpenableColumns.SIZE});String name=uri.getQueryParameter("name");c.addRow(new Object[]{name==null?Language.text(getContext(),R.string.shared_text_name):com.hop.drop.core.FileNames.sanitize(name),f.length()});return c;}catch(Exception e){return null;}}
     public String getType(Uri uri){String guessed=java.net.URLConnection.guessContentTypeFromName(uri.getLastPathSegment());return guessed==null?"application/octet-stream":guessed;}
     public ParcelFileDescriptor openFile(Uri uri,String mode)throws FileNotFoundException{if(!"r".equals(mode))throw new FileNotFoundException("Read only");return ParcelFileDescriptor.open(file(uri),ParcelFileDescriptor.MODE_READ_ONLY);}
     public Uri insert(Uri uri,ContentValues values){throw new UnsupportedOperationException();}
