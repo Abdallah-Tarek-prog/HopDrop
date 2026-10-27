@@ -4,11 +4,21 @@ HopDrop's separate Linux desktop app uses Avalonia 12, .NET 10, the shared trans
 
 ## Install or run
 
+On the **Mint computer**, open Files, go to the folder containing the downloaded installer, right-click an empty area and choose **Open in Terminal**. Run:
+
 ```bash
 sudo apt install ./hopdrop_1.3.0-linux-preview.1_amd64.deb
 ```
 
-Launch **HopDrop** from the application menu. The package installs in `/opt/hopdrop`. For a portable run, extract `out/hopdrop-linux-x64-1.3.0-linux-preview.1.tar.gz` and run `./run-hopdrop`. The window, tray, launcher and sidebar use the Windows app's logo. Settings → Appearance offers Dark, Light and Follow system. Dark mode uses the Windows app's orange accent, charcoal surfaces, text and border colors.
+After installation, launch **HopDrop** from Mint's application menu. Alternatively, press **Ctrl+Alt+T** and run this from **any folder**, without `sudo`:
+
+```bash
+/opt/hopdrop/HopDrop.Linux
+```
+
+The installer places the app in `/opt/hopdrop`; the full launch path means no `cd` is needed. For a portable run, extract `out/hopdrop-linux-x64-1.3.0-linux-preview.1.tar.gz` into a dedicated folder, open a terminal **inside that extracted folder**, and run `./run-hopdrop` without `sudo`. Keep the extracted files together. See [detailed install, launch and compatibility explanations](RELEASE_NOTES.md).
+
+The window, tray, launcher and sidebar use the Windows app's logo. Settings → Appearance offers Dark, Light and Follow system. Dark mode uses the Windows app's orange accent, charcoal surfaces, text and border colors.
 
 The package declares native .NET and desktop libraries. Portable users need the same libraries listed in `build.sh`, including OpenSSL, ICU, X11/XWayland, ICE/SM and Fontconfig. `xdg-open` opens files and links; `notify-send` sends desktop notifications. A tray needs StatusNotifierItem/AppIndicator support. Test those desktop integrations on Mint.
 
