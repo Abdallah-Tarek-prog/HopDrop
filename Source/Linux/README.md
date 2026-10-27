@@ -5,7 +5,7 @@ HopDrop's separate Linux desktop app uses Avalonia 12, .NET 10, the shared trans
 ## Install or run
 
 ```bash
-sudo apt install ./hopdrop_1.3.0~linux-preview.1_amd64.deb
+sudo apt install ./hopdrop_1.3.0-linux-preview.1_amd64.deb
 ```
 
 Launch **HopDrop** from the application menu. The package installs in `/opt/hopdrop`. For a portable run, extract `out/hopdrop-linux-x64-1.3.0-linux-preview.1.tar.gz` and run `./run-hopdrop`. The window, tray, launcher and sidebar use the Windows app's logo. Settings → Appearance offers Dark, Light and Follow system. Dark mode uses the Windows app's orange accent, charcoal surfaces, text and border colors.

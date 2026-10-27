@@ -4,10 +4,10 @@ A 64-bit Linux desktop test build for trying HopDrop on Linux Mint. Download the
 
 ## Install on Mint
 
-Download `hopdrop_1.3.0~linux-preview.1_amd64.deb`, open a terminal in the download folder, and run:
+Download `hopdrop_1.3.0-linux-preview.1_amd64.deb`, open a terminal in the download folder, and run:
 
 ```bash
-sudo apt install ./hopdrop_1.3.0~linux-preview.1_amd64.deb
+sudo apt install ./hopdrop_1.3.0-linux-preview.1_amd64.deb
 ```
 
 Open **HopDrop** from the application menu. For the portable build, extract the archive and run `./run-hopdrop`. Do not run HopDrop itself with `sudo`.

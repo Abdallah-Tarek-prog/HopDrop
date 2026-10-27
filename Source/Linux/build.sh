@@ -45,5 +45,6 @@ Description: Local file and text transfers with HopDrop
  A desktop peer for sending and receiving files, folders, and text on a
  private local network or an existing hotspot.
 EOF
-dpkg-deb --build --root-owner-group "$stage" "$out/hopdrop_${deb_version}_amd64.deb"
-echo "Created $out/hopdrop-linux-x64-$version.tar.gz and $out/hopdrop_${deb_version}_amd64.deb"
+# GitHub normalizes '~' in asset names, so keep the download name SemVer-safe.
+dpkg-deb --build --root-owner-group "$stage" "$out/hopdrop_${version}_amd64.deb"
+echo "Created $out/hopdrop-linux-x64-$version.tar.gz and $out/hopdrop_${version}_amd64.deb"
